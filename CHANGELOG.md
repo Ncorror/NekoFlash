@@ -1,5 +1,14 @@
 # История изменений NekoFlash
 
+## V6.0.0-alpha5 development baseline — `6.0.0-alpha5-dev-nekoflash` (`217`)
+
+- Зафиксирован воспроизводимый Termux workflow: bootstrap, safe publish и CI collection scripts теперь входят в source tree.
+- `termux-ci.sh` ждёт `status=completed`, затем скачивает logs/artifacts; сетевой обрыв больше не трактуется как CI failure.
+- Добавлена точка входа `docs/AI_START_HERE.md` для нового чата без дублирования живого статуса.
+- Добавлен подробный `docs/RECOVERY_FIRST_PLAN.md` с slices, safety-инвариантами и acceptance criteria alpha5.
+- Tracker переведён на Recovery-first milestone и содержит последний maintainer-confirmed green alpha4 CI evidence.
+- Функциональная реализация Recovery-first Quick Flash в этом baseline ещё не объявлена завершённой.
+
 ## V6.0.0-alpha4 — `6.0.0-alpha4-nekoflash` (`216`)
 
 - Исправлена Android compilation regression после scope cleanup: восстановлены transient-модели `PendingUnlockVerification` и `PendingSideloadVerification`.

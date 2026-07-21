@@ -2,10 +2,13 @@
 
 Канонические документы не должны дублировать статус. Текущие задачи и следующий шаг находятся только в `PROJECT_MASTER_TRACKER.md`.
 
+- [Старт для нового чата](AI_START_HERE.md)
 - [Описание проекта](../README.md)
 - [Единый трекер](../PROJECT_MASTER_TRACKER.md)
 - [V6 changelog](../CHANGELOG.md)
 - [Сборка](../BUILDING.md)
+- [Termux workflow](TERMUX_WORKFLOW.md)
+- [Recovery-first план](RECOVERY_FIRST_PLAN.md)
 - [Границы продукта](SCOPE.md)
 - [Архитектура](ARCHITECTURE.md)
 - [Safety model](SAFETY_MODEL.md)

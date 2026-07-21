@@ -56,6 +56,18 @@
     "docs/V6_AUDIT.md": {
       "role": "Результат source cleanup audit",
       "update_when": "Проводится новый полный cleanup audit"
+    },
+    "docs/AI_START_HERE.md": {
+      "role": "Точка входа для нового чата и порядок чтения канонических документов",
+      "update_when": "Меняется структура контекста, safety-инварианты или порядок продолжения работы"
+    },
+    "docs/TERMUX_WORKFLOW.md": {
+      "role": "Воспроизводимый Termux workflow для публикации, CI, логов и artifacts",
+      "update_when": "Меняются Termux scripts, GitHub Actions или пути результатов"
+    },
+    "docs/RECOVERY_FIRST_PLAN.md": {
+      "role": "Дизайн и acceptance criteria текущего Recovery-first Quick Flash milestone",
+      "update_when": "Меняется scope, архитектурный slice или safety policy Quick Flash"
     }
   },
   "generated_artifacts": {

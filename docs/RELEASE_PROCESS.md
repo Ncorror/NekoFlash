@@ -31,7 +31,7 @@ bash scripts/run-tests.sh
 - smoke instrumentation для верхней панели, Home info и четырёх переходов;
 - отсутствие compile warnings/errors, связанных с удалёнными V6 components.
 
-Недоступный Gradle/SDK — `CI_REQUIRED`, не PASS.
+Недоступный Gradle/SDK — `CI_REQUIRED`, не PASS. Из Termux используется `scripts/termux-ci.sh`; он определяет результат по `status`/`conclusion` и скачивает logs/artifacts только после завершения run.
 
 ## 4. Hardware gates
 
@@ -41,11 +41,15 @@ bash scripts/run-tests.sh
 
 Release требует production keystore, проверки certificate fingerprint, R8/lintVital и установки подписанного APK поверх предыдущего релиза, когда это предусмотрено signing continuity.
 
-## 6. Публикация
+## 6. Публикация и tag
 
 - обновить versionName/versionCode;
 - обновить tracker/changelog;
 - пересоздать `SHA256SUMS`;
-- получить CI PASS;
+- получить CI PASS для точного commit SHA;
+- сравнить `headSha` run с commit, который будет tagged;
+- создать annotated tag только после green CI;
 - приложить APK, source ZIP и checksum;
 - не публиковать raw device logs.
+
+Development baseline с суффиксом `-dev` не получает release tag. Termux-команды описаны в [`TERMUX_WORKFLOW.md`](TERMUX_WORKFLOW.md).

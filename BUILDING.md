@@ -21,7 +21,7 @@ python3 scripts/check-diagnostic-logging.py
 bash scripts/run-tests.sh
 ```
 
-Ожидаемый pure/JVM результат alpha3: `ALL TESTS PASSED (19 module(s))`.
+Ожидаемый pure/JVM результат текущей baseline: `ALL TESTS PASSED (19 module(s))`.
 
 ## Android
 
@@ -31,9 +31,44 @@ bash scripts/run-tests.sh
 
 Локальная ошибка загрузки Gradle, DNS или SDK означает `CI_REQUIRED`, а не успешную Android-сборку.
 
+## Termux
+
+Подготовка чистой установки:
+
+```bash
+bash scripts/termux-bootstrap.sh
+```
+
+Публикация проверенного дерева:
+
+```bash
+bash scripts/termux-publish.sh "Описание изменения"
+```
+
+Запуск CI с автоматическим сбором artifacts/logs:
+
+```bash
+bash scripts/termux-ci.sh
+```
+
+Сбор уже существующего run:
+
+```bash
+bash scripts/termux-ci.sh --run-id RUN_ID
+```
+
+Контекст для нового чата:
+
+```bash
+bash scripts/export-chat-context.sh
+```
+
+Подробности: [`docs/TERMUX_WORKFLOW.md`](docs/TERMUX_WORKFLOW.md).
+
 ## Артефакты
 
 - Debug APK используется только для разработки и аппаратных проверок.
 - Release APK считается релизным только после проверки signing identity, R8/lintVital и hardware gates.
+- Termux сохраняет результаты в `Download/NekoFlash-CI-<RUN_ID>/` и ZIP рядом.
 - Generated logs не добавляются в source integrity inventory.
 - Raw hardware logs с идентификаторами устройства не коммитятся; в репозитории хранится только sanitised summary.

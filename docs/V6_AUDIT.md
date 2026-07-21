@@ -38,9 +38,9 @@ Compilation hotfix: `V6.0.0-alpha4`
 - bounded/sanitised logs и reports menu;
 - 19 тестовых модулей, каждый связан с активной функцией или её минимальной safety boundary.
 
-## Не подтверждено локально
+## Подтверждение Android compile hotfix
 
-Android lint/compile/assemble требуют доступного Gradle/SDK или GitHub Actions. Аппаратные verdicts требуют нового V6 retest. Эти статусы нельзя заменять результатами pure/JVM guards.
+Alpha4 получила maintainer-confirmed green GitHub Actions run `29832274659` для commit `90871fb`. Это подтверждает Android lint/debug/release для hotfix, но не заменяет аппаратные verdicts. Hardware scenarios по-прежнему требуют нового V6 retest.
 ## Исправление после первого Android CI
 
 Первый CI run `29829689137` подтвердил static checks и матрицу 19/19, но остановился на `:app:compileDebugKotlin`: после cleanup отсутствовали две private transient-модели, которые используются проверкой Mi Unlock и ADB Sideload. В alpha4 восстановлены только `PendingUnlockVerification` и `PendingSideloadVerification`; удалённый Mi Flash и legacy-подсистемы не возвращались. В `check_project.py` добавлен постоянный regression guard для обеих моделей и их полей.

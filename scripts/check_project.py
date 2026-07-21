@@ -285,8 +285,8 @@ def check_versions() -> None:
     if int(code.group(1)) < 31:
         fail("versionCode must be >= 31 for NekoFlash rebrand")
     version_name = name.group(1)
-    if not re.fullmatch(r"\d+\.\d+\.\d+(?:-alpha\d+)?-nekoflash", version_name):
-        fail("versionName must match x.y.z[-alphaN]-nekoflash")
+    if not re.fullmatch(r"\d+\.\d+\.\d+(?:-alpha\d+(?:-dev)?)?-nekoflash", version_name):
+        fail("versionName must match x.y.z[-alphaN[-dev]]-nekoflash")
     build_id = re.search(r'buildConfigField\s+"String",\s+"BUILD_ID",\s+"\\"([^+]+)\+', build)
     if not build_id or build_id.group(1) != version_name:
         fail("BuildConfig BUILD_ID prefix must match versionName")
@@ -868,8 +868,11 @@ def check_master_tracker_presence() -> None:
     text = path.read_text(encoding="utf-8")
     for token in (
         "## Текущий следующий шаг",
+        "docs/AI_START_HERE.md",
+        "docs/RECOVERY_FIRST_PLAN.md",
         "docs/SAFETY_MODEL.md",
         "scripts/check-documentation.py",
+        "scripts/termux-ci.sh",
         "archive/full-miflash-v5.9.17",
         "TOPBAR-001",
     ):
@@ -942,18 +945,75 @@ def check_mi_account_and_share_hardening() -> None:
         if not re.search(rf"^{re.escape(module)}\t", tests_manifest, re.M):
             fail(f"Mi Account/share/console test module missing from manifest: {module}")
 
-    publisher = ROOT / "scripts/termux-publish-both-branches.sh"
-    if not publisher.is_file():
-        fail("Missing Termux dual-branch publisher")
-    else:
-        text = publisher.read_text(encoding="utf-8")
-        for token in ("git push --atomic", 'MAIN_BRANCH="main"', 'REFACTOR_BRANCH="claude-ai-refactor"', "git commit-tree"):
-            if token not in text:
-                fail(f"Termux publisher missing token: {token}")
-
     if not ERRORS:
         print("Mi Account/share/console hardening: OK")
 
+
+
+def check_termux_workflow() -> None:
+    required = {
+        "scripts/termux-bootstrap.sh": (
+            "pkg install -y",
+            "termux-setup-storage",
+            "gh auth login",
+        ),
+        "scripts/termux-publish.sh": (
+            'TARGET_BRANCH="${NEKOFLASH_BRANCH:-$CURRENT_BRANCH}"',
+            'git pull --ff-only origin "$TARGET_BRANCH"',
+            "scripts/update-checksums.py",
+            "scripts/check-documentation.py",
+            "scripts/run-tests.sh",
+            'git push -u origin "$TARGET_BRANCH"',
+            "REMOTE_SHA",
+        ),
+        "scripts/termux-ci.sh": (
+            "--run-id",
+            "status,conclusion,url,headSha",
+            'if [ "$RUN_STATUS" != "completed" ]',
+            "gh run download",
+            "compiler-errors.log",
+            'RESULT_NAME="NekoFlash-CI-$RUN_ID"',
+        ),
+        "scripts/export-chat-context.sh": (
+            "PROJECT_MASTER_TRACKER.md",
+            "RECOVERY_FIRST_PLAN.md",
+            "NekoFlash-chat-context.txt",
+        ),
+        "docs/AI_START_HERE.md": (
+            "PROJECT_MASTER_TRACKER.md",
+            "RECOVERY_FIRST_PLAN.md",
+            "TERMUX_WORKFLOW.md",
+        ),
+        "docs/TERMUX_WORKFLOW.md": (
+            "scripts/termux-bootstrap.sh",
+            "scripts/termux-publish.sh",
+            "scripts/termux-ci.sh",
+            "scripts/export-chat-context.sh",
+            "status=completed",
+        ),
+        "docs/RECOVERY_FIRST_PLAN.md": (
+            "QuickFlashTarget",
+            "QuickFlashPlan",
+            "fail-closed",
+            "TOPBAR-001",
+        ),
+    }
+    for rel, tokens in required.items():
+        path = ROOT / rel
+        if not path.is_file():
+            fail(f"Missing repository continuity file: {rel}")
+            continue
+        text = path.read_text(encoding="utf-8")
+        for token in tokens:
+            if token not in text:
+                fail(f"Repository continuity token missing in {rel}: {token}")
+
+    obsolete = ROOT / "scripts/termux-publish-both-branches.sh"
+    if obsolete.exists():
+        fail("Obsolete dual-branch Termux publisher must not return")
+
+    if not ERRORS:
+        print("Termux workflow and new-chat continuity: OK")
 
 def check_flash_operation_draft_state() -> None:
     draft = ROOT / "app/src/main/java/ru/forum/adbfastboottool/FlashOperationDraft.kt"
@@ -1040,6 +1100,7 @@ def check_v6_scope_reset() -> None:
         "validation/journal.jsonl",
         "scripts/build-journal.py",
         "scripts/test_build_journal.py",
+        "scripts/termux-publish-both-branches.sh",
     )
     for rel in removed_legacy_paths:
         if (ROOT / rel).exists():
@@ -1150,6 +1211,7 @@ def main() -> int:
     check_reports_access()
     check_private_reports()
     check_mi_account_and_share_hardening()
+    check_termux_workflow()
     check_flash_operation_draft_state()
     check_v6_scope_reset()
     check_device_viewmodel_api_refs()
