@@ -367,18 +367,15 @@ class MainActivity : AppCompatActivity() {
         findViewById<View>(R.id.btnFlashRebootMode).setOnClickListener { showRebootMenu() }
         // Тонкая кнопка терминала над плитками Fastboot.
         findViewById<View>(R.id.btnFastbootTerminal).setOnClickListener { switchTab("console") }
-        findViewById<View>(R.id.btnFastbootDataSelfTest).setOnClickListener { showFastbootDataSelfTestDialog() }
-        findViewById<View>(R.id.btnFastbootDataSharedStorageProbe).setOnClickListener {
-            showFastbootSharedStorageProbeDialog()
+        findViewById<View>(R.id.btnFastbootDataSelfTest).setOnClickListener {
+            openFastbootDiagnosticAction(getString(R.string.layout_fastboot_data_self_test_button)) {
+                showFastbootDataSelfTestDialog()
+            }
         }
-        findViewById<View>(R.id.btnFastbootDataQualifyImage).setOnClickListener {
-            showFastbootDataQualificationFileSelector()
-        }
-        findViewById<View>(R.id.btnFastbootDataAutoMatrix).setOnClickListener {
-            showFastbootAutoMatrixDialog()
-        }
-        findViewById<View>(R.id.btnFastbootDataContentProbe).setOnClickListener {
-            showFastbootContentProbeFileSelector()
+        findViewById<View>(R.id.btnFastbootDataAdvanced).setOnClickListener {
+            openFastbootDiagnosticAction(getString(R.string.layout_fastboot_data_advanced_button)) {
+                showFastbootAdvancedDiagnosticsDialog()
+            }
         }
         findViewById<View>(R.id.btnConsoleTerminal).setOnClickListener { switchTab("console") }
         findViewById<View>(R.id.btnTerminalMinimize).setOnClickListener { minimizeTerminal() }
@@ -1659,7 +1656,12 @@ class MainActivity : AppCompatActivity() {
     private fun registerMiLoginLauncher() {
         miLoginLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             if (result.resultCode != Activity.RESULT_OK) {
-                viewModel.log("Вход в Mi-аккаунт отменён")
+                val reason = result.data?.getStringExtra(MiLoginActivity.EXTRA_LOGIN_ERROR)?.trim().orEmpty()
+                if (reason.isBlank()) {
+                    viewModel.log("Вход в Mi-аккаунт отменён пользователем")
+                } else {
+                    viewModel.log("❌ Вход в Mi-аккаунт не завершён: $reason")
+                }
                 return@registerForActivityResult
             }
             val passToken = result.data?.getStringExtra("passToken")
@@ -1694,6 +1696,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startMiLogin() {
+        viewModel.log("🔑 Открыта официальная страница входа Xiaomi для unlockApi")
         miLoginLauncher.launch(Intent(this, MiLoginActivity::class.java))
     }
 
@@ -1951,6 +1954,39 @@ class MainActivity : AppCompatActivity() {
         FastbootProtocol.DataTransportMode.NATIVE_USBFS_PIPELINE_128K,
         FastbootProtocol.DataTransportMode.NATIVE_USBFS_PIPELINE_256K
     )
+
+    private fun openFastbootDiagnosticAction(label: String, action: () -> Unit) {
+        viewModel.log("Fastboot DATA: нажато «$label»")
+        if (viewModel.fastbootProtocol == null) {
+            val message = getString(R.string.fastboot_data_no_device)
+            viewModel.log("⚠️ Fastboot DATA: $message")
+            Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+            return
+        }
+        action()
+    }
+
+    private fun showFastbootAdvancedDiagnosticsDialog() {
+        val labels = arrayOf(
+            getString(R.string.layout_fastboot_data_shared_probe_button),
+            getString(R.string.layout_fastboot_data_qualify_image_button),
+            getString(R.string.layout_fastboot_data_auto_matrix_button),
+            getString(R.string.layout_fastboot_data_content_probe_button)
+        )
+        MaterialAlertDialogBuilder(this)
+            .setTitle(getString(R.string.fastboot_data_advanced_title))
+            .setItems(labels) { _, which ->
+                viewModel.log("Fastboot DATA: выбран расширенный тест «${labels[which]}»")
+                when (which) {
+                    0 -> showFastbootSharedStorageProbeDialog()
+                    1 -> showFastbootDataQualificationFileSelector()
+                    2 -> showFastbootAutoMatrixDialog()
+                    3 -> showFastbootContentProbeFileSelector()
+                }
+            }
+            .setNegativeButton(getString(R.string.cancel_upper), null)
+            .show()
+    }
 
     private fun showFastbootAutoMatrixDialog() {
         val product = viewModel.fastbootProtocol?.compatibilityProduct?.trim().orEmpty().ifBlank { "unknown" }

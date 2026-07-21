@@ -1453,6 +1453,75 @@ def check_v6_scope_reset() -> None:
     if not ERRORS:
         print("V6 scope/audit cleanup, TOPBAR-001, HOMEINFO-001 and HOMEACTIONS-001: OK")
 
+
+def check_alpha5_hardware_polish() -> None:
+    welcome = ROOT / "app/src/main/res/layout/activity_welcome.xml"
+    welcome_activity = ROOT / "app/src/main/java/ru/forum/adbfastboottool/WelcomeActivity.kt"
+    layout = ROOT / "app/src/main/res/layout/activity_main.xml"
+    main = ROOT / "app/src/main/java/ru/forum/adbfastboottool/MainActivity.kt"
+    policy = ROOT / "app/src/main/java/ru/forum/adbfastboottool/MiAccountSecurityPolicy.kt"
+    login = ROOT / "app/src/main/java/ru/forum/adbfastboottool/MiLoginActivity.kt"
+
+    required = (welcome, welcome_activity, layout, main, policy, login)
+    for path in required:
+        if not path.is_file():
+            fail(f"Missing alpha5 hardware polish file: {path.relative_to(ROOT)}")
+            return
+
+    welcome_text = welcome.read_text(encoding="utf-8")
+    welcome_activity_text = welcome_activity.read_text(encoding="utf-8")
+    layout_text = layout.read_text(encoding="utf-8")
+    main_text = main.read_text(encoding="utf-8")
+    policy_text = policy.read_text(encoding="utf-8")
+    login_text = login.read_text(encoding="utf-8")
+
+    for token in ('@+id/tvStorageChip', '@+id/tvNotificationsChip', '@+id/tvBatteryChip', '@+id/riskRow'):
+        if token not in welcome_text:
+            fail(f"Welcome compact action token missing: {token}")
+    if '@+id/btnBatterySettings' in welcome_text or 'btnBatterySettings' in welcome_activity_text:
+        fail("Welcome must not restore a separate battery settings button")
+    for token in (
+        'tvStorageChip.setOnClickListener { openStoragePermissionSettings() }',
+        'tvNotificationsChip.setOnClickListener { requestNotificationPermissionOrSettings() }',
+        'tvBatteryChip.setOnClickListener { openBatteryOptimizationSettings() }',
+        'R.id.riskRow).setOnClickListener',
+    ):
+        if token not in welcome_activity_text:
+            fail(f"Welcome clickable status binding missing: {token}")
+
+    if 'sideload_memo_icon' in layout_text or 'sideload_memo_text' in layout_text:
+        fail("Sideload yellow memo card must remain removed")
+    for token in ('@+id/btnSideloadImport', '@+id/btnSideloadCheckArchive', '@drawable/ic_nf_verify'):
+        if token not in layout_text:
+            fail(f"Sideload compact action token missing: {token}")
+
+    for token in ('@+id/btnFastbootDataSelfTest', '@+id/btnFastbootDataAdvanced'):
+        if token not in layout_text:
+            fail(f"Fastboot DATA compact UI token missing: {token}")
+    for obsolete in (
+        '@+id/btnFastbootDataSharedStorageProbe',
+        '@+id/btnFastbootDataQualifyImage',
+        '@+id/btnFastbootDataAutoMatrix',
+        '@+id/btnFastbootDataContentProbe',
+    ):
+        if obsolete in layout_text:
+            fail(f"Advanced Fastboot DATA action returned to the main card: {obsolete}")
+    for token in ('openFastbootDiagnosticAction', 'showFastbootAdvancedDiagnosticsDialog', 'Fastboot DATA: нажато'):
+        if token not in main_text:
+            fail(f"Fastboot DATA logging/collapse token missing: {token}")
+
+    for token in ('UNLOCK_CALLBACK_HOST = "unlock.update.miui.com"', 'UNLOCK_CALLBACK_PATH = "/sts"', 'isOfficialUnlockCallbackUrl'):
+        if token not in policy_text:
+            fail(f"Mi Unlock callback policy token missing: {token}")
+    for token in ('handleOfficialCompletion', 'EXTRA_LOGIN_ERROR', 'mi_login_missing_cookies', 'mi_login_retry'):
+        if token not in login_text:
+            fail(f"Mi Login observable callback token missing: {token}")
+    if 'getStringExtra(MiLoginActivity.EXTRA_LOGIN_ERROR)' not in main_text:
+        fail("MainActivity must preserve the concrete Mi Login cancellation reason")
+
+    if not ERRORS:
+        print("alpha5 hardware polish and Mi Login callback guard: OK")
+
 def main() -> int:
     check_master_tracker_presence()
     check_xml_files()
@@ -1476,6 +1545,7 @@ def main() -> int:
     check_reports_access()
     check_private_reports()
     check_mi_account_and_share_hardening()
+    check_alpha5_hardware_polish()
     check_termux_workflow()
     check_quick_flash_plan_slice()
     check_quick_flash_topology_slice()

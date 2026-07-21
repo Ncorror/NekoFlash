@@ -191,18 +191,15 @@ This writes images to bootloader partitions. Review model, slot, and file names 
     <!-- Onboarding -->
     <string name="onboarding_subtitle">Прошивальщик Android через USB Host</string>
     <string name="onboarding_bg_desc">Фоновое изображение запуска</string>
-    <string name="onboarding_grant_button">Дать доступ к файлам</string>
+    <string name="onboarding_grant_button">Настроить доступ</string>
     <string name="perm_storage">Доступ к файлам</string>
     <string name="perm_notifications">Уведомления</string>
     <string name="perm_battery_opt">Игнор оптимизации батареи</string>
-    <string name="onboarding_ready_short">Все готово для входа</string>
-    <string name="onboarding_ready_battery_recommended">Можно войти. Ограничение батареи лучше отключить</string>
+    <string name="onboarding_ready_short">Готово к входу</string>
     <string name="onboarding_need_storage_short">Нужен доступ к файлам</string>
-    <string name="onboarding_ready_notifications_optional">Можно войти. Уведомления необязательны</string>
-    <string name="onboarding_agree_text_short">Я понимаю риски прошивки</string>
-    <string name="onboarding_enter_button">Войти в NekoFlash</string>
-    <string name="onboarding_battery_settings_button">Открыть настройки батареи</string>
-    <string name="onboarding_miui_hint_short">На MIUI переход может не открыться автоматически.</string>
+    <string name="onboarding_agree_text_short">Подтверждаю риски прошивки</string>
+    <string name="onboarding_enter_button">Продолжить</string>
+    <string name="onboarding_confirm_risk_short">Подтвердите риски прошивки</string>
     <string name="onboarding_confirm_risk_first">Сначала отметьте согласие с рисками прошивки.</string>
     <string name="onboarding_miui_battery_fallback_toast">Если MIUI не открыла батарею: Настройки → Приложения → NekoFlash → Батарея → Без ограничений.</string>
     <string name="onboarding_gate_save_failed">Не удалось сохранить подтверждение онбординга. Повторите вход.</string>
@@ -411,8 +408,6 @@ Use at your own risk. Flashing can brick a device.</string>
     <string name="layout_icon_settings_tab">⚙
 Настр.</string>
     <string name="layout_flash_reboot_mode">Reboot</string>
-    <string name="sideload_memo_text">To flash: first import the file into the app folder via the Import file button, then select the .zip for Sideload. On the device, enter Recovery → Apply update → Apply from ADB.</string>
-    <string name="sideload_memo_icon">💡</string>
     <string name="slot_hint_ab_device">🔁 A/B-capable device detected (slot-count=2). Choose Active, A, B, or Both; NekoFlash will verify the concrete partition target before writing.</string>
     <string name="slot_hint_single_device">📱 Single-slot device confirmed (slot-count=1, no A/B). The both-slots option is hidden — just use the regular flash button.</string>
     <string name="slot_hint_runtime_topology">🧭 Slot-count does not prove A/B. NekoFlash will verify has-slot and partition-size before writing. If a single-slot base partition is confirmed, it will flash the base target without A/B selection.</string>
@@ -470,6 +465,9 @@ Transport: %3$s
 
 No partition is selected. No write command will be sent. The test stops after the final response to the DATA phase. Native USBFS is diagnostic-only.</string>
     <string name="fastboot_data_self_test_run">Run test</string>
+    <string name="layout_fastboot_data_advanced_button">Advanced tests</string>
+    <string name="fastboot_data_advanced_title">Advanced Fastboot DATA diagnostics</string>
+    <string name="fastboot_data_no_device">No Fastboot device is connected. Connect a device and try again.</string>
     <string name="layout_fastboot_data_shared_probe_button">Run internal-staging DATA probe</string>
     <string name="fastboot_data_shared_probe_dialog_title">Internal-staging DATA probe</string>
     <string name="fastboot_data_shared_probe_confirm_title">Confirm internal-staging download-only probe</string>
@@ -511,6 +509,9 @@ The app will create private diagnostic prefix files from the selected .img and t
     <string name="mi_login_network_error">The Xiaomi Account page could not be loaded.</string>
     <string name="mi_login_ssl_error">Login was stopped because the Xiaomi Account TLS certificate could not be verified.</string>
     <string name="mi_login_webview_error">The secure login component stopped unexpectedly. Please try again.</string>
+    <string name="mi_login_retry">Try again</string>
+    <string name="mi_login_missing_cookies">Xiaomi completed the sign-in, but the required unlockApi session cookies were not returned. Try again or sign out of Xiaomi Account in the browser first.</string>
+    <string name="mi_login_cancelled_by_user">Login was cancelled by the user.</string>
 
     <string name="home_open_workspace">Open folder</string>
     <string name="home_copy_workspace">Copy path</string>

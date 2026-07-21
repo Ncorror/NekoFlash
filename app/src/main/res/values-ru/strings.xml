@@ -191,18 +191,15 @@ ADB:
     <!-- Onboarding -->
     <string name="onboarding_subtitle">Прошивальщик Android через USB Host</string>
     <string name="onboarding_bg_desc">Фоновое изображение запуска</string>
-    <string name="onboarding_grant_button">Дать доступ к файлам</string>
+    <string name="onboarding_grant_button">Настроить доступ</string>
     <string name="perm_storage">Доступ к файлам</string>
     <string name="perm_notifications">Уведомления</string>
     <string name="perm_battery_opt">Игнор оптимизации батареи</string>
-    <string name="onboarding_ready_short">Все готово для входа</string>
-    <string name="onboarding_ready_battery_recommended">Можно войти. Ограничение батареи лучше отключить</string>
+    <string name="onboarding_ready_short">Готово к входу</string>
     <string name="onboarding_need_storage_short">Нужен доступ к файлам</string>
-    <string name="onboarding_ready_notifications_optional">Можно войти. Уведомления необязательны</string>
-    <string name="onboarding_agree_text_short">Я понимаю риски прошивки</string>
-    <string name="onboarding_enter_button">Войти в NekoFlash</string>
-    <string name="onboarding_battery_settings_button">Открыть настройки батареи</string>
-    <string name="onboarding_miui_hint_short">На MIUI переход может не открыться автоматически.</string>
+    <string name="onboarding_agree_text_short">Подтверждаю риски прошивки</string>
+    <string name="onboarding_enter_button">Продолжить</string>
+    <string name="onboarding_confirm_risk_short">Подтвердите риски прошивки</string>
     <string name="onboarding_confirm_risk_first">Сначала отметьте согласие с рисками прошивки.</string>
     <string name="onboarding_miui_battery_fallback_toast">Если MIUI не открыла батарею: Настройки → Приложения → NekoFlash → Батарея → Без ограничений.</string>
     <string name="onboarding_gate_save_failed">Не удалось сохранить подтверждение онбординга. Повторите вход.</string>
@@ -318,8 +315,8 @@ Fingerprint плана: %10$s
     <string name="layout_clear">✕ Очистить</string>
     <string name="layout_adb_sideload_title">ADB SIDELOAD</string>
     <string name="layout_sideload_recovery_hint">Recovery → Apply update → Apply from ADB</string>
-    <string name="layout_choose_zip_sideload">▶  Выбрать .zip для Sideload</string>
-    <string name="layout_sideload_hash_note">Перед отправкой приложение проверит SHA-256/MD5 если .sha256 или .md5 лежит рядом с архивом.</string>
+    <string name="layout_choose_zip_sideload">Выбрать ZIP для Sideload</string>
+    <string name="layout_sideload_hash_note">SHA-256/MD5 проверится автоматически, если файл контрольной суммы лежит рядом.</string>
     <string name="layout_console_title">CONSOLE</string>
     <string name="layout_icon_up">▲</string>
     <string name="layout_icon_down">▼</string>
@@ -382,7 +379,7 @@ Fingerprint плана: %10$s
     <string name="terminal_clear">Очистить</string>
     <string name="layout_fastboot_terminal">Открыть терминал</string>
     <string name="layout_sideload_import">Импорт файла</string>
-    <string name="layout_sideload_check_archive">🔍 Проверить архив</string>
+    <string name="layout_sideload_check_archive">Проверить ZIP</string>
     <string name="flash_choose_target_button">Выбрать цель</string>
     <string name="flash_target_selector_title">Куда прошить %1$s</string>
     <string name="flash_target_active">Активный слот (%1$s)</string>
@@ -411,8 +408,6 @@ Fingerprint плана: %10$s
     <string name="layout_icon_settings_tab">⚙
 Настр.</string>
     <string name="layout_flash_reboot_mode">Reboot</string>
-    <string name="sideload_memo_text">Чтобы прошить: сначала импортируйте файл в папку приложения кнопкой «Импорт файла», затем выберите .zip для Sideload. На устройстве войдите в Recovery → Apply update → Apply from ADB.</string>
-    <string name="sideload_memo_icon">💡</string>
     <string name="slot_hint_ab_device">🔁 Обнаружено A/B-устройство (slot-count=2). Выберите активный слот, A, B или оба; NekoFlash проверит конкретный раздел перед записью.</string>
     <string name="slot_hint_single_device">📱 Подтверждено: устройство с одним слотом (slot-count=1, без A/B). Кнопка «оба слота» скрыта — используйте обычную прошивку.</string>
     <string name="slot_hint_runtime_topology">🧭 Slot-count не сообщает A/B. NekoFlash проверит has-slot и partition-size перед записью. Если подтвердится однослотовый раздел, прошивка пойдёт прямо в base target без выбора A/B.</string>
@@ -448,8 +443,8 @@ Unlock</string>
     <string name="safety_high_risk_pro_only">High Risk доступен только в профиле Профи. Сначала переключитесь в Профи, затем отдельно разблокируйте High Risk.</string>
     <string name="safety_not_pro_toast">Для этого действия нужен профиль Профи и соответствующий уровень безопасности.</string>
     <string name="terminal_minimize">Свернуть</string>
-    <string name="layout_fastboot_data_self_test_title">FASTBOOT DATA SELF-TEST</string>
-    <string name="layout_fastboot_data_self_test_desc">Безопасный download-only тест транспорта. Раздел не выбирается, команды flash, boot, stage и update-super не отправляются.</string>
+    <string name="layout_fastboot_data_self_test_title">ПРОВЕРКА FASTBOOT DATA</string>
+    <string name="layout_fastboot_data_self_test_desc">Проверка передачи Fastboot DATA без записи разделов. Дополнительная диагностика скрыта отдельно.</string>
     <string name="layout_fastboot_data_qualify_image_button">Проверить размер выбранного .img</string>
     <string name="fastboot_data_qualify_transport_title">DATA-квалификация точного размера</string>
     <string name="fastboot_data_qualify_confirm_title">Подтвердите download-only квалификацию точного размера</string>
@@ -460,7 +455,7 @@ Unlock</string>
 
 Выбранный файл сначала копируется в private internal staging, проходит fsync и сверку SHA-256. Во временный download-буфер Fastboot отправляется только проверенная staged-копия. Раздел не выбирается, команды flash, boot, stage и update-super не отправляются. Квалификация привязана к точному SHA-256, транспорту и текущей USB-сессии. Native USBFS работает только в диагностическом режиме и не разрешает реальную прошивку.</string>
     <string name="fastboot_data_qualify_run">Запустить точный тест</string>
-    <string name="layout_fastboot_data_self_test_button">Запустить безопасный DATA self-test</string>
+    <string name="layout_fastboot_data_self_test_button">Проверить Fastboot DATA</string>
     <string name="fastboot_data_self_test_dialog_title">Безопасный Fastboot DATA Self-Test</string>
     <string name="fastboot_data_self_test_option">%1$s · %2$s</string>
     <string name="fastboot_data_self_test_confirm_title">Подтвердите download-only тест</string>
@@ -470,6 +465,9 @@ Unlock</string>
 
 Раздел не выбирается. Команда записи не будет отправлена. Тест останавливается после финального ответа DATA-фазы. Native USBFS работает только в диагностическом режиме.</string>
     <string name="fastboot_data_self_test_run">Запустить тест</string>
+    <string name="layout_fastboot_data_advanced_button">Дополнительные тесты</string>
+    <string name="fastboot_data_advanced_title">Расширенная диагностика Fastboot DATA</string>
+    <string name="fastboot_data_no_device">Fastboot-устройство не подключено. Подключите устройство и повторите.</string>
     <string name="layout_fastboot_data_shared_probe_button">Тест DATA через internal staging</string>
     <string name="fastboot_data_shared_probe_dialog_title">DATA-тест через internal staging</string>
     <string name="fastboot_data_shared_probe_confirm_title">Подтвердите download-only тест internal staging</string>
@@ -511,6 +509,9 @@ Unlock</string>
     <string name="mi_login_network_error">Не удалось загрузить страницу Mi Аккаунта.</string>
     <string name="mi_login_ssl_error">Вход остановлен: не удалось проверить TLS-сертификат Mi Аккаунта.</string>
     <string name="mi_login_webview_error">Компонент безопасного входа неожиданно остановился. Повторите попытку.</string>
+    <string name="mi_login_retry">Повторить вход</string>
+    <string name="mi_login_missing_cookies">Xiaomi завершила вход, но не вернула обязательные cookies сессии unlockApi. Повторите вход или сначала выйдите из Mi Аккаунта в браузере.</string>
+    <string name="mi_login_cancelled_by_user">Вход отменён пользователем.</string>
 
     <string name="home_open_workspace">Открыть папку</string>
     <string name="home_copy_workspace">Копировать путь</string>

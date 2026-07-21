@@ -64,9 +64,9 @@ Recovery стал главным target, остальные primary targets пр
 
 Добавлен pure `QuickFlashMutationGate` с одноразовым confirmation ticket. Перед execution повторно проверяются structural plan, transport session, Expert/read-only gates, image URI/size/SHA-256 и exact concrete candidate из текущего inventory. `DeviceViewModel.runConfirmedQuickFlash` использует существующий verified staging lifecycle и вызывает `FastbootProtocol.flashPartitionDetailed` ровно один раз; retry и mutation loop отсутствуют, а протокольный `FastbootMutationSafety` остаётся обязательным.
 
-### Slice E — evidence
+### Slice E — evidence (`DONE_CI`, hardware pending)
 
-Добавить pure tests, static guards, Android lint/assemble и аппаратный retest на восстанавливаемом устройстве.
+Pure tests, static guards и Android lint/assemble подтверждены CI. Первый Android smoke test открыл отдельный UX/login polish gate, описанный в `ALPHA5_HARDWARE_POLISH_PLAN.md`; аппаратный Terminal/Sideload/Quick Flash retest остаётся незавершённым.
 
 ## Evidence Slice E
 
@@ -90,5 +90,6 @@ GitHub Actions run `29855091700` завершился `success` для PR head `
 2. Slice B с inventory/slot regression tests — `DONE_CODE`.
 3. Slice C без изменения protected Home components — `DONE_CODE`.
 4. Slice D и end-to-end policy tests — `DONE_CODE`.
-5. Slice E: Android CI — следующий шаг.
-6. Sanitised hardware validation.
+5. Slice E: Android CI — `DONE_CI` для baseline до smoke-polish.
+6. Alpha5 hardware polish, повторный Android CI и sanitised login/UI retest.
+7. Sanitised Terminal/Sideload/Quick Flash hardware validation.

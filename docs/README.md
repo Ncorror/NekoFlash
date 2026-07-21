@@ -9,6 +9,7 @@
 - [Сборка](../BUILDING.md)
 - [Termux workflow](TERMUX_WORKFLOW.md)
 - [Recovery-first план](RECOVERY_FIRST_PLAN.md)
+- [Alpha5 hardware polish](ALPHA5_HARDWARE_POLISH_PLAN.md)
 - [Границы продукта](SCOPE.md)
 - [Архитектура](ARCHITECTURE.md)
 - [Safety model](SAFETY_MODEL.md)

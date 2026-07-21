@@ -16,6 +16,8 @@ import java.util.Locale
  */
 object MiAccountSecurityPolicy {
     private const val ACCOUNT_ROOT = "account.xiaomi.com"
+    private const val UNLOCK_CALLBACK_HOST = "unlock.update.miui.com"
+    private const val UNLOCK_CALLBACK_PATH = "/sts"
     private val cookieNamePattern = Regex("^[!#$%&'*+.^_`|~0-9A-Za-z-]+$")
 
     fun normalizeHost(raw: String?): String? {
@@ -40,6 +42,17 @@ object MiAccountSecurityPolicy {
         if (url.port != -1 && url.port != 443) return false
         if (!isAllowedAccountHost(url.host)) return false
         return true
+    }
+
+    fun isOfficialUnlockCallbackUrl(raw: String): Boolean =
+        runCatching { isOfficialUnlockCallbackUrl(URI(raw).toURL()) }.getOrDefault(false)
+
+    fun isOfficialUnlockCallbackUrl(url: URL): Boolean {
+        if (!url.protocol.equals("https", ignoreCase = true)) return false
+        if (!url.userInfo.isNullOrEmpty()) return false
+        if (url.port != -1 && url.port != 443) return false
+        if (normalizeHost(url.host) != UNLOCK_CALLBACK_HOST) return false
+        return url.path == UNLOCK_CALLBACK_PATH
     }
 
     @Throws(IOException::class)

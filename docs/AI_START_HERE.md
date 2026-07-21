@@ -9,14 +9,16 @@
 3. [`SCOPE.md`](SCOPE.md) — что входит и не входит в V6.
 4. [`SAFETY_MODEL.md`](SAFETY_MODEL.md) — обязательные safety-инварианты.
 5. [`RECOVERY_FIRST_PLAN.md`](RECOVERY_FIRST_PLAN.md) — план текущего milestone Quick Flash.
-6. [`ARCHITECTURE.md`](ARCHITECTURE.md) — компоненты и границы ответственности.
-7. [`TERMUX_WORKFLOW.md`](TERMUX_WORKFLOW.md) — публикация, CI, логи и artifacts из Termux.
-8. [`CHANGELOG.md`](../CHANGELOG.md) — история активной линии V6.
+6. [`ALPHA5_HARDWARE_POLISH_PLAN.md`](ALPHA5_HARDWARE_POLISH_PLAN.md) — UX/login исправления по первому Android smoke test.
+7. [`ARCHITECTURE.md`](ARCHITECTURE.md) — компоненты и границы ответственности.
+8. [`TERMUX_WORKFLOW.md`](TERMUX_WORKFLOW.md) — публикация, CI, логи и artifacts из Termux.
+9. [`CHANGELOG.md`](../CHANGELOG.md) — история активной линии V6.
 
 ## Правила продолжения работы
 
 - Не возвращать полный Mi Flash в активную ветку.
 - Не менять функциональное поведение верхней панели и Home device info без отдельного решения; их границы защищены `TOPBAR-001` и `HOMEINFO-001`.
+- Не менять `cardQuickFlashRecoveryFirst` в hardware-polish этапе: maintainer принял его компоновку без замечаний.
 - Не считать локальные static/pure-проверки доказательством Android lint/assemble.
 - Не считать Android CI доказательством аппаратной прошивки.
 - Не применять `force push`, автоматические mutation-retry или скрытый выбор опасного раздела.

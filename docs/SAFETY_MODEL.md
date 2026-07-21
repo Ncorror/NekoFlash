@@ -35,6 +35,8 @@ Recovery-first UI показывает только concrete candidates из rea
 
 Разблокировка требует отдельного предупреждения о сбросе данных и ручного подтверждения. Стандартный Fastboot unlock и Xiaomi account/server flow должны быть явно разделены.
 
+Mi Account WebView допускает top-level login только под `account.xiaomi.com`. Завершение unlockApi распознаётся только по точному HTTPS callback `unlock.update.miui.com/sts`; произвольные `miui.com`/`xiaomi.com` hosts и другие paths не разрешаются. Ошибка входа должна возвращать конкретную sanitised причину, а не маскироваться как пользовательская отмена.
+
 ## Логи
 
 Экспорт по умолчанию sanitised. Raw device logs не входят в source tree.

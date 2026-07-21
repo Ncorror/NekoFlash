@@ -59,6 +59,23 @@ fun main() {
         "unexpected HTTPS port must be blocked"
     )
 
+    assertTrue(
+        MiAccountSecurityPolicy.isOfficialUnlockCallbackUrl("https://unlock.update.miui.com/sts?d=token"),
+        "exact official Mi Unlock completion callback must be recognized"
+    )
+    assertFalse(
+        MiAccountSecurityPolicy.isOfficialUnlockCallbackUrl("http://unlock.update.miui.com/sts"),
+        "cleartext completion callback must be blocked"
+    )
+    assertFalse(
+        MiAccountSecurityPolicy.isOfficialUnlockCallbackUrl("https://unlock.update.miui.com/other"),
+        "unexpected callback path must be blocked"
+    )
+    assertFalse(
+        MiAccountSecurityPolicy.isOfficialUnlockCallbackUrl("https://evil.unlock.update.miui.com/sts"),
+        "callback subdomain confusion must be blocked"
+    )
+
     val base = url("https://account.xiaomi.com/pass/serviceLogin")
     assertEquals(
         "https://account.xiaomi.com/pass/next",

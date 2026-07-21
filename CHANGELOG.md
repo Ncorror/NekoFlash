@@ -2,6 +2,13 @@
 
 ## V6.0.0-alpha5 development baseline — `6.0.0-alpha5-dev-nekoflash` (`217`)
 
+- Первый Android smoke test оформлен как отдельный hardware-polish gate; Recovery-first Quick Flash зафиксирован как защищённый эталон без изменений.
+- Welcome panel стала компактнее: Files/Notifications/Battery status chips кликабельны и открывают собственные системные настройки, отдельная battery button удалена.
+- ADB Sideload card упрощена: удалена жёлтая памятка, Import/Verify выровнены, checksum note сокращена.
+- Fastboot DATA card сведена к одному основному self-test; staging/qualification/matrix/content probes перенесены в «Дополнительные тесты».
+- Нажатия Fastboot DATA без подключённого устройства теперь журналируются с точной причиной отказа.
+- Mi Account WebView распознаёт только точный официальный `unlock.update.miui.com/sts` completion callback, показывает конкретную ошибку и позволяет retry вместо безымянного «вход отменён».
+- Pure security tests защищают HTTPS/host/path callback allowlist и блокируют subdomain/path confusion.
 - Slice E Android CI подтверждён GitHub Actions run `29855091700`: pure/policy matrix, `lintDebug`, `assembleDebug` и `assembleRelease` завершились успешно для PR head `8a6dab5f81dd0ff117b3b6e27e6d528a45900e24`.
 - `termux-ci.sh` теперь по умолчанию создаёт лёгкий CI evidence archive без APK; report-artifacts сохраняются вместе с логами, а APK скачиваются только по `--with-apk` в отдельный `NekoFlash-APK-<RUN_ID>.zip`.
 - Метаданные CI теперь различают requested branch, фактическую PR head branch и event, чтобы pull-request run не отображался ошибочно как сборка `main`.

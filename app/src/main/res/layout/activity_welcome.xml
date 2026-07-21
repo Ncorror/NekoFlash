@@ -3,10 +3,8 @@
     NekoFlash welcome shell.
     CRITICAL: @drawable/bg_welcome is the user's original immutable artwork.
 
-    Structural rule: the artwork exists only inside welcomeHeroArea. The action card is a
-    separate opaque block after that hero in normal vertical document flow. Because the image
-    is no longer a full-screen background behind the controls, the card cannot cover any part
-    of the artwork on any screen size. Short screens scroll the complete document.
+    The artwork remains isolated inside welcomeHeroArea. The compact action panel follows it
+    in normal document flow, so controls never cover the composition. Short screens scroll.
 -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -129,8 +127,10 @@
                         android:layout_marginEnd="5dp"
                         android:layout_weight="1"
                         android:background="@drawable/bg_welcome_chip"
+                        android:clickable="true"
                         android:drawableStart="@drawable/ic_status_optional_gray"
                         android:drawablePadding="5dp"
+                        android:focusable="true"
                         android:fontFamily="sans-serif-medium"
                         android:gravity="center_vertical"
                         android:maxLines="2"
@@ -147,8 +147,10 @@
                         android:layout_marginEnd="5dp"
                         android:layout_weight="1"
                         android:background="@drawable/bg_welcome_chip"
+                        android:clickable="true"
                         android:drawableStart="@drawable/ic_status_optional_gray"
                         android:drawablePadding="5dp"
+                        android:focusable="true"
                         android:fontFamily="sans-serif-medium"
                         android:gravity="center_vertical"
                         android:maxLines="2"
@@ -164,8 +166,10 @@
                         android:layout_height="@dimen/welcome_chip_height"
                         android:layout_weight="1.18"
                         android:background="@drawable/bg_welcome_chip"
+                        android:clickable="true"
                         android:drawableStart="@drawable/ic_status_optional_gray"
                         android:drawablePadding="5dp"
+                        android:focusable="true"
                         android:fontFamily="sans-serif-medium"
                         android:gravity="center_vertical"
                         android:maxLines="2"
@@ -180,16 +184,18 @@
                     android:id="@+id/riskRow"
                     android:layout_width="match_parent"
                     android:layout_height="@dimen/welcome_risk_row_height"
-                    android:layout_marginTop="7dp"
+                    android:layout_marginTop="6dp"
                     android:background="@drawable/bg_welcome_status_row"
+                    android:clickable="true"
+                    android:focusable="true"
                     android:gravity="center_vertical"
                     android:orientation="horizontal"
                     android:paddingEnd="9dp">
 
                     <CheckBox
                         android:id="@+id/checkboxAgree"
-                        android:layout_width="42dp"
-                        android:layout_height="42dp"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
                         android:buttonTint="@color/accent"
                         android:enabled="false"
                         android:gravity="center" />
@@ -199,31 +205,31 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:fontFamily="sans-serif-medium"
-                        android:maxLines="2"
+                        android:maxLines="1"
                         android:text="@string/onboarding_agree_text_short"
                         android:textColor="@color/text_primary"
-                        android:textSize="12sp" />
+                        android:textSize="11.5sp" />
                 </LinearLayout>
 
                 <TextView
                     android:id="@+id/tvWelcomeStatus"
                     android:layout_width="match_parent"
                     android:layout_height="@dimen/welcome_status_height"
-                    android:layout_marginTop="7dp"
+                    android:layout_marginTop="4dp"
                     android:drawableStart="@drawable/ic_status_optional_gray"
                     android:drawablePadding="7dp"
                     android:fontFamily="sans-serif-medium"
                     android:gravity="center_vertical"
-                    android:maxLines="2"
+                    android:maxLines="1"
                     android:text="@string/onboarding_need_storage_short"
                     android:textColor="@color/text_secondary"
-                    android:textSize="11.5sp" />
+                    android:textSize="10.5sp" />
 
                 <Button
                     android:id="@+id/btnPrimaryAction"
                     android:layout_width="match_parent"
                     android:layout_height="@dimen/welcome_primary_button_height"
-                    android:layout_marginTop="6dp"
+                    android:layout_marginTop="4dp"
                     android:background="@drawable/bg_welcome_primary_button"
                     android:backgroundTint="@null"
                     android:drawableEnd="@drawable/ic_arrow_right"
@@ -235,37 +241,7 @@
                     android:text="@string/onboarding_enter_button"
                     android:textAllCaps="false"
                     android:textColor="@color/text_primary"
-                    android:textSize="14sp" />
-
-                <Button
-                    android:id="@+id/btnBatterySettings"
-                    android:layout_width="match_parent"
-                    android:layout_height="@dimen/welcome_secondary_button_height"
-                    android:layout_marginTop="7dp"
-                    android:background="@drawable/bg_welcome_secondary_button"
-                    android:backgroundTint="@null"
-                    android:drawableStart="@drawable/ic_settings_outline"
-                    android:drawablePadding="9dp"
-                    android:fontFamily="sans-serif-medium"
-                    android:insetTop="0dp"
-                    android:insetBottom="0dp"
-                    android:stateListAnimator="@null"
-                    android:text="@string/onboarding_battery_settings_button"
-                    android:textAllCaps="false"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="12.5sp" />
-
-                <TextView
-                    android:id="@+id/tvMiuiHint"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="7dp"
-                    android:fontFamily="sans-serif"
-                    android:gravity="center"
-                    android:maxLines="2"
-                    android:text="@string/onboarding_miui_hint_short"
-                    android:textColor="@color/text_muted"
-                    android:textSize="9.5sp" />
+                    android:textSize="13.5sp" />
             </LinearLayout>
         </LinearLayout>
     </ScrollView>

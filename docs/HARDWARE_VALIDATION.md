@@ -11,6 +11,27 @@
 | Xiaomi/POCO `marble` | Выполнялись read-only Fastboot transport/DATA diagnostics | Quick Flash mutation не подтверждена |
 | Mi Unlock | Владелец сообщал об успешной работе старой реализации | Нужен отдельный V6 audit и новый sanitised report |
 
+
+## Первый Android smoke test alpha5
+
+Build `6.0.0-alpha5-dev-nekoflash+6ef9da644a82.29860864789` был запущен без подключённого USB-устройства.
+
+Подтверждено:
+
+- приложение стартует и создаёт compact log/trace/session summary;
+- active transport session отсутствует, операции не стартовали;
+- summary содержит `started=0`, `failed=0`, warnings/errors отсутствуют;
+- Recovery-first Quick Flash визуально принят maintainer и зафиксирован как защищённый экран.
+
+Обнаружено до аппаратной прошивки:
+
+- welcome gate слишком высокий;
+- Sideload card перегружена памяткой;
+- Fastboot DATA diagnostics занимают слишком много места и не различают taps без устройства в compact log;
+- Mi Account login возвращал общий результат «отменён» при official unlockApi completion callback.
+
+Исправления находятся в `docs/ALPHA5_HARDWARE_POLISH_PLAN.md` и требуют нового Android smoke/CI evidence. Этот запуск не подтверждает ADB, Fastboot, Sideload, Mi Unlock либо Quick Flash transport.
+
 ## Обязательные V6 проверки
 
 ### Terminal

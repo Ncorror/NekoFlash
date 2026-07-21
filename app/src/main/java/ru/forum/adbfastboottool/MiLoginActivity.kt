@@ -46,6 +46,7 @@ class MiLoginActivity : AppCompatActivity() {
     private var passToken: String? = null
     private var deviceId: String? = null
     private var userId: String? = null
+    private var lastFailureMessage: String? = null
     private val handler = Handler(Looper.getMainLooper())
 
     private lateinit var webView: WebView
@@ -101,7 +102,13 @@ class MiLoginActivity : AppCompatActivity() {
         root.addView(webView)
         setContentView(root)
 
-        onBackPressedDispatcher.addCallback(this) { finish() }
+        onBackPressedDispatcher.addCallback(this) {
+            setResult(
+                Activity.RESULT_CANCELED,
+                Intent().putExtra(EXTRA_LOGIN_ERROR, lastFailureMessage ?: getString(R.string.mi_login_cancelled_by_user))
+            )
+            finish()
+        }
 
         if (checkExistingCookies()) {
             webView.visibility = View.GONE
@@ -143,7 +150,7 @@ class MiLoginActivity : AppCompatActivity() {
         webView.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
-            userAgentString = "(Android) Mobile"
+            userAgentString = WebSettings.getDefaultUserAgent(this@MiLoginActivity)
             loadWithOverviewMode = true
             useWideViewPort = true
             setSupportZoom(false)
@@ -167,6 +174,10 @@ class MiLoginActivity : AppCompatActivity() {
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 val raw = request.url.toString()
                 if (request.isForMainFrame) {
+                    if (MiAccountSecurityPolicy.isOfficialUnlockCallbackUrl(raw)) {
+                        handleOfficialCompletion(raw)
+                        return true
+                    }
                     return if (MiAccountSecurityPolicy.isAllowedAccountUrl(raw)) {
                         false
                     } else {
@@ -179,6 +190,10 @@ class MiLoginActivity : AppCompatActivity() {
 
             @Suppress("DEPRECATION")
             override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean {
+                if (MiAccountSecurityPolicy.isOfficialUnlockCallbackUrl(url)) {
+                    handleOfficialCompletion(url)
+                    return true
+                }
                 return if (MiAccountSecurityPolicy.isAllowedAccountUrl(url)) {
                     false
                 } else {
@@ -200,6 +215,11 @@ class MiLoginActivity : AppCompatActivity() {
             }
 
             override fun onPageStarted(view: WebView, url: String, favicon: android.graphics.Bitmap?) {
+                if (MiAccountSecurityPolicy.isOfficialUnlockCallbackUrl(url)) {
+                    view.stopLoading()
+                    handleOfficialCompletion(url)
+                    return
+                }
                 if (!MiAccountSecurityPolicy.isAllowedAccountUrl(url)) {
                     blockUnsafeNavigation(url)
                     return
@@ -265,17 +285,50 @@ class MiLoginActivity : AppCompatActivity() {
     }
 
     private fun failLogin(message: String) {
-        if (monitoringEnded || isFinishing || isDestroyed) return
+        if (isFinishing || isDestroyed) return
         monitoringEnded = true
+        lastFailureMessage = message
         if (::webView.isInitialized && !webViewDestroyed) webView.stopLoading()
         progressBar.visibility = View.GONE
-        continueButton.visibility = View.GONE
         logoutButton.visibility = View.GONE
         loginMessage.visibility = View.VISIBLE
         loginMessage.text = message
-        setResult(Activity.RESULT_CANCELED)
+        continueButton.text = getString(R.string.mi_login_retry)
+        continueButton.visibility = View.VISIBLE
+        continueButton.setOnClickListener { retryLogin() }
+        setResult(Activity.RESULT_CANCELED, Intent().putExtra(EXTRA_LOGIN_ERROR, message))
         handler.removeCallbacksAndMessages(null)
-        handler.postDelayed({ if (!isFinishing && !isDestroyed) finish() }, 1800)
+    }
+
+    private fun retryLogin() {
+        if (webViewDestroyed || isFinishing || isDestroyed) return
+        monitoringEnded = false
+        lastFailureMessage = null
+        loginMessage.visibility = View.GONE
+        continueButton.visibility = View.GONE
+        logoutButton.visibility = View.GONE
+        continueButton.text = getString(R.string.mi_login_continue)
+        continueButton.setOnClickListener { returnResults() }
+        setupWebView()
+    }
+
+    private fun handleOfficialCompletion(rawUrl: String) {
+        if (monitoringEnded || isFinishing || isDestroyed) return
+        if (!MiAccountSecurityPolicy.isOfficialUnlockCallbackUrl(rawUrl)) {
+            blockUnsafeNavigation(rawUrl)
+            return
+        }
+        CookieManager.getInstance().flush()
+        extractCookies()
+        if (passToken.isNullOrEmpty() || deviceId.isNullOrEmpty() || userId.isNullOrEmpty()) {
+            failLogin(getString(R.string.mi_login_missing_cookies))
+            return
+        }
+        monitoringEnded = true
+        loginMessage.text = getString(R.string.mi_login_success, userId ?: "")
+        loginMessage.visibility = View.VISIBLE
+        progressBar.visibility = View.GONE
+        handler.postDelayed({ returnResults() }, 350)
     }
 
     private fun extractCookies() {
@@ -294,12 +347,12 @@ class MiLoginActivity : AppCompatActivity() {
                 .replace("\\\"", "\"").replace("\\\\", "\\")
             if (cleaned.contains(endPattern)) {
                 if (passToken.isNullOrEmpty() || deviceId.isNullOrEmpty() || userId.isNullOrEmpty()) {
-                    view.loadUrl(initialUrl)
+                    failLogin(getString(R.string.mi_login_missing_cookies))
                 } else {
                     monitoringEnded = true
                     loginMessage.text = getString(R.string.mi_login_success, userId ?: "")
                     loginMessage.visibility = View.VISIBLE
-                    handler.postDelayed({ returnResults() }, 1500)
+                    handler.postDelayed({ returnResults() }, 350)
                 }
             }
         }
@@ -329,8 +382,7 @@ class MiLoginActivity : AppCompatActivity() {
             clearSensitiveFields()
             finish()
         } else if (!webViewDestroyed) {
-            monitoringEnded = false
-            webView.loadUrl(initialUrl)
+            failLogin(getString(R.string.mi_login_missing_cookies))
         }
     }
 
@@ -359,5 +411,9 @@ class MiLoginActivity : AppCompatActivity() {
         destroyWebViewSafely()
         clearSensitiveFields()
         super.onDestroy()
+    }
+
+    companion object {
+        const val EXTRA_LOGIN_ERROR = "nekoflash_mi_login_error"
     }
 }
