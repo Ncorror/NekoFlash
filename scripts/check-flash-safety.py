@@ -41,6 +41,7 @@ viewmodel = read("app/src/main/java/ru/forum/adbfastboottool/DeviceViewModel.kt"
 main_activity = read("app/src/main/java/ru/forum/adbfastboottool/MainActivity.kt")
 manifest = read("tools/tests.manifest")
 quick_flash_plan = read("app/src/main/java/ru/forum/adbfastboottool/QuickFlashPlan.kt")
+quick_flash_topology = read("app/src/main/java/ru/forum/adbfastboottool/QuickFlashTopologyCandidateBuilder.kt")
 
 # --- Fix A: single-URB is diagnostic-only for real DATA ---
 require("isSingleUrbDiagnostic" in protocol, "Fix A: isSingleUrbDiagnostic present")
@@ -97,6 +98,35 @@ require(
     "Quick Flash: one plan resolves to one concrete flash command",
 )
 require("quick-flash-plan" in manifest, "Quick Flash: Slice A pure regression module registered")
+
+# --- Recovery-first Quick Flash Slice B ---
+require(
+    "object QuickFlashTopologyCandidateBuilder" in quick_flash_topology,
+    "Quick Flash: read-only topology candidate builder present",
+)
+require(
+    "FastbootPartitionInventory.from" in quick_flash_topology and
+    "FastbootSlotResolver.resolve" in quick_flash_topology and
+    "FastbootPartitionProbePlanner.plan" in quick_flash_topology,
+    "Quick Flash: Slice B combines inventory, slot resolution and bounded probes",
+)
+require(
+    "PartitionNameResolver.resolve" in quick_flash_topology and
+    "suggestedTargets" in quick_flash_topology,
+    "Quick Flash: filename classification remains a hint",
+)
+require(
+    "SLOT_TOPOLOGY_UNKNOWN" in quick_flash_topology and
+    "SESSION_BROKEN" in quick_flash_topology and
+    "IMAGE_ARCHIVE_REQUIRES_SIDELOAD" in quick_flash_topology,
+    "Quick Flash: unknown topology, broken session and archives fail closed",
+)
+require(
+    "inventory.partition" in quick_flash_topology and
+    "resolution.targets != listOf(entry.name)" in quick_flash_topology,
+    "Quick Flash: candidates require exact concrete inventory and slot match",
+)
+require("quick-flash-topology" in manifest, "Quick Flash: Slice B pure regression module registered")
 
 # --- Read-only partition inventory ---
 require("object FastbootPartitionInventory" in inventory, "Inventory: model present")

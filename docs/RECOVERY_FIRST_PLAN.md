@@ -52,9 +52,9 @@ Expert Mode:
 
 Добавлены pure Kotlin модели `QuickFlashTarget`, `QuickFlashCandidate`, `QuickFlashPlan`, детерминированный confirmation codec и fail-closed validator. Модель не зависит от Android UI. Один план содержит ровно один concrete partition и аргументы одной команды `flash`; A/B `both` не кодируется как скрытая multi-mutation операция.
 
-### Slice B — topology resolver
+### Slice B — topology resolver (`DONE_CODE`)
 
-Объединить `FastbootPartitionInventory`, `FastbootSlotResolver`, bounded point-query и `PartitionNameResolver` в read-only candidate builder.
+Добавлен pure `QuickFlashTopologyCandidateBuilder`, который строит candidates только из concrete inventory evidence, проверяет slot mapping через `FastbootSlotResolver` и выдаёт bounded read-only point-query plan для недостающих данных. `PartitionNameResolver` задаёт лишь порядок подсказок и никогда не выбирает target. Unknown topology, archive input и broken session закрываются fail-closed; legacy A-only не получает синтетические `_a`/`_b`.
 
 ### Slice C — UI
 
@@ -83,8 +83,8 @@ Expert Mode:
 ## Порядок реализации
 
 1. Slice A с pure tests — `DONE_CODE`.
-2. Slice B с inventory/slot regression tests — следующий шаг.
-3. Slice C без изменения protected Home components.
+2. Slice B с inventory/slot regression tests — `DONE_CODE`.
+3. Slice C без изменения protected Home components — следующий шаг.
 4. Slice D и end-to-end policy tests.
 5. Android CI.
 6. Sanitised hardware validation.

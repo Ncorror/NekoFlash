@@ -1058,6 +1058,58 @@ def check_quick_flash_plan_slice() -> None:
         print("Quick Flash Slice A plan model: OK")
 
 
+
+def check_quick_flash_topology_slice() -> None:
+    builder = ROOT / "app/src/main/java/ru/forum/adbfastboottool/QuickFlashTopologyCandidateBuilder.kt"
+    test = ROOT / "tools/quick-flash-topology-test/ru/forum/adbfastboottool/QuickFlashTopologyCandidateBuilderTest.kt"
+    planner = ROOT / "app/src/main/java/ru/forum/adbfastboottool/FastbootPartitionProbePlanner.kt"
+    manifest = ROOT / "tools/tests.manifest"
+    gitignore = ROOT / ".gitignore"
+    for path in (builder, test, planner, manifest, gitignore):
+        if not path.is_file():
+            fail(f"Missing FLASH-001 Slice B file: {path.relative_to(ROOT)}")
+            return
+
+    builder_text = builder.read_text(encoding="utf-8")
+    required = (
+        "object QuickFlashTopologyCandidateBuilder",
+        "FastbootPartitionInventory.from",
+        "FastbootPartitionProbePlanner.plan",
+        "FastbootSlotResolver.resolve",
+        "PartitionNameResolver.resolve",
+        "SLOT_TOPOLOGY_UNKNOWN",
+        "SESSION_BROKEN",
+        "IMAGE_ARCHIVE_REQUIRES_SIDELOAD",
+        "MANUAL_PARTITION_REQUIRES_EXPERT_MODE",
+        "inventory.topology != FastbootPartitionInventory.SlotTopology.UNKNOWN",
+    )
+    for token in required:
+        if token not in builder_text:
+            fail(f"FLASH-001 Slice B token missing: {token}")
+
+    if any(token in builder_text for token in ("android.", "androidx.")):
+        fail("FLASH-001 Slice B builder must remain independent from Android UI/framework")
+
+    planner_text = planner.read_text(encoding="utf-8")
+    if "discoveryPartitions: List<String> = emptyList()" not in planner_text:
+        fail("Slice B bounded discovery partitions are missing from probe planner")
+    if "val limited = sorted.take(maxQueries)" not in planner_text:
+        fail("Slice B probe planner must remain bounded by maxQueries")
+
+    manifest_text = manifest.read_text(encoding="utf-8")
+    if not re.search(r"^quick-flash-topology\t", manifest_text, re.M):
+        fail("Quick Flash topology pure test module missing from manifest")
+
+    gitignore_text = gitignore.read_text(encoding="utf-8")
+    if "__pycache__/" not in gitignore_text or "*.py[cod]" not in gitignore_text:
+        fail("Generated Python cache must stay excluded from source control")
+    checksum_policy = (ROOT / "scripts/checksum_inventory.py").read_text(encoding="utf-8")
+    if '"__pycache__"' not in checksum_policy:
+        fail("Generated Python cache must stay excluded from checksum inventory")
+
+    if not ERRORS:
+        print("Quick Flash Slice B topology builder: OK")
+
 def check_flash_operation_draft_state() -> None:
     draft = ROOT / "app/src/main/java/ru/forum/adbfastboottool/FlashOperationDraft.kt"
     viewmodel = ROOT / "app/src/main/java/ru/forum/adbfastboottool/DeviceViewModel.kt"
@@ -1256,6 +1308,7 @@ def main() -> int:
     check_mi_account_and_share_hardening()
     check_termux_workflow()
     check_quick_flash_plan_slice()
+    check_quick_flash_topology_slice()
     check_flash_operation_draft_state()
     check_v6_scope_reset()
     check_device_viewmodel_api_refs()

@@ -13,8 +13,9 @@
 ## Quick Flash
 
 - `QuickFlashTarget`, `QuickFlashCandidate` и `QuickFlashPlan` образуют pure confirmation-ready model; `QuickFlashPlanValidator` принимает только один concrete partition с read-only evidence.
-- `FastbootPartitionInventory` и probe planner определяют доступные разделы.
-- `FastbootSlotResolver` разрешает A/B target.
+- `QuickFlashTopologyCandidateBuilder` объединяет `FastbootPartitionInventory`, bounded probe planner, `FastbootSlotResolver` и filename hint в read-only candidate result; он не выбирает target и не выполняет mutation.
+- `FastbootPartitionInventory` принимает только concrete bootloader evidence, а probe planner формирует ограниченные read-only запросы для недостающих данных.
+- `FastbootSlotResolver` проверяет точное соответствие concrete partition и A/B policy; unknown topology не выдаёт candidate.
 - `FastbootFlashPreparationPolicy` и `PreflightValidator` выполняют минимальный preflight.
 - `FlashOperationDraft` хранит только восстановимый UI draft; выполнение требует свежей проверки и подтверждения.
 

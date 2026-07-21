@@ -164,6 +164,20 @@ object QuickFlashPlanValidator {
         "tz", "hyp", "rpm", "devinfo"
     )
 
+    fun definedTargetForBase(basePartition: String): QuickFlashTarget? {
+        val normalized = basePartitionName(basePartition)
+        return QuickFlashTarget.entries.firstOrNull { it.fixedBasePartition == normalized }
+    }
+
+    fun isCanonicalPartitionName(partitionName: String): Boolean =
+        isCanonicalPartition(partitionName)
+
+    fun isManualPartitionAllowed(partitionName: String): Boolean {
+        if (!isCanonicalPartition(partitionName)) return false
+        val base = basePartitionName(partitionName)
+        return base !in DEFINED_BASE_PARTITIONS && base !in FORBIDDEN_MANUAL_BASE_PARTITIONS
+    }
+
     fun validate(request: QuickFlashPlanRequest): QuickFlashPlanValidation {
         val errors = linkedSetOf<QuickFlashPlanError>()
 
@@ -369,16 +383,24 @@ object QuickFlashPlanValidator {
         if (manualPartitionConfirmation != partitionName) {
             errors += QuickFlashPlanError.MANUAL_CONFIRMATION_REQUIRED
         }
-        if (basePartition in DEFINED_BASE_PARTITIONS) {
+        if (definedTargetForBase(basePartition) != null) {
             errors += QuickFlashPlanError.MANUAL_TARGET_DUPLICATES_DEFINED_TARGET
         }
-        if (basePartition in FORBIDDEN_MANUAL_BASE_PARTITIONS) {
+        if (!isManualPartitionAllowed(partitionName) && definedTargetForBase(basePartition) == null) {
             errors += QuickFlashPlanError.MANUAL_TARGET_FORBIDDEN
         }
     }
 
     private fun expectedPartitionName(basePartition: String, slot: QuickFlashSlot): String =
         basePartition + slot.suffix
+
+    private fun basePartitionName(partitionName: String): String {
+        val normalized = partitionName.trim().lowercase(Locale.US)
+        return when {
+            normalized.endsWith("_a") || normalized.endsWith("_b") -> normalized.dropLast(2)
+            else -> normalized
+        }
+    }
 
     private fun isCanonicalPartition(value: String): Boolean =
         PARTITION_PATTERN.matches(value) && value == value.trim().lowercase(Locale.US)

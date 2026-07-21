@@ -1,5 +1,7 @@
 package ru.forum.adbfastboottool
 
+import java.util.Locale
+
 /**
  * Builds a bounded read-only point-query plan for metadata omitted by
  * `getvar:all`. The plan never turns a guessed name into an inventory entry;
@@ -32,7 +34,8 @@ object FastbootPartitionProbePlanner {
     fun plan(
         source: FastbootGetVarAllParser.Snapshot,
         inventory: FastbootPartitionInventory.Snapshot,
-        maxQueries: Int = 24
+        maxQueries: Int = 24,
+        discoveryPartitions: List<String> = emptyList()
     ): Plan {
         require(maxQueries >= 0)
         val requests = linkedSetOf<Request>()
@@ -53,6 +56,14 @@ object FastbootPartitionProbePlanner {
         }
 
         inventory.entries.forEach { entry -> addMissingFields(entry.name, entry) }
+
+        val normalizedDiscoveryPartitions = discoveryPartitions
+            .map { it.trim().lowercase(Locale.US) }
+            .filter { it.matches(Regex("^[a-z0-9._-]{1,64}$")) }
+            .distinct()
+        normalizedDiscoveryPartitions.forEach { name ->
+            addMissingFields(name, inventory.partition(name))
+        }
 
         // Family-only metadata, for example has-slot:boot=yes, is not an actual
         // partition. Probe concrete names, then expose only those confirmed by
@@ -87,8 +98,12 @@ object FastbootPartitionProbePlanner {
             }
         }
 
+        val discoveryRank = normalizedDiscoveryPartitions
+            .withIndex()
+            .associate { it.value to it.index }
         val sorted = requests.sortedWith(
-            compareBy<Request> { riskPriority(it.partition) }
+            compareBy<Request> { discoveryRank[it.partition] ?: Int.MAX_VALUE }
+                .thenBy { riskPriority(it.partition) }
                 .thenBy { fieldPriority(it.field) }
                 .thenBy { it.partition }
         )

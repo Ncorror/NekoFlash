@@ -4,6 +4,9 @@
 
 - Termux publish разделён с проверками и CI: `termux-publish.sh` теперь выполняет только безопасный импорт source ZIP, commit и push feature-ветки; локальные тесты и Android CI запускаются отдельно.
 - Реализован Slice A Recovery-first Quick Flash: pure модели target/candidate/plan и fail-closed validator без Android UI dependencies.
+- Реализован Slice B: `QuickFlashTopologyCandidateBuilder` объединяет concrete partition inventory, slot resolver и bounded point-query; filename остаётся только hint.
+- Добавлен pure regression module `quick-flash-topology` для A/B, legacy A-only, unknown topology, point-query, Expert/Manual gates, archive и broken-session сценариев.
+- Python `__pycache__`/`.pyc` исключены из source tree; Termux publication остаётся быстрым push-only действием без локальной сборки и CI.
 - Confirmation payload сериализуется детерминированно и связывает device session, concrete partition, slot, file URI, размер и SHA-256.
 - Primary и Expert targets разделены; ручной target требует Expert Mode и точного повторного ввода, а full-ROM/radio/bootloader partitions блокируются.
 - Добавлен pure regression module `quick-flash-plan`; один валидный план содержит ровно одну команду `fastboot flash`.

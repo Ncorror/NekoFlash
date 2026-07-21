@@ -44,7 +44,7 @@ bash scripts/termux-publish.sh \
 - сравнивает локальный и удалённый SHA;
 - **не запускает** Gradle, pure/JVM matrix, локальную сборку или GitHub Actions.
 
-Проверки исходников выполняются до передачи ZIP, а Android-сборка запускается отдельно на GitHub Actions.
+Проверки исходников выполняются до передачи ZIP, а Android-сборка запускается отдельно на GitHub Actions. Generated Python cache (`__pycache__`, `*.pyc`, `*.pyo`) не входит в source ZIP и запрещён `.gitignore`.
 
 ## Новый запуск GitHub Actions
 
