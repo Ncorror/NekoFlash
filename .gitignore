@@ -24,3 +24,7 @@ forum-build/
 /debug_build_log.txt
 /release_build_log.txt
 /ci-failed*.log
+
+# Python generated cache
+__pycache__/
+*.py[cod]
