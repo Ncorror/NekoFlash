@@ -1015,6 +1015,43 @@ def check_termux_workflow() -> None:
     if not ERRORS:
         print("Termux workflow and new-chat continuity: OK")
 
+def check_quick_flash_plan_slice() -> None:
+    model = ROOT / "app/src/main/java/ru/forum/adbfastboottool/QuickFlashPlan.kt"
+    test = ROOT / "tools/quick-flash-plan-test/ru/forum/adbfastboottool/QuickFlashPlanTest.kt"
+    manifest = ROOT / "tools/tests.manifest"
+    for path in (model, test, manifest):
+        if not path.is_file():
+            fail(f"Missing FLASH-001 Slice A file: {path.relative_to(ROOT)}")
+            return
+
+    model_text = model.read_text(encoding="utf-8")
+    required = (
+        "enum class QuickFlashTarget",
+        "data class QuickFlashCandidate",
+        "data class QuickFlashPlan",
+        "object QuickFlashPlanValidator",
+        "object QuickFlashPlanCodec",
+        "TARGET_AMBIGUOUS",
+        "CANDIDATE_NOT_CONFIRMED",
+        "MANUAL_CONFIRMATION_REQUIRED",
+        'listOf("flash", partitionName)',
+    )
+    for token in required:
+        if token not in model_text:
+            fail(f"FLASH-001 Slice A token missing: {token}")
+
+    forbidden_imports = ("android.", "androidx.")
+    if any(token in model_text for token in forbidden_imports):
+        fail("FLASH-001 Slice A model must remain independent from Android UI/framework")
+
+    manifest_text = manifest.read_text(encoding="utf-8")
+    if not re.search(r"^quick-flash-plan\t", manifest_text, re.M):
+        fail("Quick Flash plan pure test module missing from manifest")
+
+    if not ERRORS:
+        print("Quick Flash Slice A plan model: OK")
+
+
 def check_flash_operation_draft_state() -> None:
     draft = ROOT / "app/src/main/java/ru/forum/adbfastboottool/FlashOperationDraft.kt"
     viewmodel = ROOT / "app/src/main/java/ru/forum/adbfastboottool/DeviceViewModel.kt"
@@ -1212,6 +1249,7 @@ def main() -> int:
     check_private_reports()
     check_mi_account_and_share_hardening()
     check_termux_workflow()
+    check_quick_flash_plan_slice()
     check_flash_operation_draft_state()
     check_v6_scope_reset()
     check_device_viewmodel_api_refs()

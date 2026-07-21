@@ -40,6 +40,7 @@ probe_planner = read("app/src/main/java/ru/forum/adbfastboottool/FastbootPartiti
 viewmodel = read("app/src/main/java/ru/forum/adbfastboottool/DeviceViewModel.kt")
 main_activity = read("app/src/main/java/ru/forum/adbfastboottool/MainActivity.kt")
 manifest = read("tools/tests.manifest")
+quick_flash_plan = read("app/src/main/java/ru/forum/adbfastboottool/QuickFlashPlan.kt")
 
 # --- Fix A: single-URB is diagnostic-only for real DATA ---
 require("isSingleUrbDiagnostic" in protocol, "Fix A: isSingleUrbDiagnostic present")
@@ -76,6 +77,26 @@ require(
 )
 # resolver is compiled by the fastboot-core test module
 require("PartitionNameResolver.kt" in manifest, "Hint: resolver added to fastboot-core test sources")
+
+# --- Recovery-first Quick Flash Slice A ---
+require("enum class QuickFlashTarget" in quick_flash_plan, "Quick Flash: explicit target catalog present")
+require(
+    "Visibility.PRIMARY" in quick_flash_plan and "Visibility.EXPERT" in quick_flash_plan,
+    "Quick Flash: primary and expert targets are separated",
+)
+require(
+    "TARGET_AMBIGUOUS" in quick_flash_plan and "CANDIDATE_NOT_CONFIRMED" in quick_flash_plan,
+    "Quick Flash: missing/ambiguous evidence fails closed",
+)
+require(
+    "MANUAL_CONFIRMATION_REQUIRED" in quick_flash_plan and "MANUAL_TARGET_FORBIDDEN" in quick_flash_plan,
+    "Quick Flash: manual target requires repeat entry and blocks excluded scope",
+)
+require(
+    'listOf("flash", partitionName)' in quick_flash_plan and "QuickFlashSlot" in quick_flash_plan,
+    "Quick Flash: one plan resolves to one concrete flash command",
+)
+require("quick-flash-plan" in manifest, "Quick Flash: Slice A pure regression module registered")
 
 # --- Read-only partition inventory ---
 require("object FastbootPartitionInventory" in inventory, "Inventory: model present")

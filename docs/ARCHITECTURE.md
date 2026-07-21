@@ -12,6 +12,7 @@
 
 ## Quick Flash
 
+- `QuickFlashTarget`, `QuickFlashCandidate` и `QuickFlashPlan` образуют pure confirmation-ready model; `QuickFlashPlanValidator` принимает только один concrete partition с read-only evidence.
 - `FastbootPartitionInventory` и probe planner определяют доступные разделы.
 - `FastbootSlotResolver` разрешает A/B target.
 - `FastbootFlashPreparationPolicy` и `PreflightValidator` выполняют минимальный preflight.

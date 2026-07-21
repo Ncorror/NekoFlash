@@ -2,6 +2,10 @@
 
 ## V6.0.0-alpha5 development baseline — `6.0.0-alpha5-dev-nekoflash` (`217`)
 
+- Реализован Slice A Recovery-first Quick Flash: pure модели target/candidate/plan и fail-closed validator без Android UI dependencies.
+- Confirmation payload сериализуется детерминированно и связывает device session, concrete partition, slot, file URI, размер и SHA-256.
+- Primary и Expert targets разделены; ручной target требует Expert Mode и точного повторного ввода, а full-ROM/radio/bootloader partitions блокируются.
+- Добавлен pure regression module `quick-flash-plan`; один валидный план содержит ровно одну команду `fastboot flash`.
 - Зафиксирован воспроизводимый Termux workflow: bootstrap, safe publish и CI collection scripts теперь входят в source tree.
 - `termux-ci.sh` ждёт `status=completed`, затем скачивает logs/artifacts; сетевой обрыв больше не трактуется как CI failure.
 - Добавлена точка входа `docs/AI_START_HERE.md` для нового чата без дублирования живого статуса.

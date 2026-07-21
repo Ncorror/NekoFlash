@@ -23,3 +23,5 @@ mi-account-client	tools/mi-account-client-test/android/util/Base64.kt tools/mi-a
 sanitized-log-share	app/src/main/java/ru/forum/adbfastboottool/ReportSanitizer.kt app/src/main/java/ru/forum/adbfastboottool/SanitizedLogShare.kt tools/sanitized-log-share-test/ru/forum/adbfastboottool/SanitizedLogShareTest.kt
 compact-log-render	app/src/main/java/ru/forum/adbfastboottool/CompactLogRenderPolicy.kt tools/compact-log-render-test/ru/forum/adbfastboottool/CompactLogRenderPolicyTest.kt
 flash-operation-draft	app/src/main/java/ru/forum/adbfastboottool/HashUtils.kt app/src/main/java/ru/forum/adbfastboottool/FlashOperationDraft.kt tools/flash-operation-draft-test/ru/forum/adbfastboottool/FlashOperationDraftTest.kt
+
+quick-flash-plan	app/src/main/java/ru/forum/adbfastboottool/QuickFlashPlan.kt tools/quick-flash-plan-test/ru/forum/adbfastboottool/QuickFlashPlanTest.kt

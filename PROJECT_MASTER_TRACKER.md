@@ -35,7 +35,7 @@ NekoFlash остаётся компактным Android-инструментом
 | HOMEINFO-001 | Сохранить карточку устройства и рабочей папки | DONE_CODE | Android UI smoke test |
 | HOMEACTIONS-001 | Четыре главных перехода на Home | DONE_CODE | Android UI smoke test |
 | TERMINAL-001 | Проверить ADB/Fastboot terminal на устройстве | OPEN | Команды read-only и экспорт лога |
-| FLASH-001 | Recovery-first Quick Flash | IN_PROGRESS | Slice A: pure model и fail-closed tests |
+| FLASH-001 | Recovery-first Quick Flash | IN_PROGRESS | Slice B: read-only topology candidate builder и regression tests |
 | SIDELOAD-001 | Подтвердить ADB Sideload в V6 | RETEST_REQUIRED | ZIP transfer, cancel, recovery result |
 | UNLOCK-001 | Провести отдельный аудит Mi Unlock | OPEN | Разделить стандартный Fastboot unlock и Xiaomi flow |
 | TEST-001 | Сокращённая релевантная test matrix | DONE_CI | 19/19 плюс Android lint/debug/release для alpha4 |
@@ -51,15 +51,21 @@ NekoFlash остаётся компактным Android-инструментом
 - sanitization и экспорт диагностических отчётов;
 - верхняя панель и карточка устройства.
 
+## Локальное evidence alpha5
+
+- Slice A реализован в `QuickFlashPlan.kt`: `QuickFlashTarget`, `QuickFlashCandidate`, `QuickFlashPlan`, детерминированный confirmation codec и fail-closed validator.
+- Pure module `quick-flash-plan` покрывает primary/expert targets, A-only/A/B concrete candidates, неоднозначность, отсутствие evidence, ручное подтверждение, hash/size и ровно одну mutation-команду.
+- Это `DONE_CODE`/локальное pure evidence; Android lint/assemble и аппаратная прошивка этим не подтверждены.
+
 ## Текущий следующий шаг
 
 Полный план alpha5 находится в [`docs/RECOVERY_FIRST_PLAN.md`](docs/RECOVERY_FIRST_PLAN.md). Проверки scope/safety определены в `docs/SAFETY_MODEL.md`, а canonical documentation guard запускается через `scripts/check-documentation.py`. Архивная база остаётся в `archive/full-miflash-v5.9.17`.
 
-1. Зафиксировать green alpha4 commit annotated tag `v6.0.0-alpha4`.
-2. Создать рабочую ветку `feature/recovery-first-quick-flash` от `main` после тега.
-3. Реализовать Slice A: pure Kotlin модели `QuickFlashTarget`, `QuickFlashCandidate`, `QuickFlashPlan` и fail-closed validator.
-4. Добавить tests и guards до изменения Android UI.
-5. Затем выполнить Slice B topology resolver и только после него Slice C UI.
+1. Сверить в Git remote наличие annotated tag `v6.0.0-alpha4` на green commit `90871fb`; source ZIP не содержит `.git` и не доказывает состояние тега.
+2. Считать Slice A `DONE_CODE`, сохраняя его pure и независимым от Android UI.
+3. Реализовать Slice B: read-only builder, который объединяет inventory, slot resolver, bounded point-query и `PartitionNameResolver` только как hint.
+4. Добавить Slice B A/B, legacy A-only и unknown-topology regression tests; неизвестная topology должна оставаться fail-closed.
+5. Только после Slice B переходить к Slice C UI, не меняя `TOPBAR-001`, `HOMEINFO-001` и `HOMEACTIONS-001`.
 6. Публиковать через `scripts/termux-publish.sh`, CI и сбор логов выполнять через `scripts/termux-ci.sh`; перед новым чатом создавать `scripts/export-chat-context.sh`.
 7. После зелёного Android CI провести отдельный sanitised hardware retest Terminal/Sideload и контролируемый Quick Flash.
 

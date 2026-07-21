@@ -48,9 +48,9 @@ Expert Mode:
 
 ## Архитектурные slices
 
-### Slice A — модель плана
+### Slice A — модель плана (`DONE_CODE`)
 
-Добавить pure Kotlin модели `QuickFlashTarget`, `QuickFlashCandidate`, `QuickFlashPlan` и fail-closed validator. Модель не должна зависеть от Android UI.
+Добавлены pure Kotlin модели `QuickFlashTarget`, `QuickFlashCandidate`, `QuickFlashPlan`, детерминированный confirmation codec и fail-closed validator. Модель не зависит от Android UI. Один план содержит ровно один concrete partition и аргументы одной команды `flash`; A/B `both` не кодируется как скрытая multi-mutation операция.
 
 ### Slice B — topology resolver
 
@@ -82,8 +82,8 @@ Expert Mode:
 
 ## Порядок реализации
 
-1. Slice A с pure tests.
-2. Slice B с inventory/slot regression tests.
+1. Slice A с pure tests — `DONE_CODE`.
+2. Slice B с inventory/slot regression tests — следующий шаг.
 3. Slice C без изменения protected Home components.
 4. Slice D и end-to-end policy tests.
 5. Android CI.
