@@ -43,6 +43,7 @@ manifest = read("tools/tests.manifest")
 quick_flash_plan = read("app/src/main/java/ru/forum/adbfastboottool/QuickFlashPlan.kt")
 quick_flash_topology = read("app/src/main/java/ru/forum/adbfastboottool/QuickFlashTopologyCandidateBuilder.kt")
 quick_flash_ui = read("app/src/main/java/ru/forum/adbfastboottool/QuickFlashUiPolicy.kt")
+quick_flash_mutation = read("app/src/main/java/ru/forum/adbfastboottool/QuickFlashMutationGate.kt")
 main_layout = read("app/src/main/res/layout/activity_main.xml")
 
 # --- Fix A: single-URB is diagnostic-only for real DATA ---
@@ -155,8 +156,8 @@ require(
 quick_flash_ui_body = main_activity.split("private fun startQuickFlashTargetFlow", 1)[-1].split("private fun showFlashConfirmation", 1)[0]
 require(
     "FastbootSlotResolver.RequestedSlot.BOTH" not in quick_flash_ui_body and
-    "viewModel.runFlash(plan.partitionName, file)" in quick_flash_ui_body,
-    "Quick Flash: new UI confirms one concrete partition, never BOTH",
+    "viewModel.runConfirmedQuickFlash(" in quick_flash_ui_body,
+    "Quick Flash: new UI confirms one concrete partition through Slice D, never BOTH",
 )
 require(
     "currentTransportSessionId() != inventorySessionId" in quick_flash_ui_body and
@@ -165,6 +166,48 @@ require(
     "Quick Flash: inventory candidates remain bound to one transport session",
 )
 require("quick-flash-ui" in manifest, "Quick Flash: Slice C pure regression module registered")
+
+# --- Recovery-first Quick Flash Slice D ---
+require(
+    "object QuickFlashMutationGate" in quick_flash_mutation and
+    "data class ConfirmationTicket" in quick_flash_mutation,
+    "Quick Flash: one-shot pure mutation gate present",
+)
+require(
+    "CONFIRMATION_ALREADY_CONSUMED" in quick_flash_mutation and
+    "SESSION_CHANGED" in quick_flash_mutation and
+    "IMAGE_SHA256_CHANGED" in quick_flash_mutation and
+    "TARGET_AMBIGUOUS" in quick_flash_mutation,
+    "Quick Flash: replay, session, file and topology changes fail closed",
+)
+require(
+    "commandCount = 1" in quick_flash_mutation and
+    "retryAllowed = false" in quick_flash_mutation,
+    "Quick Flash: authorization encodes one flash command and no retry",
+)
+mutation_body = viewmodel.split("fun runConfirmedQuickFlash(", 1)[-1].split("fun runFlashTarget(", 1)[0]
+require(
+    "QuickFlashMutationGate.evaluate" in mutation_body and
+    "computeFastbootArtifactId(canonicalFile)" in mutation_body and
+    "QuickFlashTopologyCandidateBuilder.buildFromInventory" in mutation_body,
+    "Quick Flash: runtime gate rechecks plan, file identity and topology",
+)
+require(
+    mutation_body.count("flashPartitionDetailed(") == 1 and
+    mutation_body.count("proto.flashPartitionDetailed(") == 1,
+    "Quick Flash: Slice D has exactly one mutation call and no duplicate call",
+)
+require(
+    "prepareGuidedFastbootDataArtifact(" in mutation_body and
+    "releaseFastbootStagedArtifact" in mutation_body,
+    "Quick Flash: Slice D uses existing verified staging lifecycle",
+)
+require(
+    "viewModel.runConfirmedQuickFlash(" in quick_flash_ui_body and
+    "viewModel.runFlash(plan.partitionName, file)" not in quick_flash_ui_body,
+    "Quick Flash: Recovery-first UI cannot bypass the mutation gate",
+)
+require("quick-flash-mutation-gate" in manifest, "Quick Flash: Slice D pure regression module registered")
 
 # --- Read-only partition inventory ---
 require("object FastbootPartitionInventory" in inventory, "Inventory: model present")

@@ -2,6 +2,10 @@
 
 ## V6.0.0-alpha5 development baseline — `6.0.0-alpha5-dev-nekoflash` (`217`)
 
+- Реализован Slice D: pure `QuickFlashMutationGate` выдаёт одноразовую authorization только для неизменившихся plan/session/image/topology evidence.
+- `DeviceViewModel.runConfirmedQuickFlash` заново вычисляет SHA-256, сверяет concrete candidate, использует существующий verified staging и выполняет ровно один `flashPartitionDetailed` без retry.
+- Recovery-first UI больше не обходит gate через legacy `runFlash`; confirmation ticket очищается при смене или завершении USB-сессии.
+- Добавлен pure regression module `quick-flash-mutation-gate`; static/safety guards защищают one-shot confirmation, session/file identity и single-command execution.
 - Реализован Slice C Recovery-first UI: Recovery — главный target, primary и expert actions разделены, Expert Mode выключен по умолчанию.
 - UI выбирает image первым, вычисляет SHA-256 и показывает только concrete partitions из `QuickFlashTopologyCandidateBuilder.buildFromInventory`; filename не авторизует target.
 - Для A/B пользователь выбирает один точный partition (`_a` или `_b`); вариант `BOTH` и legacy multi-flash queue скрыты из активного Quick Flash.

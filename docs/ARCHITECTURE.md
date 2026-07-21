@@ -14,7 +14,8 @@
 
 - `QuickFlashTarget`, `QuickFlashCandidate` и `QuickFlashPlan` образуют pure confirmation-ready model; `QuickFlashPlanValidator` принимает только один concrete partition с read-only evidence.
 - `QuickFlashTopologyCandidateBuilder` объединяет `FastbootPartitionInventory`, bounded probe planner, `FastbootSlotResolver` и filename hint в read-only candidate result; он не выбирает target и не выполняет mutation.
-- `QuickFlashUiPolicy` фиксирует Recovery-first порядок и hidden-by-default Expert Mode. `MainActivity` использует `buildFromInventory`, показывает только concrete candidates и создаёт confirmation-ready `QuickFlashPlan`; прямой service gate остаётся задачей Slice D.
+- `QuickFlashUiPolicy` фиксирует Recovery-first порядок и hidden-by-default Expert Mode. `MainActivity` использует `buildFromInventory`, показывает только concrete candidates, создаёт confirmation-ready `QuickFlashPlan` и одноразовый `QuickFlashMutationGate.ConfirmationTicket`.
+- `QuickFlashMutationGate` остаётся pure boundary перед mutation: повторно связывает confirmation с plan fingerprint, transport session, image identity и concrete candidate. `DeviceViewModel.runConfirmedQuickFlash` поглощает ticket один раз, использует существующий private staging и делает ровно один вызов `FastbootProtocol.flashPartitionDetailed`.
 - Legacy multi-flash queue не входит в активный Recovery-first UI и скрыт; один UI plan соответствует одному concrete partition.
 - `FastbootPartitionInventory` принимает только concrete bootloader evidence, а probe planner формирует ограниченные read-only запросы для недостающих данных.
 - `FastbootSlotResolver` проверяет точное соответствие concrete partition и A/B policy; unknown topology не выдаёт candidate.

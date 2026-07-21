@@ -1183,7 +1183,7 @@ def check_quick_flash_ui_slice() -> None:
         "QuickFlashTopologyCandidateBuilder.buildFromInventory",
         "QuickFlashPlanValidator.validate",
         "selectedPartitionName = candidate.partitionName",
-        "viewModel.runFlash(plan.partitionName, file)",
+        "viewModel.runConfirmedQuickFlash(",
         "currentTransportSessionId() != inventorySessionId",
         "expectedSessionId = inventorySessionId",
         "currentTransportSessionId() != expectedSessionId",
@@ -1205,6 +1205,69 @@ def check_quick_flash_ui_slice() -> None:
     if not ERRORS:
         print("Quick Flash Slice C Recovery-first UI: OK")
 
+
+
+def check_quick_flash_mutation_gate_slice() -> None:
+    gate = ROOT / "app/src/main/java/ru/forum/adbfastboottool/QuickFlashMutationGate.kt"
+    test = ROOT / "tools/quick-flash-mutation-gate-test/ru/forum/adbfastboottool/QuickFlashMutationGateTest.kt"
+    viewmodel = ROOT / "app/src/main/java/ru/forum/adbfastboottool/DeviceViewModel.kt"
+    main = ROOT / "app/src/main/java/ru/forum/adbfastboottool/MainActivity.kt"
+    manifest = ROOT / "tools/tests.manifest"
+    for path in (gate, test, viewmodel, main, manifest):
+        if not path.is_file():
+            fail(f"Missing FLASH-001 Slice D file: {path.relative_to(ROOT)}")
+            return
+
+    gate_text = gate.read_text(encoding="utf-8")
+    required_gate = (
+        "object QuickFlashMutationGate",
+        "data class ConfirmationTicket",
+        "confirmationAvailable",
+        "CONFIRMATION_ALREADY_CONSUMED",
+        "SESSION_CHANGED",
+        "IMAGE_SHA256_CHANGED",
+        "TARGET_AMBIGUOUS",
+        "commandCount = 1",
+        "retryAllowed = false",
+        "class QuickFlashConfirmationRegistry",
+    )
+    for token in required_gate:
+        if token not in gate_text:
+            fail(f"FLASH-001 Slice D gate token missing: {token}")
+    if any(token in gate_text for token in ("android.", "androidx.")):
+        fail("FLASH-001 Slice D mutation gate must remain pure")
+
+    vm_text = viewmodel.read_text(encoding="utf-8")
+    vm_tokens = (
+        "fun runConfirmedQuickFlash(",
+        "quickFlashConfirmationRegistry.consume",
+        "QuickFlashMutationGate.evaluate",
+        "computeFastbootArtifactId(canonicalFile)",
+        "QuickFlashTopologyCandidateBuilder.buildFromInventory",
+        "proto.flashPartitionDetailed(authorization.partitionName, activePrepared.stagedFile)",
+        "confirmed quick flash finished",
+    )
+    for token in vm_tokens:
+        if token not in vm_text:
+            fail(f"FLASH-001 Slice D DeviceViewModel token missing: {token}")
+    body = vm_text.split("fun runConfirmedQuickFlash(", 1)[-1].split("fun runFlashTarget(", 1)[0]
+    if body.count("flashPartitionDetailed(") != 1:
+        fail("Slice D must contain exactly one flashPartitionDetailed call")
+    if body.count("proto.flashPartitionDetailed(") != 1:
+        fail("Slice D mutation body must not retry or duplicate the flash command")
+
+    main_text = main.read_text(encoding="utf-8")
+    if "QuickFlashMutationGate.issueConfirmation" not in main_text or "viewModel.runConfirmedQuickFlash(" not in main_text:
+        fail("Slice D confirmation ticket is not wired from MainActivity to DeviceViewModel")
+    if "viewModel.runFlash(plan.partitionName, file)" in main_text:
+        fail("Recovery-first UI must not bypass Slice D through the legacy runFlash path")
+
+    manifest_text = manifest.read_text(encoding="utf-8")
+    if not re.search(r"^quick-flash-mutation-gate\t", manifest_text, re.M):
+        fail("Quick Flash mutation gate pure test module missing from manifest")
+
+    if not ERRORS:
+        print("Quick Flash Slice D one-shot mutation gate: OK")
 
 def check_flash_operation_draft_state() -> None:
     draft = ROOT / "app/src/main/java/ru/forum/adbfastboottool/FlashOperationDraft.kt"
@@ -1406,6 +1469,7 @@ def main() -> int:
     check_quick_flash_plan_slice()
     check_quick_flash_topology_slice()
     check_quick_flash_ui_slice()
+    check_quick_flash_mutation_gate_slice()
     check_flash_operation_draft_state()
     check_v6_scope_reset()
     check_device_viewmodel_api_refs()

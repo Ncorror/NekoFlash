@@ -58,6 +58,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.Locale
+import java.util.UUID
 
 class MainActivity : AppCompatActivity() {
 
@@ -2863,6 +2864,15 @@ class MainActivity : AppCompatActivity() {
             blockQuickFlash(validation.errors.joinToString())
             return
         }
+        val ticketIssue = QuickFlashMutationGate.issueConfirmation(
+            plan = plan,
+            confirmationId = UUID.randomUUID().toString()
+        )
+        val confirmationTicket = ticketIssue.ticket
+        if (!ticketIssue.issued || confirmationTicket == null) {
+            blockQuickFlash(ticketIssue.errors.joinToString())
+            return
+        }
 
         val preflight = PreflightValidator.validateFlash(
             context = this,
@@ -2910,7 +2920,12 @@ class MainActivity : AppCompatActivity() {
                         !QuickFlashPlanValidator.validatePlan(plan).canProceed -> {
                             blockQuickFlash(getString(R.string.quick_flash_no_candidate))
                         }
-                        else -> viewModel.runFlash(plan.partitionName, file)
+                        else -> viewModel.runConfirmedQuickFlash(
+                            plan = plan,
+                            sourceFile = file,
+                            ticket = confirmationTicket,
+                            expertModeEnabled = quickFlashExpertModeEnabled
+                        )
                     }
                 }
                 if (PreflightValidator.requiresDoubleConfirm(plan.basePartition)) {

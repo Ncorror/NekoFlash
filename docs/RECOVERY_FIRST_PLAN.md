@@ -60,9 +60,9 @@ Expert Mode:
 
 Recovery стал главным target, остальные primary targets представлены отдельными действиями, а `dtbo`, `vbmeta`, `vendor_kernel_boot` и ручное имя скрыты за выключенным по умолчанию Expert Mode. UI выбирает image первым, вычисляет SHA-256 и показывает только concrete candidates из `QuickFlashTopologyCandidateBuilder`; filename остаётся hint. Inventory evidence, candidate selector и confirmation привязаны к одному transport session ID, поэтому detach или смена устройства блокируют план. Legacy multi-flash queue скрыт, выбор `BOTH` отсутствует. `TOPBAR-001`, `HOMEINFO-001` и `HOMEACTIONS-001` не изменены.
 
-### Slice D — mutation gate
+### Slice D — mutation gate (`DONE_CODE`)
 
-Передать подтверждённый `QuickFlashPlan` в существующий flash service без обхода `FastbootMutationSafety` и без повторного staging.
+Добавлен pure `QuickFlashMutationGate` с одноразовым confirmation ticket. Перед execution повторно проверяются structural plan, transport session, Expert/read-only gates, image URI/size/SHA-256 и exact concrete candidate из текущего inventory. `DeviceViewModel.runConfirmedQuickFlash` использует существующий verified staging lifecycle и вызывает `FastbootProtocol.flashPartitionDetailed` ровно один раз; retry и mutation loop отсутствуют, а протокольный `FastbootMutationSafety` остаётся обязательным.
 
 ### Slice E — evidence
 
@@ -85,6 +85,6 @@ Recovery стал главным target, остальные primary targets пр
 1. Slice A с pure tests — `DONE_CODE`.
 2. Slice B с inventory/slot regression tests — `DONE_CODE`.
 3. Slice C без изменения protected Home components — `DONE_CODE`.
-4. Slice D и end-to-end policy tests — следующий шаг.
-5. Android CI.
+4. Slice D и end-to-end policy tests — `DONE_CODE`.
+5. Slice E: Android CI — следующий шаг.
 6. Sanitised hardware validation.
