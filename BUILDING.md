@@ -21,7 +21,7 @@ python3 scripts/check-diagnostic-logging.py
 bash scripts/run-tests.sh
 ```
 
-Ожидаемый pure/JVM результат текущей baseline: `ALL TESTS PASSED (19 module(s))`.
+Ожидаемый pure/JVM результат текущей baseline: `ALL TESTS PASSED (20 module(s))`.
 
 ## Android
 
@@ -39,13 +39,19 @@ bash scripts/run-tests.sh
 bash scripts/termux-bootstrap.sh
 ```
 
-Публикация проверенного дерева:
+Быстрый commit и push без локальной сборки:
 
 ```bash
 bash scripts/termux-publish.sh "Описание изменения"
 ```
 
-Запуск CI с автоматическим сбором artifacts/logs:
+Импорт нового source ZIP и push одной командой:
+
+```bash
+bash scripts/termux-publish.sh --source-zip SOURCE.zip --sha256 SHA256 "Описание изменения"
+```
+
+Запуск CI с автоматическим сбором artifacts/logs выполняется отдельно:
 
 ```bash
 bash scripts/termux-ci.sh

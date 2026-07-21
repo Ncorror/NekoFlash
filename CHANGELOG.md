@@ -2,6 +2,7 @@
 
 ## V6.0.0-alpha5 development baseline — `6.0.0-alpha5-dev-nekoflash` (`217`)
 
+- Termux publish разделён с проверками и CI: `termux-publish.sh` теперь выполняет только безопасный импорт source ZIP, commit и push feature-ветки; локальные тесты и Android CI запускаются отдельно.
 - Реализован Slice A Recovery-first Quick Flash: pure модели target/candidate/plan и fail-closed validator без Android UI dependencies.
 - Confirmation payload сериализуется детерминированно и связывает device session, concrete partition, slot, file URI, размер и SHA-256.
 - Primary и Expert targets разделены; ручной target требует Expert Mode и точного повторного ввода, а full-ROM/radio/bootloader partitions блокируются.

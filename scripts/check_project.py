@@ -959,12 +959,13 @@ def check_termux_workflow() -> None:
         ),
         "scripts/termux-publish.sh": (
             'TARGET_BRANCH="${NEKOFLASH_BRANCH:-$CURRENT_BRANCH}"',
+            "--source-zip",
             'git pull --ff-only origin "$TARGET_BRANCH"',
-            "scripts/update-checksums.py",
-            "scripts/check-documentation.py",
-            "scripts/run-tests.sh",
+            "rsync -a --delete",
+            "main branch is protected from direct publishing",
             'git push -u origin "$TARGET_BRANCH"',
             "REMOTE_SHA",
+            "No local build or CI was started",
         ),
         "scripts/termux-ci.sh": (
             "--run-id",
@@ -998,6 +999,11 @@ def check_termux_workflow() -> None:
             "TOPBAR-001",
         ),
     }
+    publish_script = (ROOT / "scripts/termux-publish.sh").read_text(encoding="utf-8")
+    for forbidden in ("scripts/run-tests.sh", "./gradlew", "assembleDebug", "gh workflow run"):
+        if forbidden in publish_script:
+            fail(f"Push-only Termux publisher contains forbidden build/CI command: {forbidden}")
+
     for rel, tokens in required.items():
         path = ROOT / rel
         if not path.is_file():

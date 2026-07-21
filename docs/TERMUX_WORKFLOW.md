@@ -18,21 +18,33 @@ git config --global user.email "YOUR_EMAIL"
 git config --global init.defaultBranch main
 ```
 
-## Публикация проверенного дерева
+## Быстрая публикация без локальной сборки
+
+Когда изменения уже находятся в рабочем дереве:
 
 ```bash
 bash scripts/termux-publish.sh "Описание изменения"
 ```
 
+Когда новый проверенный source ZIP скачан в Android Download:
+
+```bash
+bash scripts/termux-publish.sh \
+  --source-zip "$HOME/storage/downloads/NekoFlash-source.zip" \
+  --sha256 "ОЖИДАЕМЫЙ_SHA256" \
+  "Описание изменения"
+```
+
 Скрипт:
 
-- делает `git fetch`, а для уже опубликованной текущей ветки — только `git pull --ff-only`;
-- обновляет `SHA256SUMS`;
-- запускает canonical documentation/source/safety guards и pure/JVM matrix;
-- очищает generated-каталоги;
-- создаёт обычный commit;
-- отправляет текущую ветку без force push;
-- сравнивает локальный и удалённый SHA.
+- запрещает прямую публикацию в `main`;
+- при переданном ZIP сначала требует чистое рабочее дерево и выполняет только `git pull --ff-only`;
+- переносит source tree через `rsync`, сохраняя `.git`, локальные Android properties и signing-файлы;
+- создаёт обычный commit и отправляет текущую feature-ветку без force push;
+- сравнивает локальный и удалённый SHA;
+- **не запускает** Gradle, pure/JVM matrix, локальную сборку или GitHub Actions.
+
+Проверки исходников выполняются до передачи ZIP, а Android-сборка запускается отдельно на GitHub Actions.
 
 ## Новый запуск GitHub Actions
 

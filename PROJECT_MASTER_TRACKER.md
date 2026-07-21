@@ -30,7 +30,7 @@ NekoFlash остаётся компактным Android-инструментом
 | AUDIT-001 | Удалить хвосты, исторический груз и осиротевший код | DONE_CI | Alpha4 Android CI green |
 | ALPHA4-CI | Подтвердить compile hotfix | DONE_CI | Tag `v6.0.0-alpha4` на green commit |
 | CONTEXT-001 | Самодостаточный handoff для нового чата | DONE_CODE | `docs/AI_START_HERE.md` и этот tracker входят в source ZIP |
-| TERMUX-001 | Воспроизводимые bootstrap/publish/CI scripts | DONE_CODE | Self-test в чистом Termux и следующий completed run |
+| TERMUX-001 | Раздельные Termux push и CI scripts | DONE_CODE | Push-only self-test и следующий completed GitHub Actions run |
 | TOPBAR-001 | Сохранить функциональное поведение верхней панели | DONE_CODE | Android UI smoke test |
 | HOMEINFO-001 | Сохранить карточку устройства и рабочей папки | DONE_CODE | Android UI smoke test |
 | HOMEACTIONS-001 | Четыре главных перехода на Home | DONE_CODE | Android UI smoke test |
@@ -66,7 +66,7 @@ NekoFlash остаётся компактным Android-инструментом
 3. Реализовать Slice B: read-only builder, который объединяет inventory, slot resolver, bounded point-query и `PartitionNameResolver` только как hint.
 4. Добавить Slice B A/B, legacy A-only и unknown-topology regression tests; неизвестная topology должна оставаться fail-closed.
 5. Только после Slice B переходить к Slice C UI, не меняя `TOPBAR-001`, `HOMEINFO-001` и `HOMEACTIONS-001`.
-6. Публиковать через `scripts/termux-publish.sh`, CI и сбор логов выполнять через `scripts/termux-ci.sh`; перед новым чатом создавать `scripts/export-chat-context.sh`.
+6. Публиковать без локальной сборки через `scripts/termux-publish.sh`, а CI и сбор логов выполнять отдельно через `scripts/termux-ci.sh`; перед новым чатом создавать `scripts/export-chat-context.sh`.
 7. После зелёного Android CI провести отдельный sanitised hardware retest Terminal/Sideload и контролируемый Quick Flash.
 
 Реальная прошивка всегда требует подключённого Fastboot-устройства, существующего раздела, корректного slot, проверенного файла и явного подтверждения. Автоматического повторения mutation-команд нет.
