@@ -21,7 +21,7 @@ python3 scripts/check-diagnostic-logging.py
 bash scripts/run-tests.sh
 ```
 
-Ожидаемый pure/JVM результат текущей baseline: `ALL TESTS PASSED (21 module(s))`.
+Ожидаемый pure/JVM результат текущей baseline: `ALL TESTS PASSED (23 module(s))`.
 
 ## Android
 
@@ -51,7 +51,7 @@ bash scripts/termux-publish.sh "Описание изменения"
 bash scripts/termux-publish.sh --source-zip SOURCE.zip --sha256 SHA256 "Описание изменения"
 ```
 
-Запуск CI с автоматическим сбором artifacts/logs выполняется отдельно:
+Запуск CI с автоматическим сбором лёгкого evidence archive без APK выполняется отдельно:
 
 ```bash
 bash scripts/termux-ci.sh
@@ -61,6 +61,12 @@ bash scripts/termux-ci.sh
 
 ```bash
 bash scripts/termux-ci.sh --run-id RUN_ID
+```
+
+APK скачиваются только отдельно и только когда нужны для установки или hardware retest:
+
+```bash
+bash scripts/termux-ci.sh --run-id RUN_ID --with-apk
 ```
 
 Контекст для нового чата:
@@ -75,6 +81,7 @@ bash scripts/export-chat-context.sh
 
 - Debug APK используется только для разработки и аппаратных проверок.
 - Release APK считается релизным только после проверки signing identity, R8/lintVital и hardware gates.
-- Termux сохраняет результаты в `Download/NekoFlash-CI-<RUN_ID>/` и ZIP рядом.
+- Termux сохраняет CI evidence без APK в `Download/NekoFlash-CI-<RUN_ID>/` и ZIP рядом.
+- При `--with-apk` APK сохраняются отдельно в `Download/NekoFlash-APK-<RUN_ID>/` и отдельном ZIP.
 - Generated logs не добавляются в source integrity inventory.
 - Raw hardware logs с идентификаторами устройства не коммитятся; в репозитории хранится только sanitised summary.

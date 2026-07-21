@@ -11,12 +11,14 @@ Version code: **`217`**
 
 ## Последнее подтверждённое доказательство
 
-- Предыдущая стабильная development-версия: `6.0.0-alpha4-nekoflash` (`216`).
-- GitHub Actions run: `29832274659`.
-- Commit из run: `90871fb`.
-- Результат: maintainer confirmed all workflow steps green.
-- Alpha4 исправила отсутствующие `PendingUnlockVerification` и `PendingSideloadVerification`; regression guard сохранён.
-- Перед началом alpha5 этот точный alpha4 commit следует зафиксировать annotated tag `v6.0.0-alpha4`.
+- Текущая development-версия: `6.0.0-alpha5-dev-nekoflash` (`217`).
+- GitHub Actions run: `29855091700` (`Build Android APK #14`).
+- Event/head branch: `pull_request` / `feature/recovery-first-quick-flash`.
+- PR head SHA: `8a6dab5f81dd0ff117b3b6e27e6d528a45900e24`.
+- GitHub Actions checkout/build commit: `3057477010f2ac8f1e39c1390a3c74732baab20c` (synthetic PR merge checkout; не подменяет PR head SHA).
+- Результат: `success`; static/safety checks, pure/policy matrix, `lintDebug`, `assembleDebug` и `assembleRelease` зелёные.
+- Release APK в run unsigned; Android CI не является аппаратным доказательством прошивки.
+- Предыдущий alpha4 green run `29832274659` на commit `90871fb` остаётся основанием для annotated tag `v6.0.0-alpha4`.
 
 ## Цель продукта
 
@@ -30,15 +32,15 @@ NekoFlash остаётся компактным Android-инструментом
 | AUDIT-001 | Удалить хвосты, исторический груз и осиротевший код | DONE_CI | Alpha4 Android CI green |
 | ALPHA4-CI | Подтвердить compile hotfix | DONE_CI | Tag `v6.0.0-alpha4` на green commit |
 | CONTEXT-001 | Самодостаточный handoff для нового чата | DONE_CODE | `docs/AI_START_HERE.md` и этот tracker входят в source ZIP |
-| TERMUX-001 | Раздельные Termux push и CI scripts | DONE_CODE | Push-only self-test и следующий completed GitHub Actions run |
+| TERMUX-001 | Раздельные Termux push и CI scripts | DONE_CI | Push-only подтверждён; CI evidence собирается без APK по умолчанию |
 | TOPBAR-001 | Сохранить функциональное поведение верхней панели | DONE_CODE | Android UI smoke test |
 | HOMEINFO-001 | Сохранить карточку устройства и рабочей папки | DONE_CODE | Android UI smoke test |
 | HOMEACTIONS-001 | Четыре главных перехода на Home | DONE_CODE | Android UI smoke test |
 | TERMINAL-001 | Проверить ADB/Fastboot terminal на устройстве | OPEN | Команды read-only и экспорт лога |
-| FLASH-001 | Recovery-first Quick Flash | IN_PROGRESS | Slice E: Android CI и sanitised hardware evidence |
+| FLASH-001 | Recovery-first Quick Flash | DONE_CI | Sanitised hardware retest Terminal/Sideload/Quick Flash |
 | SIDELOAD-001 | Подтвердить ADB Sideload в V6 | RETEST_REQUIRED | ZIP transfer, cancel, recovery result |
 | UNLOCK-001 | Провести отдельный аудит Mi Unlock | OPEN | Разделить стандартный Fastboot unlock и Xiaomi flow |
-| TEST-001 | Сокращённая релевантная test matrix | DONE_CI | Alpha4: 19/19 + Android CI; alpha5 local: 23/23, Android CI pending |
+| TEST-001 | Сокращённая релевантная test matrix | DONE_CI | Alpha5: local 23/23 + run 29855091700 Android CI green |
 | RELEASE-001 | Signing и аппаратный release gate | OPEN | После стабилизации alpha/beta |
 
 ## Что намеренно сохранено
@@ -66,7 +68,10 @@ NekoFlash остаётся компактным Android-инструментом
 - Slice D реализован в `QuickFlashMutationGate.kt` и `DeviceViewModel.runConfirmedQuickFlash`: confirmation ticket одноразовый, а session, image URI/size/SHA-256 и concrete topology candidate перепроверяются внутри operation.
 - Recovery-first UI больше не вызывает legacy `runFlash`; gate выдаёт ровно одну команду `flash <partition>`, запрещает retry и передаёт её в единственный вызов `FastbootProtocol.flashPartitionDetailed`.
 - Существующие `FastbootFlashPreparationPolicy`, private staging lifecycle и протокольный `FastbootMutationSafety` сохранены; detach/BROKEN после staging блокируют flash до отправки mutation-команды.
-- Полная локальная pure/JVM matrix после Slice D: `23/23`; Android lint/assemble и hardware flash этим evidence не подтверждены.
+- Полная локальная pure/JVM matrix после Slice D: `23/23`.
+- Slice E подтверждён GitHub Actions run `29855091700`: static/safety, pure/policy matrix, `lintDebug`, `assembleDebug` и `assembleRelease` завершились `success` для PR head `8a6dab5f81dd0ff117b3b6e27e6d528a45900e24`.
+- CI collector сохраняет metadata/logs/reports без APK по умолчанию; APK доступны только через `scripts/termux-ci.sh --with-apk` и отдельный архив.
+- Android CI не подтверждает реальную прошивку; hardware gate остаётся открытым.
 
 ## Текущий следующий шаг
 
@@ -77,7 +82,7 @@ NekoFlash остаётся компактным Android-инструментом
 3. Считать Slice C `DONE_CODE`: Recovery-first UI использует только candidates из `QuickFlashTopologyCandidateBuilder`, Expert Mode скрыт по умолчанию, legacy queue не виден.
 4. Сохранить `TOPBAR-001`, `HOMEINFO-001` и `HOMEACTIONS-001`; Android UI smoke test остаётся отдельным evidence gate.
 5. Считать Slice D `DONE_CODE`: одноразовый confirmation ticket проходит pure mutation gate, затем существующий flash service выполняет один `flashPartitionDetailed` без retry.
-6. Выполнить Slice E: опубликовать через push-only `scripts/termux-publish.sh`, затем отдельно запустить `scripts/termux-ci.sh` для GitHub Actions `lintDebug`, `assembleDebug`, `assembleRelease` и сохранить artifacts/logs.
-7. После зелёного Android CI провести отдельный sanitised hardware retest Terminal/Sideload и контролируемый Quick Flash.
+6. Считать Slice E `DONE_CI`: run `29855091700` подтвердил `lintDebug`, `assembleDebug`, `assembleRelease` и pure/policy checks. Обычный `scripts/termux-ci.sh` сохраняет лёгкий evidence archive без APK; `--with-apk` используется только для установки или hardware retest.
+7. Провести отдельный sanitised hardware retest Terminal/Sideload и контролируемый Quick Flash на восстанавливаемом устройстве.
 
 Реальная прошивка всегда требует подключённого Fastboot-устройства, существующего раздела, корректного slot, проверенного файла и явного подтверждения. Автоматического повторения mutation-команд нет.

@@ -68,6 +68,10 @@ Recovery стал главным target, остальные primary targets пр
 
 Добавить pure tests, static guards, Android lint/assemble и аппаратный retest на восстанавливаемом устройстве.
 
+## Evidence Slice E
+
+GitHub Actions run `29855091700` завершился `success` для PR head `8a6dab5f81dd0ff117b3b6e27e6d528a45900e24`: static/safety checks, pure/policy matrix, `lintDebug`, `assembleDebug` и `assembleRelease` зелёные. APK не входят в обычный CI evidence archive и скачиваются отдельно только для установки или hardware retest.
+
 ## Acceptance criteria alpha5
 
 - target plan воспроизводим и сериализуем для confirmation;

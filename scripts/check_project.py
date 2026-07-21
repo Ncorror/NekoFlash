@@ -969,11 +969,16 @@ def check_termux_workflow() -> None:
         ),
         "scripts/termux-ci.sh": (
             "--run-id",
-            "status,conclusion,url,headSha",
+            "--with-apk",
+            "status,conclusion,url,headSha,headBranch,event",
             'if [ "$RUN_STATUS" != "completed" ]',
-            "gh run download",
+            "REPORT_ARTIFACTS",
+            "APK_ARTIFACTS",
+            '--name "$artifact_name"',
             "compiler-errors.log",
             'RESULT_NAME="NekoFlash-CI-$RUN_ID"',
+            'APK_RESULT_NAME="NekoFlash-APK-$RUN_ID"',
+            "evidence only (no APK)",
         ),
         "scripts/export-chat-context.sh": (
             "PROJECT_MASTER_TRACKER.md",
@@ -1003,6 +1008,12 @@ def check_termux_workflow() -> None:
     for forbidden in ("scripts/run-tests.sh", "./gradlew", "assembleDebug", "gh workflow run"):
         if forbidden in publish_script:
             fail(f"Push-only Termux publisher contains forbidden build/CI command: {forbidden}")
+
+    ci_script = (ROOT / "scripts/termux-ci.sh").read_text(encoding="utf-8")
+    if re.search(r"gh run download \"?\$RUN_ID\"?\s*\\?\s*--repo[^\n]+\s*\\?\s*-D \"?\$LOCAL_RESULT_DIR/artifacts", ci_script):
+        fail("Termux CI collector must not download every artifact into the evidence archive")
+    if 'endswith("-reports")' not in ci_script or 'endswith("-apk")' not in ci_script:
+        fail("Termux CI collector must select report and APK artifacts explicitly")
 
     for rel, tokens in required.items():
         path = ROOT / rel

@@ -2,6 +2,9 @@
 
 ## V6.0.0-alpha5 development baseline — `6.0.0-alpha5-dev-nekoflash` (`217`)
 
+- Slice E Android CI подтверждён GitHub Actions run `29855091700`: pure/policy matrix, `lintDebug`, `assembleDebug` и `assembleRelease` завершились успешно для PR head `8a6dab5f81dd0ff117b3b6e27e6d528a45900e24`.
+- `termux-ci.sh` теперь по умолчанию создаёт лёгкий CI evidence archive без APK; report-artifacts сохраняются вместе с логами, а APK скачиваются только по `--with-apk` в отдельный `NekoFlash-APK-<RUN_ID>.zip`.
+- Метаданные CI теперь различают requested branch, фактическую PR head branch и event, чтобы pull-request run не отображался ошибочно как сборка `main`.
 - Реализован Slice D: pure `QuickFlashMutationGate` выдаёт одноразовую authorization только для неизменившихся plan/session/image/topology evidence.
 - `DeviceViewModel.runConfirmedQuickFlash` заново вычисляет SHA-256, сверяет concrete candidate, использует существующий verified staging и выполняет ровно один `flashPartitionDetailed` без retry.
 - Recovery-first UI больше не обходит gate через legacy `runFlash`; confirmation ticket очищается при смене или завершении USB-сессии.

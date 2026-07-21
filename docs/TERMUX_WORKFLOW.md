@@ -52,7 +52,7 @@ bash scripts/termux-publish.sh \
 bash scripts/termux-ci.sh
 ```
 
-Скрипт запускает `build.yml`, получает новый `RUN_ID`, опрашивает GitHub до `status=completed` и только после завершения скачивает логи и artifacts.
+Скрипт запускает `build.yml`, получает новый `RUN_ID`, опрашивает GitHub до `status=completed` и только после завершения сохраняет метаданные, полный лог и report-artifacts. По умолчанию APK не скачиваются и не входят в CI evidence ZIP.
 
 ## Сбор уже существующего запуска
 
@@ -60,7 +60,15 @@ bash scripts/termux-ci.sh
 bash scripts/termux-ci.sh --run-id 29832274659
 ```
 
-Новый run при этом не создаётся.
+Новый run при этом не создаётся. Обычный режим сохраняет лёгкий evidence archive без APK.
+
+APK нужны только для установки или аппаратного теста. Для них используется явный флаг:
+
+```bash
+bash scripts/termux-ci.sh --run-id 29832274659 --with-apk
+```
+
+При этом CI evidence остаётся отдельным `NekoFlash-CI-<RUN_ID>.zip`, а APK сохраняются отдельно в `NekoFlash-APK-<RUN_ID>.zip`.
 
 ## Результаты в Android Download
 
@@ -69,7 +77,7 @@ Download/NekoFlash-CI-<RUN_ID>/
 Download/NekoFlash-CI-<RUN_ID>.zip
 ```
 
-Для успешного run внутри находятся `run-info.txt`, `run-result.json`, `jobs.tsv`, `full.log` и папка `artifacts`.
+Для успешного run внутри находятся `run-info.txt`, `run-result.json`, `jobs.tsv`, `full.log`, список доступных artifacts и папка `reports`. APK в этот архив не помещаются.
 
 Для неуспешного run дополнительно создаются:
 
