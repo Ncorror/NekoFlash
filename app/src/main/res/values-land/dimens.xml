@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="welcome_horizontal_padding">24dp</dimen>
+    <dimen name="welcome_top_padding">18dp</dimen>
+    <dimen name="welcome_bottom_padding">10dp</dimen>
+    <dimen name="welcome_art_height">250dp</dimen>
+    <dimen name="welcome_panel_gap">8dp</dimen>
+    <dimen name="welcome_panel_padding_horizontal">12dp</dimen>
+    <dimen name="welcome_panel_padding_vertical">10dp</dimen>
+    <dimen name="welcome_chip_height">44dp</dimen>
+    <dimen name="welcome_risk_row_height">44dp</dimen>
+    <dimen name="welcome_status_height">34dp</dimen>
+    <dimen name="welcome_primary_button_height">48dp</dimen>
+    <dimen name="welcome_secondary_button_height">42dp</dimen>
+</resources>

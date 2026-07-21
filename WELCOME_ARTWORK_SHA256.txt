@@ -1,0 +1,1 @@
+d16195d6ab022a4ec8f9686a1d750a4dd83595140e68f718c992df8a0a60a8f7  app/src/main/res/drawable/bg_welcome.jpg

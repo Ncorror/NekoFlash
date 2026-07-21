@@ -1,0 +1,26 @@
+.gradle/
+**/build/
+/local.properties
+.DS_Store
+*.iml
+.idea/
+
+# Generated APK/AAB artifacts
+*.apk
+*.aab
+*.ap_
+
+# Runtime/forum artifacts
+forum-build/
+
+# Local verification transcripts (published separately, not source-controlled)
+*_LOCAL_CHECKS.log
+
+# Generated CI/local verification transcripts
+/safety-checks.log
+/protocol-tests.log
+/*-test.log
+/lint_log.txt
+/debug_build_log.txt
+/release_build_log.txt
+/ci-failed*.log

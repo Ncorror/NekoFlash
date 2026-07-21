@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <external-path
+        name="nekoflash_logs"
+        path="Download/NekoFlash/logs/" />
+
+    <external-path
+        name="nekoflash_reports"
+        path="Download/NekoFlash/reports/" />
+    <cache-path
+        name="nekoflash_sanitized_shares"
+        path="shared-logs/" />
+</paths>

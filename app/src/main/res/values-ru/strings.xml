@@ -1,0 +1,472 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">NekoFlash</string>
+    <string name="app_name_neko">Neko</string>
+    <string name="app_name_flash">Flash</string>
+    <string name="status_no_device">● Нет устройства</string>
+    <string name="language_dialog_title">Язык интерфейса</string>
+    <string name="language_system">Как в системе</string>
+    <string name="language_russian">Русский</string>
+    <string name="language_english">English</string>
+
+    <string name="status_connecting">● Подключение...</string>
+    <string name="status_fastboot">● FASTBOOT • BOOTLOADER</string>
+    <string name="status_adb_system">● ADB • SYSTEM</string>
+    <string name="status_adb_recovery">● ADB • RECOVERY</string>
+    <string name="status_adb_sideload">● ADB • SIDELOAD</string>
+    <string name="status_adb_unknown">● ADB • UNKNOWN</string>
+    <string name="status_fastboot_unknown">● FASTBOOT • UNKNOWN</string>
+    <string name="status_error">● Ошибка</string>
+    <string name="language_changed">Язык изменён. Интерфейс перезапущен.</string>
+    <string name="cancel_upper">ОТМЕНА</string>
+    <string name="close_upper">ЗАКРЫТЬ</string>
+    <string name="ok_understood_upper">ПОНЯТНО</string>
+    <string name="flash_upper">ПРОШИТЬ</string>
+    <string name="start_upper">НАЧАТЬ</string>
+    <string name="share_upper">ПОДЕЛИТЬСЯ</string>
+    <string name="copy_path_upper">КОПИРОВАТЬ ПУТЬ</string>
+    <string name="share_file_upper">ПОДЕЛИТЬСЯ FILE</string>
+    <string name="copy_sha256_upper">КОПИРОВАТЬ SHA-256</string>
+    <string name="to_log_upper">В ЛОГ</string>
+    <string name="open_upper">ОТКРЫТЬ</string>
+    <string name="later_upper">ПОЗЖЕ</string>
+    <string name="dialog_usb_choose_title">Выберите USB-устройство</string>
+    <string name="dialog_file_choose_title">Выберите файл</string>
+    <string name="dialog_analysis_title">Анализ файла</string>
+    <string name="dialog_destructive_fastboot_title">Подтвердите опасную Fastboot-команду</string>
+    <string name="dialog_destructive_fastboot_message">Команда:
+%1$s
+
+Риск:
+%2$s
+
+Whitelist не включается обратно, но destructive-команды требуют ручного подтверждения.</string>
+    <string name="typed_confirm_message">%1$s
+
+Защитный шлюз: введите точно `%2$s`, чтобы продолжить.</string>
+    <string name="typed_confirm_error">Введите точно: %1$s</string>
+    <string name="typed_confirm_failed_log">Typed-подтверждение не прошло: %1$s</string>
+    <string name="dialog_sideload_confirm_title">Подтвердите ADB Sideload</string>
+    <string name="dialog_report_title">Отчёт для форума</string>
+    <string name="dialog_log_title">Лог операции</string>
+    <string name="dialog_help_title">Как пользоваться</string>
+    <string name="dialog_battery_title">Оптимизация батареи</string>
+    <string name="language_dialog_message">Выберите язык интерфейса приложения. Системный режим берёт язык из настроек Android.</string>
+    <string name="help_long">1. Установите APK на телефон-хост.
+2. Подключите target-устройство через USB OTG.
+3. Второе устройство переведите в Fastboot или Recovery Sideload.
+4. Файлы .img/.zip положите в /sdcard/Download/NekoFlash или нажмите «Импорт».
+5. Нажмите «Поиск USB». Если найдено несколько устройств, выберите нужное.
+6. Выдайте USB-доступ. Если система не ответит за 30 секунд, переподключите OTG.
+
+Кабель и OTG:
+• host-телефон должен поддерживать USB OTG;
+• USB-C ↔ USB-C подходит только если кабель передаёт данные;
+• для microUSB нужен OTG-переходник;
+• если устройство не найдено, попробуйте другой data-кабель или USB-хаб с питанием.
+
+Fastboot:
+• кнопка «Прошить .IMG» остаётся для удобного download → flash;
+• ручной терминал принимает fastboot getvar/flash/erase/format/oem/flashing/reboot и raw-команды;
+• fastboot flash &lt;partition&gt; &lt;file.img&gt; берёт файл из /sdcard/Download/NekoFlash, если путь относительный;
+• перед файловыми операциями выполняются getvar, max-download-size и проверка соседних .sha256/.md5.
+
+Диагностика форума:
+• «Авто» проверяет USB каждые 3 секунды и сообщает о новых устройствах;
+• «Debug» добавляет подробные USB/Fastboot строки в лог;
+• «Отчёт» создаёт ZIP с log.txt, usb-info.txt, fastboot-info.txt и app-info.txt.
+
+Файлы и логи:
+• кнопка «Импорт» копирует .img/.zip/.bin/.sha256/.md5 в /sdcard/Download/NekoFlash;
+• кнопка «Анализ» проверяет boot/vendor_boot/vbmeta/sparse/zip до прошивки;
+• кнопка «Лог» отправляет лог как .txt-файл через FileProvider;
+• кнопка «Батарея» открывает отключение оптимизации батареи для долгих операций.
+
+ADB:
+• ADB Sideload остаётся отдельной кнопкой для recovery/sideload mode;
+• ручной терминал поддерживает adb shell, adb exec, adb reboot и raw ADB service;
+• push/pull/sync требуют отдельного ADB sync-протокола и пока не эмулируются.
+
+Профили устройств:
+• папка: /sdcard/Download/NekoFlash/profiles;
+• пример создаётся автоматически;
+• профиль предупреждает, если выбранный раздел не входит в allowed_partitions.</string>
+
+    <string name="analysis_file_title">Анализ: %1$s</string>
+    <string name="analysis_header">=== АНАЛИЗ ФАЙЛА ПРОШИВКИ ===</string>
+    <string name="sha256_copied">SHA-256 скопирован</string>
+    <string name="report_created_message">Файл создан:
+%1$s
+
+Внутри: журналы, сведения USB/ADB/Fastboot, данные приложения и выбранные диагностические файлы. Архив можно приложить к отчёту об ошибке.</string>
+    <string name="share_file_chooser">Отправить файл</string>
+    <string name="share_file_text">Файл: %1$s</string>
+    <string name="log_file_not_created">ОШИБКА: лог-файл ещё не создан</string>
+    <string name="log_dialog_message">Файл:
+%1$s
+
+Лог сохраняется автоматически. Можно скопировать путь или отправить лог как .txt-файл через системное меню.</string>
+    <string name="log_path_copied">Путь к логу скопирован</string>
+    <string name="battery_optimization_already_disabled">✅ Оптимизация батареи уже отключена для приложения</string>
+    <string name="battery_optimization_message">Для долгой прошивки лучше отключить ограничения батареи для этого приложения. Это снижает риск, что Android остановит процесс во время передачи файла.</string>
+    <string name="battery_optimization_open_error">ОШИБКА: не удалось открыть настройки батареи: %1$s</string>
+    <string name="system_terminal_ready">[Система] Терминал готов...</string>
+    <string name="security_full_terminal_active">[Терминал] Полный ADB/Fastboot режим активирован. Whitelist снят.</string>
+    <string name="log_cleared">[Лог очищен]</string>
+    <string name="connection_status_header">=== СТАТУС ПОДКЛЮЧЕНИЯ ===</string>
+    <string name="state_label">Состояние: %1$s</string>
+    <string name="device_not_connected">Устройство: не подключено</string>
+    <string name="log_auto_saved">Лог сохраняется автоматически: %1$s</string>
+    <string name="log_folder_not_ready">папка логов ещё не создана</string>
+    <string name="debug_enabled">Подробный лог включён</string>
+    <string name="debug_disabled">Подробный лог выключен</string>
+    <string name="notif_fastboot_diagnostics">Fastboot диагностика</string>
+    <string name="notif_updating_device">Обновление данных устройства</string>
+    <string name="error_no_fastboot">ОШИБКА: Нет Fastboot-соединения</string>
+    <string name="notif_file_analysis">Анализ файла</string>
+    <string name="notif_checking_file">Проверяется %1$s</string>
+    <string name="notif_fastboot_command">Fastboot-команда</string>
+    <string name="notif_adb_command">ADB-команда</string>
+    <string name="notif_executing">Выполняется: %1$s</string>
+    <string name="notif_flash_img">Прошивка .IMG</string>
+    <string name="notif_flashing_partition">Идет прошивка %1$s в раздел %2$s. Не отключайте кабель.</string>
+    <string name="notif_adb_sideload">ADB Sideload</string>
+    <string name="notif_sideload_sending">Идет отправка %1$s. Не отключайте кабель.</string>
+    <string name="error_no_adb">ОШИБКА: Нет ADB-соединения</string>
+    <string name="operation_error">ОШИБКА операции: %1$s</string>
+    <string name="operation_cancelled">⚠️ Операция отменена</string>
+    <string name="service_default_text">Идет операция. Не отключайте кабель.</string>
+    <string name="service_channel_name">ADB Fastboot operations</string>
+    <string name="service_channel_description">Уведомление во время прошивки или ADB Sideload</string>
+    <string name="dialog_permissions_title">Разрешения и безопасность</string>
+    <string name="permissions_dialog_message">Текущий статус:
+
+Доступ ко всем файлам: %1$s
+Уведомления: %2$s
+Исключение из оптимизации батареи: %3$s
+Защита от окон поверх приложения: %4$s
+
+Используемые разрешения:
+• Доступ ко всем файлам — читает .img/.zip/.sha256/.md5 из /sdcard/Download/NekoFlash.
+• Уведомления — показывает foreground-уведомление во время операции.
+• WakeLock — держит CPU активным только во время прошивки или sideload и освобождается после операции.
+• Hide overlay windows — на Android 12+ блокирует чужие окна поверх приложения во время чувствительных действий.
+
+Не запрашивается:
+• Поверх всех окон / SYSTEM_ALERT_WINDOW.
+• Интернет.
+• Контакты, SMS, микрофон, камера, телефон или геолокация.</string>
+    <string name="permission_status_granted">выдано</string>
+    <string name="permission_status_not_granted">не выдано</string>
+    <string name="permission_status_optional">необязательно / рекомендуется для долгих операций</string>
+    <string name="permission_status_not_required">не требуется на этой версии Android</string>
+    <string name="permission_status_enabled">включена</string>
+    <string name="permission_status_not_supported">не поддерживается на этой версии Android</string>
+    <string name="open_app_settings_upper">НАСТРОЙКИ ПРИЛОЖЕНИЯ</string>
+    <string name="app_settings_open_error">ОШИБКА: не удалось открыть настройки приложения: %1$s</string>
+    <string name="overlay_protection_enabled">✅ Защита от overlay включена: другие приложения не могут перекрыть окно утилиты.</string>
+    <string name="overlay_protection_error">⚠️ Не удалось включить защиту от overlay: %1$s</string>
+    <string name="overlay_protection_unsupported">Защита от overlay недоступна до Android 12.</string>
+    <string name="wake_lock_acquired">✅ WakeLock активен на время операции.</string>
+    <string name="wake_lock_released">✅ WakeLock освобождён.</string>
+    <string name="wake_lock_error">⚠️ Не удалось включить WakeLock: %1$s</string>
+    <string name="wake_lock_release_error">⚠️ Ошибка освобождения WakeLock: %1$s</string>
+    <string name="log_init_v20">Интерфейс v2.1: включён полный ADB/Fastboot-терминал без жёсткого whitelist. SYSTEM_ALERT_WINDOW не запрашивается.</string>
+
+    <!-- UX v3 full-window redesign -->
+    <string name="device_workspace_placeholder">Папка: /sdcard/Download/NekoFlash</string>
+    <string name="flash_queue_empty">Очередь пуста. Выберите раздел ниже и укажите .img файл.</string>
+    <string name="flash_queue_confirm_title">Подтвердите очередь прошивки</string>
+    <string name="flash_queue_confirm_message">Приложение прошьёт эти образы по порядку:\n\n%1$s\n\nПроверки: Fastboot-соединение, getvar-кэш, max-download-size и соседние SHA-256/MD5 файлы. Жёсткого списка разделов больше нет; перед продолжением проверьте модель и слот.</string>
+    <string name="flash_queue_typed_confirm_message">Будет выполнена следующая очередь прошивки:
+
+%1$s
+
+Операция записывает образы в разделы загрузчика. Перед подтверждением проверьте модель, слот и имена файлов.</string>
+    <string name="flash_queue_empty_log">ОШИБКА: очередь прошивки пуста</string>
+    <string name="flash_queue_updated_log">Очередь обновлена: %1$s → %2$s</string>
+    <string name="flash_queue_cleared_log">Очередь прошивки очищена</string>
+    <string name="flash_queue_filename_warning">Внимание: %1$s похож на %2$s, но выбран раздел %3$s.</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_subtitle">Прошивальщик Android через USB Host</string>
+    <string name="onboarding_bg_desc">Фоновое изображение запуска</string>
+    <string name="onboarding_grant_button">Дать доступ к файлам</string>
+    <string name="perm_storage">Доступ к файлам</string>
+    <string name="perm_notifications">Уведомления</string>
+    <string name="perm_battery_opt">Игнор оптимизации батареи</string>
+    <string name="onboarding_ready_short">Все готово для входа</string>
+    <string name="onboarding_ready_battery_recommended">Можно войти. Ограничение батареи лучше отключить</string>
+    <string name="onboarding_need_storage_short">Нужен доступ к файлам</string>
+    <string name="onboarding_ready_notifications_optional">Можно войти. Уведомления необязательны</string>
+    <string name="onboarding_agree_text_short">Я понимаю риски прошивки</string>
+    <string name="onboarding_enter_button">Войти в NekoFlash</string>
+    <string name="onboarding_battery_settings_button">Открыть настройки батареи</string>
+    <string name="onboarding_miui_hint_short">На MIUI переход может не открыться автоматически.</string>
+    <string name="onboarding_confirm_risk_first">Сначала отметьте согласие с рисками прошивки.</string>
+    <string name="onboarding_miui_battery_fallback_toast">Если MIUI не открыла батарею: Настройки → Приложения → NekoFlash → Батарея → Без ограничений.</string>
+    <string name="onboarding_gate_save_failed">Не удалось сохранить подтверждение онбординга. Повторите вход.</string>
+    <string name="onboarding_notifications_open_settings">Уведомления были отклонены несколько раз. Откройте настройки NekoFlash и разрешите их вручную; вход в приложение не заблокирован.</string>
+    <!-- Preflight -->
+    <string name="preflight_title">Предполётная проверка</string>
+    <string name="preflight_proceed">Прошить</string>
+    <string name="preflight_blocked">Старт заблокирован: есть критические ошибки</string>
+    <string name="double_check_title">Двойное подтверждение</string>
+    <string name="double_check_message">Раздел «%1$s» критичен. Ошибка может привести к bootloop. Подтвердите ещё раз.</string>
+    <!-- Layout text extracted from activity_main.xml -->
+    <string name="layout_status_no_device">● Нет устройства</string>
+    <string name="layout_icon_scan">🔌</string>
+    <string name="layout_icon_cancel">✕</string>
+    <string name="layout_icon_home">⌂
+Главная</string>
+    <string name="layout_icon_fastboot">⚡
+Прошить</string>
+    <string name="layout_icon_adb">↯
+Sideload</string>
+    <string name="layout_device_title">ИНФОРМАЦИЯ ОБ УСТРОЙСТВЕ</string>
+    <string name="layout_mode_empty">Режим: —</string>
+    <string name="layout_model_empty">Модель: —</string>
+    <string name="layout_slot_empty">Слот: —</string>
+    <string name="layout_bl_empty">BL: —</string>
+    <string name="layout_max_dl_empty">Max DL: —</string>
+    <string name="layout_refresh">↻ Обновить</string>
+    <string name="layout_partitions">☷ Разделы</string>
+    <string name="partition_inventory_title">Инвентаризация разделов</string>
+    <string name="partition_inventory_empty">Инвентаризация ещё не получена. Подключите устройство в Fastboot и нажмите «Обновить».</string>
+    <string name="partition_inventory_filter_hint">Фильтр по имени или типу</string>
+    <string name="partition_inventory_filter_all">Все разделы</string>
+    <string name="partition_inventory_filter_normal">Обычные</string>
+    <string name="partition_inventory_filter_advanced">Расширенные</string>
+    <string name="partition_inventory_filter_critical">Критичные</string>
+    <string name="partition_inventory_filter_logical">Только logical</string>
+    <string name="partition_inventory_filter_physical">Только physical</string>
+    <string name="partition_inventory_no_matches">Нет разделов по выбранному фильтру.</string>
+    <string name="partition_inventory_read_only_note">Только чтение: этот список не разрешает и не запускает прошивку.</string>
+    <string name="partition_inventory_close">Закрыть</string>
+    <string name="layout_reboot_system">Система</string>
+    <string name="layout_reboot_bootloader">Загрузчик</string>
+    <string name="layout_reboot_recovery">Recovery</string>
+    <string name="layout_flash_partition_title">ПРОШИТЬ РАЗДЕЛ</string>
+    <string name="layout_partition_boot">boot</string>
+    <string name="layout_partition_init_boot">init_boot</string>
+    <string name="layout_partition_recovery">recovery</string>
+    <string name="layout_partition_vendor_boot">vendor_boot</string>
+    <string name="layout_partition_dtbo">dtbo</string>
+    <string name="layout_flash_queue_title">ОЧЕРЕДЬ ПРОШИВКИ</string>
+    <string name="layout_add_boot">+ boot</string>
+    <string name="layout_add_init_boot">+ init_boot</string>
+    <string name="layout_add_recovery">+ recovery</string>
+    <string name="layout_add_vendor_boot">+ vendor_boot</string>
+    <string name="layout_add_dtbo">+ dtbo</string>
+    <string name="layout_queue_added">✓ %1$s</string>
+    <string name="layout_queue_empty_short">Очередь пуста</string>
+    <string name="layout_start_queue">▶ ЗАПУСТИТЬ ОЧЕРЕДЬ</string>
+    <string name="layout_clear">✕ Очистить</string>
+    <string name="layout_adb_sideload_title">ADB SIDELOAD</string>
+    <string name="layout_sideload_recovery_hint">Recovery → Apply update → Apply from ADB</string>
+    <string name="layout_choose_zip_sideload">▶  Выбрать .zip для Sideload</string>
+    <string name="layout_sideload_hash_note">Перед отправкой приложение проверит SHA-256/MD5 если .sha256 или .md5 лежит рядом с архивом.</string>
+    <string name="layout_console_title">CONSOLE</string>
+    <string name="layout_icon_up">▲</string>
+    <string name="layout_icon_down">▼</string>
+    <string name="layout_prompt">➤</string>
+    <string name="layout_command_hint">adb shell / adb shell getprop / fastboot getvar all</string>
+<string name="continue_upper">ПРОДОЛЖИТЬ</string>
+
+    <!-- 2.5.1 Classic Recovery UI -->
+
+    <!-- 2.5.2 Operation Center UI -->
+    <string name="layout_operation_center_title">OPERATION CENTER</string>
+    <string name="layout_operation_center_idle">ОЖИДАНИЕ — активной операции записи нет</string>
+    <string name="layout_operation_center_running">ВЫПОЛНЯЕТСЯ — не отключайте USB/OTG и не сворачивайте приложение</string>
+    <string name="layout_operation_center_completed">ЗАВЕРШЕНО — проверьте лог/отчёт перед перезагрузкой</string>
+    <string name="layout_operation_center_failed">ОШИБКА — остановитесь и изучите отчёт перед повтором</string>
+    <string name="layout_operation_center_warning">ПРЕДУПРЕЖДЕНИЕ — проверьте последнее событие</string>
+    <string name="layout_operation_center_last_event_empty">Последнее событие: —</string>
+    <string name="layout_operation_center_last_event">Последнее событие: %1$s</string>
+    <string name="layout_operation_console">Консоль</string>
+    <string name="layout_operation_cancel">Отменить операцию</string>
+
+    <string name="layout_operation_steps_empty">Очередь шагов: активный план ещё не создан</string>
+    <string name="layout_operation_steps_more">… и ещё %1$d шаг(ов)</string>
+
+    <string name="layout_safety_profile_title">ПРОФИЛЬ БЕЗОПАСНОСТИ</string>
+    <string name="safety_profile_novice">Новичок</string>
+    <string name="safety_profile_novice_desc">НОВИЧОК: управляемые операции доступны; ручной ввод команд скрыт; опасные действия заблокированы.</string>
+    <string name="safety_profile_changed_log">Профиль безопасности изменён: %1$s</string>
+    <string name="safety_high_risk_locked">High-risk действия: заблокированы</string>
+    <string name="safety_high_risk_unlocked">High-risk действия: разрешены на эту сессию</string>
+    <string name="safety_high_risk_title">Включить high-risk действия</string>
+    <string name="safety_high_risk_message">Это включает destructive-действия: clean all, запись super/userdata/metadata и опасные Fastboot-команды из терминала. Используйте только после проверки ROM, product, состояния загрузчика и пути восстановления.</string>
+    <string name="safety_high_risk_enabled_log">High-risk действия разрешены.</string>
+    <string name="safety_high_risk_disabled_log">High-risk действия заблокированы.</string>
+    <string name="safety_blocked_title">Заблокировано профилем безопасности</string>
+    <string name="safety_high_risk_blocked_message">Действие заблокировано: %1$s. Текущий профиль: %2$s. Переключитесь в Профи и разблокируйте High Risk.</string>
+    <string name="safety_action_blocked_log">Профиль безопасности заблокировал действие: %1$s</string>
+
+    <string name="layout_reboot_menu">⟳ Перезагрузка</string>
+    <string name="layout_reboot_fastbootd">Fastbootd</string>
+    <string name="layout_reports_menu">📋 Отчёты</string>
+    <string name="reports_sheet_title">📋 Отчёты и логи</string>
+    <string name="reports_open_folder">📂  Открыть папку отчётов</string>
+    <string name="reports_forum_zip">📦  Создать форум-отчёт (zip)</string>
+    <string name="reports_log_actions">📄  Лог: экспорт / очистка</string>
+    <string name="reports_selftest">🧪  Отчёт self-test</string>
+    <string name="reports_selftest_forum">🧪  Self-test форум-комплект</string>
+    <string name="settings_section_profile">Профиль безопасности</string>
+    <string name="settings_open_language">🌐  Язык</string>
+    <string name="settings_open_permissions">🔐  Разрешения</string>
+    <string name="settings_open_battery">🔋  Оптимизация батареи</string>
+    <string name="terminal_title">ТЕРМИНАЛ</string>
+    <string name="terminal_batch_syntax_hint">💡 Это синтаксис ПК-батника/shell-скрипта («%1$s»), а не команда fastboot/adb — у устройства нет такой wire-команды. Откройте .bat/.sh файл и выполняйте fastboot/adb-команды из него по одной, без служебных строк echo/if/for/set/pause/label.</string>
+    <string name="terminal_filter_all">Все</string>
+    <string name="terminal_filter_info">Инфо</string>
+    <string name="terminal_filter_warn">Предупр</string>
+    <string name="terminal_filter_error">Ошибки</string>
+    <string name="terminal_autoscroll_on">↓ Авто</string>
+    <string name="terminal_autoscroll_off">↓ Стоп</string>
+    <string name="terminal_clear">Очистить</string>
+    <string name="layout_fastboot_terminal">Открыть терминал</string>
+    <string name="layout_sideload_import">Импорт файла</string>
+    <string name="layout_sideload_check_archive">🔍 Проверить архив</string>
+    <string name="flash_choose_target_button">Выбрать цель</string>
+    <string name="flash_target_selector_title">Куда прошить %1$s</string>
+    <string name="flash_target_active">Активный слот (%1$s)</string>
+    <string name="flash_target_slot_a">Только слот A</string>
+    <string name="flash_target_slot_b">Только слот B</string>
+    <string name="flash_target_both">Оба слота A + B</string>
+
+    <string name="settings_section_system">СИСТЕМА</string>
+    <string name="settings_section_service">СЕРВИС</string>
+    <string name="settings_clear_workspace">🗑 Очистить рабочую папку</string>
+    <string name="settings_clear_workspace_sub">Удалить импортированные файлы из рабочей папки</string>
+    <string name="settings_clear_workspace_confirm">Удалить все файлы в:
+%1$s
+
+Это действие необратимо.</string>
+    <string name="settings_clear_workspace_do">Удалить</string>
+    <string name="settings_clear_workspace_done">🗑 Рабочая папка очищена: удалено файлов — %1$d</string>
+    <string name="settings_about">ℹ️ О NekoFlash</string>
+    <string name="settings_about_sub">Версия %1$s</string>
+    <string name="settings_about_body">NekoFlash v%1$s
+
+Инструмент прошивки Android через USB-host (ADB/Fastboot).
+Прошивка без ПК — телефон прошивает телефон.
+
+Используйте на свой риск. Прошивка может превратить устройство в кирпич.</string>
+    <string name="layout_icon_settings_tab">⚙
+Настр.</string>
+    <string name="layout_flash_reboot_mode">Reboot</string>
+    <string name="sideload_memo_text">Чтобы прошить: сначала импортируйте файл в папку приложения кнопкой «Импорт файла», затем выберите .zip для Sideload. На устройстве войдите в Recovery → Apply update → Apply from ADB.</string>
+    <string name="sideload_memo_icon">💡</string>
+    <string name="slot_hint_ab_device">🔁 Обнаружено A/B-устройство (slot-count=2). Выберите активный слот, A, B или оба; NekoFlash проверит конкретный раздел перед записью.</string>
+    <string name="slot_hint_single_device">📱 Подтверждено: устройство с одним слотом (slot-count=1, без A/B). Кнопка «оба слота» скрыта — используйте обычную прошивку.</string>
+    <string name="slot_hint_runtime_topology">🧭 Slot-count не сообщает A/B. NekoFlash проверит has-slot и partition-size перед записью. Если подтвердится однослотовый раздел, прошивка пойдёт прямо в base target без выбора A/B.</string>
+    <string name="flash_progress_writing">Запись...</string>
+    <string name="flash_progress_title">⚡ Идёт прошивка</string>
+    <string name="flash_progress_warning">⚠️ Не отключайте кабель и не сворачивайте приложение</string>
+    <string name="flash_progress_done_ok">✅ Операция завершена</string>
+    <string name="flash_progress_done_fail">❌ Операция не удалась</string>
+    <string name="flash_progress_cancel">Отмена</string>
+    <string name="flash_progress_close">Закрыть</string>
+    <string name="flash_progress_cancel_confirm_title">Отменить операцию?</string>
+    <string name="flash_progress_cancel_confirm_body">Прерывание записи может оставить раздел в повреждённом состоянии. Всё равно отменить?</string>
+    <string name="status_fastbootd">● FASTBOOT • FASTBOOTD</string>
+    <string name="otg_status_checking">🔌 OTG: проверка...</string>
+    <string name="otg_status_unsupported">🔌 OTG: не поддерживается этим телефоном</string>
+    <string name="otg_status_active">🔌 OTG: активен · устройство найдено</string>
+    <string name="otg_status_no_device">🔌 OTG: нет устройств · проверьте кабель или включите OTG в настройках</string>
+    <string name="perm_open_settings_manually">Не удалось открыть настройки автоматически. Выдайте NekoFlash доступ «Ко всем файлам» вручную: Настройки → Приложения.</string>
+<string name="layout_icon_unlock_tab">🔓
+Unlock</string>
+    <string name="console_open_terminal_btn">Терминал</string>
+    <string name="mi_login_continue">Продолжить</string>
+    <string name="mi_login_logout">Выйти</string>
+    <string name="mi_login_already">Уже выполнен вход, ID: %1$s</string>
+    <string name="mi_login_success">Вход выполнен, ID: %1$s</string>
+    <string name="usb_generic_fastboot_title">Неподтверждённый USB-интерфейс</string>
+    <string name="usb_generic_fastboot_message">У интерфейса есть vendor-specific bulk IN/OUT, но его дескрипторы не подтверждают Android Fastboot. Продолжайте только если на целевом устройстве явно открыт режим Fastboot.
+
+%s</string>
+    <string name="safety_profile_pro">Профи</string>
+    <string name="safety_profile_pro_desc">ПРОФИ: доступны полный терминал и расширенные инструменты. High Risk включается отдельно.</string>
+    <string name="safety_profile_pro_unlocked_desc">ПРОФИ + HIGH RISK: полный терминал и опасные операции включены. Typed-подтверждения всё равно обязательны.</string>
+    <string name="safety_high_risk_pro_only">High Risk доступен только в профиле Профи. Сначала переключитесь в Профи, затем отдельно разблокируйте High Risk.</string>
+    <string name="safety_not_pro_toast">Для этого действия нужен профиль Профи и соответствующий уровень безопасности.</string>
+    <string name="terminal_minimize">Свернуть</string>
+    <string name="layout_fastboot_data_self_test_title">FASTBOOT DATA SELF-TEST</string>
+    <string name="layout_fastboot_data_self_test_desc">Безопасный download-only тест транспорта. Раздел не выбирается, команды flash, boot, stage и update-super не отправляются.</string>
+    <string name="layout_fastboot_data_qualify_image_button">Проверить размер выбранного .img</string>
+    <string name="fastboot_data_qualify_transport_title">DATA-квалификация точного размера</string>
+    <string name="fastboot_data_qualify_confirm_title">Подтвердите download-only квалификацию точного размера</string>
+    <string name="fastboot_data_qualify_confirm_message">Product: %1$s
+Файл: %2$s
+Точный размер: %3$s
+Транспорт: %4$s
+
+Выбранный файл сначала копируется в private internal staging, проходит fsync и сверку SHA-256. Во временный download-буфер Fastboot отправляется только проверенная staged-копия. Раздел не выбирается, команды flash, boot, stage и update-super не отправляются. Квалификация привязана к точному SHA-256, транспорту и текущей USB-сессии. Native USBFS работает только в диагностическом режиме и не разрешает реальную прошивку.</string>
+    <string name="fastboot_data_qualify_run">Запустить точный тест</string>
+    <string name="layout_fastboot_data_self_test_button">Запустить безопасный DATA self-test</string>
+    <string name="fastboot_data_self_test_dialog_title">Безопасный Fastboot DATA Self-Test</string>
+    <string name="fastboot_data_self_test_option">%1$s · %2$s</string>
+    <string name="fastboot_data_self_test_confirm_title">Подтвердите download-only тест</string>
+    <string name="fastboot_data_self_test_confirm_message">Product: %1$s
+Размер: %2$s
+Транспорт: %3$s
+
+Раздел не выбирается. Команда записи не будет отправлена. Тест останавливается после финального ответа DATA-фазы. Native USBFS работает только в диагностическом режиме.</string>
+    <string name="fastboot_data_self_test_run">Запустить тест</string>
+    <string name="layout_fastboot_data_shared_probe_button">Тест DATA через internal staging</string>
+    <string name="fastboot_data_shared_probe_dialog_title">DATA-тест через internal staging</string>
+    <string name="fastboot_data_shared_probe_confirm_title">Подтвердите download-only тест internal staging</string>
+    <string name="fastboot_data_shared_probe_confirm_message">Product: %1$s
+Файл: %2$s
+Размер: %3$s
+Транспорт: %4$s
+Папка: %5$s
+
+Приложение создаст детерминированный .img в общей памяти, скопирует его в private internal storage, выполнит fsync, сверит SHA-256 исходника и staged-копии, удалит исходник из общей памяти и отправит в Fastboot только private staged-копию. Команды flash, boot, stage и update-super не отправляются.
+
+Этот тест проверяет внутреннюю подготовку Fastboot DATA без записи разделов.</string>
+    <string name="fastboot_data_shared_probe_run">Запустить staging-тест</string>
+    <string name="layout_fastboot_data_auto_matrix_button">Авто Matrix 100 MB</string>
+    <string name="layout_fastboot_data_content_probe_button">Content probe выбранного .img</string>
+    <string name="fastboot_data_auto_matrix_title">Автоматический Native USBFS Matrix</string>
+    <string name="fastboot_data_auto_matrix_message">Product: %1$s
+Размер: %2$s
+
+Приложение последовательно проверит все Native USBFS профили в одной свежей Fastboot-сессии. Команды flash, boot, stage и update-super не отправляются. Если любой профиль упадёт, сессия будет закрыта и автотест остановится.</string>
+    <string name="fastboot_data_auto_matrix_run">Запустить авто-тест</string>
+    <string name="fastboot_data_content_probe_title">Content probe .img</string>
+    <string name="fastboot_data_content_probe_message">Файл: %1$s
+Размер: %2$s
+Транспорт: %3$s
+
+Приложение создаст private diagnostic prefix-файлы из выбранного .img и проверит первые 1/2/3/4/8/16 MB через download-only. Это нужно, чтобы понять, на каком участке содержимого файл ломает DATA. Команды записи не отправляются.</string>
+    <string name="fastboot_data_content_probe_run">Запустить content probe</string>
+    <string name="fastboot_data_transport_async">UsbRequest</string>
+    <string name="fastboot_data_transport_sync">sync bulkTransfer</string>
+    <string name="fastboot_data_transport_native_usbfs_single_64k">Native USBFS single 64 KiB (diagnostic-only)</string>
+    <string name="fastboot_data_transport_native_usbfs_single_256k">Native USBFS single 256 KiB (diagnostic-only)</string>
+    <string name="fastboot_data_transport_native_usbfs_pipeline_16k">Native USBFS pipeline 2×16 KiB (diagnostic-only)</string>
+    <string name="fastboot_data_transport_native_usbfs_pipeline_64k">Native USBFS pipeline 2×64 KiB (diagnostic-only)</string>
+    <string name="fastboot_data_transport_native_usbfs_pipeline_128k">Native USBFS pipeline 2×128 KiB (diagnostic-only)</string>
+    <string name="fastboot_data_transport_native_usbfs_pipeline_256k">Native USBFS pipeline 2×256 KiB (diagnostic-only)</string>
+    <string name="terminal_send">Отправить команду</string>
+    <string name="mi_login_blocked_host">Вход остановлен: переход на недоверенный адрес (%1$s) заблокирован.</string>
+    <string name="mi_login_network_error">Не удалось загрузить страницу Mi Аккаунта.</string>
+    <string name="mi_login_ssl_error">Вход остановлен: не удалось проверить TLS-сертификат Mi Аккаунта.</string>
+    <string name="mi_login_webview_error">Компонент безопасного входа неожиданно остановился. Повторите попытку.</string>
+
+    <string name="home_open_workspace">Открыть папку</string>
+    <string name="home_copy_workspace">Копировать путь</string>
+    <string name="home_workspace_opening">Открываю рабочую папку: %1$s</string>
+    <string name="home_workspace_open_failed">Не удалось открыть папку. Путь скопирован.</string>
+    <string name="home_workspace_path_copied">Путь к рабочей папке скопирован</string>
+    <string name="home_primary_actions_title">ОСНОВНЫЕ ИНСТРУМЕНТЫ</string>
+    <string name="home_action_terminal">Терминал</string>
+    <string name="home_action_quick_flash">Быстрая прошивка</string>
+    <string name="home_action_sideload">ADB Sideload</string>
+    <string name="home_action_mi_unlock">Mi Unlock</string>
+
+</resources>

@@ -1,0 +1,106 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+def releaseKeystorePath = System.getenv("NEKOFLASH_KEYSTORE_PATH")
+def releaseStorePassword = System.getenv("NEKOFLASH_STORE_PASSWORD")
+def releaseKeyAlias = System.getenv("NEKOFLASH_KEY_ALIAS")
+def releaseKeyPassword = System.getenv("NEKOFLASH_KEY_PASSWORD")
+def releaseSigningReady = [
+        releaseKeystorePath,
+        releaseStorePassword,
+        releaseKeyAlias,
+        releaseKeyPassword
+].every { value -> value != null && !value.trim().isEmpty() } &&
+        file(releaseKeystorePath ?: "__missing_keystore__").isFile()
+
+android {
+    namespace 'ru.forum.adbfastboottool'
+    compileSdk 34
+
+    // AGP 8.x по умолчанию НЕ генерирует BuildConfig — включаем явно,
+    // т.к. код использует BuildConfig.VERSION_NAME / VERSION_CODE / DEBUG.
+    buildFeatures {
+        buildConfig true
+    }
+
+    defaultConfig {
+        applicationId "ru.forum.adbfastboottool"
+        minSdk 26
+        targetSdk 34
+        versionCode 215
+        versionName "6.0.0-alpha3-nekoflash"
+        def buildCommit = (System.getenv("GITHUB_SHA") ?: System.getenv("NEKOFLASH_BUILD_COMMIT") ?: "local").trim()
+        def buildRunId = (System.getenv("GITHUB_RUN_ID") ?: System.getenv("NEKOFLASH_BUILD_RUN_ID") ?: "local").trim()
+        buildConfigField "String", "BUILD_COMMIT", "\"${buildCommit.replace('\\', '_').replace('\"', '_')}\""
+        buildConfigField "String", "BUILD_RUN_ID", "\"${buildRunId.replace('\\', '_').replace('\"', '_')}\""
+        buildConfigField "String", "BUILD_ID", "\"6.0.0-alpha3-nekoflash+${buildCommit.take(12)}.${buildRunId}\""
+        externalNativeBuild {
+            cmake {
+                cppFlags "-std=c++17 -Wall -Wextra -Werror"
+            }
+        }
+    }
+
+    signingConfigs {
+        if (releaseSigningReady) {
+            release {
+                storeFile file(releaseKeystorePath)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            // Release signing is enabled only when all four NEKOFLASH_* variables are present.
+            // Without secrets Gradle still creates an explicitly unsigned release artifact.
+            if (releaseSigningReady) {
+                signingConfig signingConfigs.release
+            }
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+        debug {
+            minifyEnabled false
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path "src/main/cpp/CMakeLists.txt"
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+}
+
+dependencies {
+    implementation 'androidx.core:core-ktx:1.13.1'
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+    implementation 'androidx.activity:activity-ktx:1.9.3'
+    implementation 'com.google.android.material:material:1.12.0'
+
+    // ViewModel + LiveData
+    implementation 'androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.6'
+    implementation 'androidx.lifecycle:lifecycle-viewmodel-savedstate:2.8.6'
+    implementation 'androidx.lifecycle:lifecycle-livedata-ktx:2.8.6'
+    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.8.6'
+
+    // Корутины
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1'
+    androidTestImplementation 'androidx.test.ext:junit:1.2.1'
+
+    // Palette API — динамическое извлечение цветов из bg_welcome.jpg
+    implementation 'androidx.palette:palette-ktx:1.0.0'
+}

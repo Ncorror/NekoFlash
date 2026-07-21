@@ -1,0 +1,1749 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    UI V6 — restrained cyber-dark shell over unchanged operational logic:
+    - Console is a reserved bottom dock and never overlays the active page
+    - Ambiguous empty history glyphs are hidden from the compact console
+    - Orange is reserved for brand/primary emphasis; secondary controls are dark
+    - Navigation and transport logic remain unchanged
+    - vbmeta remains removed from the normal queue/menu
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg_base"
+    android:orientation="vertical">
+
+    <!-- ═══ PERSISTENT HEADER: brand + persistent connection state + actions ═══ -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:background="@drawable/bg_app_header"
+        android:gravity="center_vertical"
+        android:paddingStart="14dp"
+        android:paddingEnd="10dp"
+        android:orientation="horizontal">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center_vertical"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:letterSpacing="0.08"
+                android:text="@string/app_name"
+                android:textColor="@color/accent"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:ellipsize="end"
+                android:fontFamily="monospace"
+                android:maxLines="1"
+                android:text="@string/layout_status_no_device"
+                android:textColor="@color/text_muted"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- SCAN -->
+        <!-- Импорт файла — глобально доступен с любой вкладки -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnScan"
+            android:layout_width="40dp"
+            android:layout_height="36dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:text="@string/layout_icon_scan"
+            android:textSize="16sp"
+            android:layout_marginStart="6dp"
+            app:backgroundTint="@color/bg_elevated"
+            app:cornerRadius="12dp" />
+
+        <!-- EXPERT режим убран из хедера — профиль теперь в Настройках -->
+
+        <!-- СТОП (красная) — всегда видна -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnCancel"
+            android:layout_width="40dp"
+            android:layout_height="36dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:text="@string/layout_icon_cancel"
+            android:textSize="16sp"
+            android:layout_marginStart="6dp"
+            app:backgroundTint="#32171A"
+            app:cornerRadius="12dp" />
+    </LinearLayout>
+
+    <!-- ═══ OTG-индикатор: тонкая строка под верхней панелью ═══════════════ -->
+    <TextView
+        android:id="@+id/tvOtgStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="10dp"
+        android:layout_marginTop="6dp"
+        android:layout_marginEnd="10dp"
+        android:layout_marginBottom="6dp"
+        android:background="@drawable/bg_otg_strip"
+        android:gravity="center_vertical"
+        android:minHeight="34dp"
+        android:text="@string/otg_status_checking"
+        android:textColor="@color/text_secondary"
+        android:textSize="11sp"
+        android:fontFamily="monospace" />
+
+    <!-- ═══ НАВИГАЦИЯ: 4 иконки ══════════════════════════════════════════ -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:background="@color/bg_header"
+        android:orientation="horizontal">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/tabHome"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:text="@string/layout_icon_home"
+            android:textSize="8sp"
+            android:lineSpacingExtra="1dp"
+            android:gravity="center"
+            android:maxLines="2"
+            android:paddingHorizontal="0dp"
+            app:textAllCaps="false"
+            android:textColor="@color/accent"
+            app:backgroundTint="@color/bg_elevated"
+            app:cornerRadius="0dp" />
+
+        <View android:layout_width="1dp" android:layout_height="match_parent" android:background="@color/stroke" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/tabFastboot"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:text="@string/layout_icon_fastboot"
+            android:textSize="8sp"
+            android:lineSpacingExtra="1dp"
+            android:gravity="center"
+            android:maxLines="2"
+            android:paddingHorizontal="0dp"
+            app:textAllCaps="false"
+            android:textColor="@color/text_secondary"
+            app:backgroundTint="@color/bg_card"
+            app:cornerRadius="0dp" />
+
+        <View android:layout_width="1dp" android:layout_height="match_parent" android:background="@color/stroke" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/tabAdb"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:text="@string/layout_icon_adb"
+            android:textSize="8sp"
+            android:lineSpacingExtra="1dp"
+            android:gravity="center"
+            android:maxLines="2"
+            android:paddingHorizontal="0dp"
+            app:textAllCaps="false"
+            android:textColor="@color/text_secondary"
+            app:backgroundTint="@color/bg_card"
+            app:cornerRadius="0dp" />
+
+        <View android:layout_width="1dp" android:layout_height="match_parent" android:background="@color/stroke" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/tabUnlock"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:text="@string/layout_icon_unlock_tab"
+            android:textSize="8sp"
+            android:lineSpacingExtra="1dp"
+            android:gravity="center"
+            android:maxLines="2"
+            android:paddingHorizontal="0dp"
+            app:textAllCaps="false"
+            android:textColor="@color/text_secondary"
+            app:backgroundTint="@color/bg_card"
+            app:cornerRadius="0dp" />
+
+        <View android:layout_width="1dp" android:layout_height="match_parent" android:background="@color/stroke" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/tabSettings"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:text="@string/layout_icon_settings_tab"
+            android:textSize="8sp"
+            android:lineSpacingExtra="1dp"
+            android:gravity="center"
+            android:maxLines="2"
+            android:paddingHorizontal="0dp"
+            app:textAllCaps="false"
+            android:textColor="@color/text_secondary"
+            app:backgroundTint="@color/bg_card"
+            app:cornerRadius="0dp" />
+    </LinearLayout>
+
+    <!-- ═══ КОНТЕНТ (верхняя половина, скроллируется) ═══════════════════ -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <!-- ── HOME ─────────────────────────────────────────────────── -->
+        <ScrollView
+            android:id="@+id/pageHome"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:overScrollMode="ifContentScrolls">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="10dp">
+
+                <!-- HOMEINFO-001: карточка устройства и рабочей папки. Поведение сохраняется. -->
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardHomeDeviceInfo"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:cardBackgroundColor="@color/bg_card"
+                    app:cardCornerRadius="16dp"
+                    app:strokeColor="@color/stroke"
+                    app:strokeWidth="1dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="12dp">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/layout_device_title"
+                            android:textColor="@color/accent"
+                            android:textSize="11sp"
+                            android:textStyle="bold"
+                            android:letterSpacing="0.1"
+                            android:fontFamily="monospace" />
+
+                        <TextView
+                            android:id="@+id/tvDeviceModeValue"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="@string/layout_mode_empty"
+                            android:textColor="@color/text_primary"
+                            android:textSize="15sp"
+                            android:textStyle="bold"
+                            android:fontFamily="monospace" />
+
+                        <TextView
+                            android:id="@+id/tvDeviceProductValue"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="@string/layout_model_empty"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="12sp"
+                            android:fontFamily="monospace" />
+
+                        <!-- Слот + Unlocked в строку -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                android:id="@+id/tvDeviceSlotValue"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="@string/layout_slot_empty"
+                                android:textColor="@color/text_secondary"
+                                android:textSize="12sp"
+                                android:fontFamily="monospace" />
+
+                            <TextView
+                                android:id="@+id/tvDeviceUnlockedValue"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="@string/layout_bl_empty"
+                                android:textColor="@color/text_secondary"
+                                android:textSize="12sp"
+                                android:fontFamily="monospace" />
+                        </LinearLayout>
+
+                        <TextView
+                            android:id="@+id/tvDeviceMaxDownloadValue"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="@string/layout_max_dl_empty"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="11sp"
+                            android:fontFamily="monospace" />
+
+                        <TextView
+                            android:id="@+id/tvDeviceWorkspaceValue"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="@string/device_workspace_placeholder"
+                            android:textIsSelectable="true"
+                            android:textColor="@color/status_info"
+                            android:textSize="11sp"
+                            android:fontFamily="monospace" />
+
+                        <!-- Кнопки действий -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:orientation="horizontal">
+
+                            <com.google.android.material.button.MaterialButton
+                                style="@style/Widget.NekoFlash.SecondaryAction"
+                                android:id="@+id/btnHomeRefreshData"
+                                android:layout_width="0dp"
+                                android:layout_height="40dp"
+                                android:layout_weight="1"
+                                android:text="@string/layout_refresh"
+                                android:textSize="12sp" />
+
+                            <com.google.android.material.button.MaterialButton
+                                style="@style/Widget.NekoFlash.SecondaryAction"
+                                android:id="@+id/btnHomePartitions"
+                                android:layout_width="0dp"
+                                android:layout_height="40dp"
+                                android:layout_weight="1"
+                                android:layout_marginStart="6dp"
+                                android:enabled="false"
+                                android:text="@string/layout_partitions"
+                                android:textSize="12sp" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:orientation="horizontal">
+
+                            <com.google.android.material.button.MaterialButton
+                                style="@style/Widget.NekoFlash.SecondaryAction"
+                                android:id="@+id/btnHomeOpenWorkspace"
+                                android:layout_width="0dp"
+                                android:layout_height="40dp"
+                                android:layout_weight="1"
+                                android:text="@string/home_open_workspace"
+                                android:textSize="11sp" />
+
+                            <com.google.android.material.button.MaterialButton
+                                style="@style/Widget.NekoFlash.SecondaryAction"
+                                android:id="@+id/btnHomeCopyWorkspace"
+                                android:layout_width="0dp"
+                                android:layout_height="40dp"
+                                android:layout_weight="1"
+                                android:layout_marginStart="6dp"
+                                android:text="@string/home_copy_workspace"
+                                android:textSize="11sp" />
+                        </LinearLayout>
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <!-- HOMEACTIONS-001: четыре главных сценария V6. -->
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardHomePrimaryActions"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    app:cardBackgroundColor="@color/bg_card"
+                    app:cardCornerRadius="16dp"
+                    app:strokeColor="@color/stroke"
+                    app:strokeWidth="1dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="12dp">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/home_primary_actions_title"
+                            android:textColor="@color/accent"
+                            android:textSize="11sp"
+                            android:textStyle="bold"
+                            android:letterSpacing="0.1"
+                            android:fontFamily="monospace" />
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:orientation="horizontal">
+
+                            <com.google.android.material.button.MaterialButton
+                                style="@style/Widget.NekoFlash.PartitionTile"
+                                android:id="@+id/btnHomeTerminal"
+                                android:layout_width="0dp"
+                                android:layout_height="52dp"
+                                android:layout_weight="1"
+                                android:text="@string/home_action_terminal"
+                                android:textAllCaps="false"
+                                android:textSize="12sp" />
+
+                            <com.google.android.material.button.MaterialButton
+                                style="@style/Widget.NekoFlash.PartitionTile"
+                                android:id="@+id/btnHomeQuickFlash"
+                                android:layout_width="0dp"
+                                android:layout_height="52dp"
+                                android:layout_weight="1"
+                                android:layout_marginStart="6dp"
+                                android:text="@string/home_action_quick_flash"
+                                android:textAllCaps="false"
+                                android:textSize="12sp" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:orientation="horizontal">
+
+                            <com.google.android.material.button.MaterialButton
+                                style="@style/Widget.NekoFlash.PartitionTile"
+                                android:id="@+id/btnHomeSideload"
+                                android:layout_width="0dp"
+                                android:layout_height="52dp"
+                                android:layout_weight="1"
+                                android:text="@string/home_action_sideload"
+                                android:textAllCaps="false"
+                                android:textSize="12sp" />
+
+                            <com.google.android.material.button.MaterialButton
+                                style="@style/Widget.NekoFlash.PartitionTile"
+                                android:id="@+id/btnHomeMiUnlock"
+                                android:layout_width="0dp"
+                                android:layout_height="52dp"
+                                android:layout_weight="1"
+                                android:layout_marginStart="6dp"
+                                android:text="@string/home_action_mi_unlock"
+                                android:textAllCaps="false"
+                                android:textSize="12sp" />
+                        </LinearLayout>
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <!-- Safety profile -->
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    app:cardBackgroundColor="@color/bg_card"
+                    app:cardCornerRadius="16dp"
+                    app:strokeColor="#687280"
+                    app:strokeWidth="1dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="12dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:text="@string/layout_safety_profile_title"
+                                android:textColor="@color/accent"
+                                android:textSize="11sp"
+                                android:textStyle="bold"
+                                android:letterSpacing="0.1"
+                                android:fontFamily="monospace" />
+                        </LinearLayout>
+
+                        <TextView
+                            android:id="@+id/tvSafetyProfileValue"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:text="@string/safety_profile_novice_desc"
+                            android:textColor="@color/text_primary"
+                            android:textSize="11sp"
+                            android:lineSpacingExtra="2dp"
+                            android:fontFamily="monospace" />
+
+                        <!-- Два понятных профиля: Новичок и Профи -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:orientation="horizontal">
+
+                            <com.google.android.material.button.MaterialButton
+                                style="@style/Widget.NekoFlash.ProfileTile"
+                                android:id="@+id/btnSafetyNovice"
+                                android:layout_width="0dp"
+                                android:layout_height="40dp"
+                                android:layout_weight="1"
+                                android:text="@string/safety_profile_novice"
+                                android:textSize="11sp" />
+
+                            <com.google.android.material.button.MaterialButton
+                                style="@style/Widget.NekoFlash.ProfileTile"
+                                android:id="@+id/btnSafetyPro"
+                                android:layout_width="0dp"
+                                android:layout_height="40dp"
+                                android:layout_weight="1"
+                                android:layout_marginStart="6dp"
+                                android:text="@string/safety_profile_pro"
+                                android:textSize="11sp" />
+                        </LinearLayout>
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnSafetyHighRisk"
+                            android:layout_width="match_parent"
+                            android:layout_height="42dp"
+                            android:layout_marginTop="8dp"
+                            android:insetTop="0dp"
+                            android:insetBottom="0dp"
+                            android:text="@string/safety_high_risk_locked"
+                            android:textAllCaps="false"
+                            android:textColor="#F2B766"
+                            android:textSize="11sp"
+                            android:fontFamily="monospace"
+                            app:backgroundTint="#32171A"
+                            app:cornerRadius="12dp" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <!-- Operation Center / Recovery-style result panel -->
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardOperationCenter"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:visibility="gone"
+                    app:cardBackgroundColor="@color/bg_card"
+                    app:cardCornerRadius="16dp"
+                    app:strokeColor="#181D24"
+                    app:strokeWidth="1dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="12dp">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/layout_operation_center_title"
+                            android:textColor="@color/accent"
+                            android:textSize="11sp"
+                            android:textStyle="bold"
+                            android:letterSpacing="0.1"
+                            android:fontFamily="monospace" />
+
+                        <TextView
+                            android:id="@+id/tvOperationCenterStatus"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:background="@color/bg_console"
+                            android:padding="8dp"
+                            android:text="@string/layout_operation_center_idle"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="12sp"
+                            android:fontFamily="monospace" />
+
+                        <TextView
+                            android:id="@+id/tvOperationCenterLastEvent"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:text="@string/layout_operation_center_last_event_empty"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="11sp"
+                            android:lineSpacingExtra="2dp"
+                            android:fontFamily="monospace" />
+
+                        <TextView
+                            android:id="@+id/tvOperationStepQueue"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:background="@color/bg_console"
+                            android:padding="8dp"
+                            android:text="@string/layout_operation_steps_empty"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="10sp"
+                            android:lineSpacingExtra="2dp"
+                            android:fontFamily="monospace" />
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:orientation="horizontal">
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnOperationCenterConsole"
+                                android:layout_width="0dp"
+                                android:layout_height="40dp"
+                                android:layout_weight="1"
+                                android:insetTop="0dp"
+                                android:insetBottom="0dp"
+                                android:text="@string/layout_operation_console"
+                                android:textAllCaps="false"
+                                android:textColor="@color/text_primary"
+                                android:textSize="11sp"
+                                android:fontFamily="monospace"
+                                app:backgroundTint="@color/bg_card"
+                                app:cornerRadius="12dp" />
+
+                            <!-- Единая кнопка «Отчёты» — открывает BottomSheet -->
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnReportsMenu"
+                                android:layout_width="0dp"
+                                android:layout_height="40dp"
+                                android:layout_weight="1"
+                                android:layout_marginStart="6dp"
+                                android:insetTop="0dp"
+                                android:insetBottom="0dp"
+                                android:text="@string/layout_reports_menu"
+                                android:textAllCaps="false"
+                                android:textColor="@color/text_primary"
+                                android:textSize="11sp"
+                                android:fontFamily="monospace"
+                                app:backgroundTint="@color/bg_card"
+                                app:cornerRadius="12dp"
+                                app:icon="@drawable/ic_nf_reports"
+                                app:iconGravity="textStart"
+                                app:iconSize="16dp"
+                                app:iconTint="@color/accent" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:orientation="horizontal">
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnOperationCenterCancel"
+                                android:layout_width="match_parent"
+                                android:layout_height="40dp"
+                                android:insetTop="0dp"
+                                android:insetBottom="0dp"
+                                android:text="@string/layout_operation_cancel"
+                                android:textAllCaps="false"
+                                android:textColor="#E06C75"
+                                android:textSize="11sp"
+                                android:fontFamily="monospace"
+                                app:backgroundTint="#32171A"
+                                app:cornerRadius="12dp" />
+
+                            <!-- Старые report-кнопки сохранены скрытыми (обработчики/ID живы) -->
+                        </LinearLayout>
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+
+
+
+            </LinearLayout>
+        </ScrollView>
+
+        <!-- ── FLASH (⚡) ───────────────────────────────────────────── -->
+        <ScrollView
+            android:id="@+id/containerFastboot"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:overScrollMode="ifContentScrolls"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="10dp">
+
+                <!-- Тонкая кнопка вызова терминала (отдельный цвет) -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnFastbootTerminal"
+                    android:layout_width="match_parent"
+                    android:layout_height="44dp"
+                    android:layout_marginBottom="9dp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:text="@string/layout_fastboot_terminal"
+                    android:textAllCaps="false"
+                    android:textColor="@color/text_primary"
+                    android:textSize="12sp"
+                    android:fontFamily="monospace"
+                    app:backgroundTint="@color/bg_elevated"
+                    app:cornerRadius="12dp"
+                    app:icon="@drawable/ic_terminal_keyboard"
+                    app:iconGravity="textStart"
+                    app:iconPadding="8dp"
+                    app:iconSize="18dp"
+                    app:iconTint="@color/accent"
+                    app:strokeColor="#806A4428"
+                    app:strokeWidth="1dp" />
+
+                <!-- Безопасная диагностика Fastboot DATA: download-only, без flash/boot/stage -->
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    app:cardBackgroundColor="#101923"
+                    app:cardCornerRadius="16dp"
+                    app:strokeColor="#2B4B5D"
+                    app:strokeWidth="1dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="12dp">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/layout_fastboot_data_self_test_title"
+                            android:textColor="#79C5E6"
+                            android:textSize="11sp"
+                            android:textStyle="bold"
+                            android:letterSpacing="0.08"
+                            android:fontFamily="monospace" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="5dp"
+                            android:text="@string/layout_fastboot_data_self_test_desc"
+                            android:textColor="#9EABB8"
+                            android:textSize="11sp"
+                            android:lineSpacingExtra="2dp" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnFastbootDataSelfTest"
+                            android:layout_width="match_parent"
+                            android:layout_height="46dp"
+                            android:layout_marginTop="10dp"
+                            android:insetTop="0dp"
+                            android:insetBottom="0dp"
+                            android:text="@string/layout_fastboot_data_self_test_button"
+                            android:textAllCaps="false"
+                            android:textColor="#D8EEF7"
+                            android:textSize="12sp"
+                            android:textStyle="bold"
+                            android:fontFamily="monospace"
+                            app:backgroundTint="#142732"
+                            app:strokeColor="#356A80"
+                            app:strokeWidth="1dp"
+                            app:cornerRadius="12dp" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnFastbootDataSharedStorageProbe"
+                            android:layout_width="match_parent"
+                            android:layout_height="46dp"
+                            android:layout_marginTop="8dp"
+                            android:insetTop="0dp"
+                            android:insetBottom="0dp"
+                            android:text="@string/layout_fastboot_data_shared_probe_button"
+                            android:textAllCaps="false"
+                            android:textColor="#D5EBF2"
+                            android:textSize="12sp"
+                            android:textStyle="bold"
+                            android:fontFamily="monospace"
+                            app:backgroundTint="#14292D"
+                            app:strokeColor="#3E737F"
+                            app:strokeWidth="1dp"
+                            app:cornerRadius="12dp" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnFastbootDataQualifyImage"
+                            android:layout_width="match_parent"
+                            android:layout_height="46dp"
+                            android:layout_marginTop="8dp"
+                            android:insetTop="0dp"
+                            android:insetBottom="0dp"
+                            android:text="@string/layout_fastboot_data_qualify_image_button"
+                            android:textAllCaps="false"
+                            android:textColor="#E9D6B8"
+                            android:textSize="12sp"
+                            android:textStyle="bold"
+                            android:fontFamily="monospace"
+                            app:backgroundTint="#2B2319"
+                            app:strokeColor="#765B34"
+                            app:strokeWidth="1dp"
+                            app:cornerRadius="12dp" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnFastbootDataAutoMatrix"
+                            android:layout_width="match_parent"
+                            android:layout_height="46dp"
+                            android:layout_marginTop="8dp"
+                            android:insetTop="0dp"
+                            android:insetBottom="0dp"
+                            android:text="@string/layout_fastboot_data_auto_matrix_button"
+                            android:textAllCaps="false"
+                            android:textColor="#CBE8EE"
+                            android:textSize="12sp"
+                            android:textStyle="bold"
+                            android:fontFamily="monospace"
+                            app:backgroundTint="#10242C"
+                            app:strokeColor="#348BA5"
+                            app:strokeWidth="1dp"
+                            app:cornerRadius="12dp" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnFastbootDataContentProbe"
+                            android:layout_width="match_parent"
+                            android:layout_height="46dp"
+                            android:layout_marginTop="8dp"
+                            android:insetTop="0dp"
+                            android:insetBottom="0dp"
+                            android:text="@string/layout_fastboot_data_content_probe_button"
+                            android:textAllCaps="false"
+                            android:textColor="#E8CFC6"
+                            android:textSize="12sp"
+                            android:textStyle="bold"
+                            android:fontFamily="monospace"
+                            app:backgroundTint="#2B1917"
+                            app:strokeColor="#884A3B"
+                            app:strokeWidth="1dp"
+                            app:cornerRadius="12dp" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <!-- Одиночная прошивка -->
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:cardBackgroundColor="@color/bg_card"
+                    app:cardCornerRadius="16dp"
+                    app:strokeColor="@color/stroke"
+                    app:strokeWidth="1dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="12dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="@string/layout_flash_partition_title"
+                                android:textColor="@color/accent"
+                                android:textSize="11sp"
+                                android:textStyle="bold"
+                                android:letterSpacing="0.1"
+                                android:fontFamily="monospace" />
+
+                            <!-- Импорт файла прямо в контексте прошивки -->
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnBlockImportFastboot"
+                                android:layout_width="36dp"
+                                android:layout_height="32dp"
+                                android:insetTop="0dp"
+                                android:insetBottom="0dp"
+                                android:minWidth="0dp"
+                                app:icon="@drawable/ic_nf_import"
+                                app:iconGravity="textStart"
+                                app:iconPadding="0dp"
+                                app:iconSize="20dp"
+                                app:iconTint="@null"
+                                app:backgroundTint="@color/bg_elevated"
+                                app:cornerRadius="12dp" />
+                        </LinearLayout>
+
+                        <!-- Сетка разделов 3×2 (vbmeta УДАЛЕНА) -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:orientation="horizontal">
+
+                            <com.google.android.material.button.MaterialButton
+                                style="@style/Widget.NekoFlash.PartitionTile"
+                                android:id="@+id/btnFlashBoot"
+                                android:layout_width="0dp"
+                                android:layout_height="48dp"
+                                android:layout_weight="1"
+                                android:text="@string/layout_partition_boot"
+                                android:textSize="13sp"
+                                android:textStyle="bold" />
+
+                            <com.google.android.material.button.MaterialButton
+                                style="@style/Widget.NekoFlash.PartitionTile"
+                                android:id="@+id/btnFlashInitBoot"
+                                android:layout_width="0dp"
+                                android:layout_height="48dp"
+                                android:layout_weight="1"
+                                android:layout_marginStart="6dp"
+                                android:text="@string/layout_partition_init_boot"
+                                android:textSize="12sp" />
+
+                            <com.google.android.material.button.MaterialButton
+                                style="@style/Widget.NekoFlash.PartitionTile"
+                                android:id="@+id/btnFlashRecovery"
+                                android:layout_width="0dp"
+                                android:layout_height="48dp"
+                                android:layout_weight="1"
+                                android:layout_marginStart="6dp"
+                                android:text="@string/layout_partition_recovery"
+                                android:textSize="12sp" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:orientation="horizontal">
+
+                            <com.google.android.material.button.MaterialButton
+                                style="@style/Widget.NekoFlash.PartitionTile"
+                                android:id="@+id/btnFlashVendorBoot"
+                                android:layout_width="0dp"
+                                android:layout_height="48dp"
+                                android:layout_weight="1"
+                                android:text="@string/layout_partition_vendor_boot"
+                                android:textSize="11sp" />
+
+                            <com.google.android.material.button.MaterialButton
+                                style="@style/Widget.NekoFlash.PartitionTile"
+                                android:id="@+id/btnFlashDtbo"
+                                android:layout_width="0dp"
+                                android:layout_height="48dp"
+                                android:layout_weight="1"
+                                android:layout_marginStart="6dp"
+                                android:text="@string/layout_partition_dtbo"
+                                android:textSize="13sp" />
+
+                            <!-- Reboot mode на месте бывшей пустой ячейки сетки -->
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnFlashRebootMode"
+                                android:layout_width="0dp"
+                                android:layout_height="48dp"
+                                android:layout_weight="1"
+                                android:layout_marginStart="6dp"
+                                android:insetTop="0dp"
+                                android:insetBottom="0dp"
+                                android:text="@string/layout_flash_reboot_mode"
+                                android:textAllCaps="false"
+                                android:textColor="#F97316"
+                                android:textSize="13sp"
+                                android:fontFamily="monospace"
+                                app:backgroundTint="#2A1C10"
+                                app:strokeColor="#5A3A1E"
+                                app:strokeWidth="1dp"
+                                app:cornerRadius="12dp" />
+                        </LinearLayout>
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+<!-- Очередь прошивки (без vbmeta) -->
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    app:cardBackgroundColor="@color/bg_card"
+                    app:cardCornerRadius="16dp"
+                    app:strokeColor="@color/stroke"
+                    app:strokeWidth="1dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="12dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="@string/layout_flash_queue_title"
+                                android:textColor="@color/accent"
+                                android:textSize="11sp"
+                                android:textStyle="bold"
+                                android:letterSpacing="0.1"
+                                android:fontFamily="monospace" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnBlockImportQueue"
+                                android:layout_width="36dp"
+                                android:layout_height="32dp"
+                                android:insetTop="0dp"
+                                android:insetBottom="0dp"
+                                android:minWidth="0dp"
+                                app:icon="@drawable/ic_nf_import"
+                                app:iconGravity="textStart"
+                                app:iconPadding="0dp"
+                                app:iconSize="20dp"
+                                app:iconTint="@null"
+                                app:backgroundTint="@color/bg_elevated"
+                                app:cornerRadius="12dp" />
+                        </LinearLayout>
+
+                        <!-- Кнопки добавления в очередь 3×2 (без vbmeta) -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:orientation="horizontal">
+
+                            <com.google.android.material.button.MaterialButton
+                                style="@style/Widget.NekoFlash.QueueTile"
+                                android:id="@+id/btnQueueBoot"
+                                android:layout_width="0dp"
+                                android:layout_height="40dp"
+                                android:layout_weight="1"
+                                android:text="@string/layout_add_boot"
+                                android:textSize="11sp" />
+
+                            <com.google.android.material.button.MaterialButton
+                                style="@style/Widget.NekoFlash.QueueTile"
+                                android:id="@+id/btnQueueInitBoot"
+                                android:layout_width="0dp"
+                                android:layout_height="40dp"
+                                android:layout_weight="1"
+                                android:layout_marginStart="5dp"
+                                android:text="@string/layout_add_init_boot"
+                                android:textSize="10sp" />
+
+                            <com.google.android.material.button.MaterialButton
+                                style="@style/Widget.NekoFlash.QueueTile"
+                                android:id="@+id/btnQueueRecovery"
+                                android:layout_width="0dp"
+                                android:layout_height="40dp"
+                                android:layout_weight="1"
+                                android:layout_marginStart="5dp"
+                                android:text="@string/layout_add_recovery"
+                                android:textSize="11sp" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="5dp"
+                            android:orientation="horizontal">
+
+                            <com.google.android.material.button.MaterialButton
+                                style="@style/Widget.NekoFlash.QueueTile"
+                                android:id="@+id/btnQueueVendorBoot"
+                                android:layout_width="0dp"
+                                android:layout_height="40dp"
+                                android:layout_weight="1"
+                                android:text="@string/layout_add_vendor_boot"
+                                android:textSize="10sp" />
+
+                            <com.google.android.material.button.MaterialButton
+                                style="@style/Widget.NekoFlash.QueueTile"
+                                android:id="@+id/btnQueueDtbo"
+                                android:layout_width="0dp"
+                                android:layout_height="40dp"
+                                android:layout_weight="1"
+                                android:layout_marginStart="5dp"
+                                android:text="@string/layout_add_dtbo"
+                                android:textSize="11sp" />
+
+                            <!-- Распорка для выравнивания сетки 3×2 (раздел vbmeta удалён) -->
+                            <Space
+                                android:layout_width="0dp"
+                                android:layout_height="40dp"
+                                android:layout_weight="1"
+                                android:layout_marginStart="5dp" />
+                        </LinearLayout>
+
+                        <!-- Резюме очереди -->
+                        <TextView
+                            android:id="@+id/tvFlashQueueSummary"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:background="@color/bg_console"
+                            android:padding="8dp"
+                            android:text="@string/layout_queue_empty_short"
+                            android:textColor="@color/text_muted"
+                            android:textSize="11sp"
+                            android:fontFamily="monospace" />
+
+                        <!-- Запустить / Очистить -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:orientation="horizontal">
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnQueueStart"
+                                android:layout_width="0dp"
+                                android:layout_height="44dp"
+                                android:layout_weight="2"
+                                android:insetTop="0dp"
+                                android:insetBottom="0dp"
+                                android:text="@string/layout_start_queue"
+                                android:textAllCaps="false"
+                                android:textColor="@color/text_primary"
+                                android:textSize="12sp"
+                                android:textStyle="bold"
+                                app:backgroundTint="#3A210D"
+                                app:cornerRadius="12dp" />
+
+                            <com.google.android.material.button.MaterialButton
+                                style="@style/Widget.NekoFlash.SecondaryAction"
+                                android:id="@+id/btnQueueClear"
+                                android:layout_width="0dp"
+                                android:layout_height="44dp"
+                                android:layout_weight="1"
+                                android:layout_marginStart="8dp"
+                                android:text="@string/layout_clear"
+                                android:textSize="12sp" />
+                        </LinearLayout>
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+
+            </LinearLayout>
+        </ScrollView>
+
+        <!-- ── SIDELOAD (↯) ──────────────────────────────────────────── -->
+        <ScrollView
+            android:id="@+id/containerAdb"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:overScrollMode="ifContentScrolls"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="10dp">
+
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:cardBackgroundColor="@color/bg_card"
+                    app:cardCornerRadius="16dp"
+                    app:strokeColor="@color/stroke"
+                    app:strokeWidth="1dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="12dp">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/layout_adb_sideload_title"
+                            android:textColor="@color/accent"
+                            android:textSize="11sp"
+                            android:textStyle="bold"
+                            android:letterSpacing="0.1"
+                            android:fontFamily="monospace" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:text="@string/layout_sideload_recovery_hint"
+                            android:textColor="@color/text_muted"
+                            android:textSize="12sp"
+                            android:fontFamily="monospace" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnAdbSideload"
+                            android:layout_width="match_parent"
+                            android:layout_height="56dp"
+                            android:layout_marginTop="12dp"
+                            android:insetTop="0dp"
+                            android:insetBottom="0dp"
+                            android:text="@string/layout_choose_zip_sideload"
+                            android:textAllCaps="false"
+                            android:textColor="@color/text_primary"
+                            android:textSize="14sp"
+                            android:textStyle="bold"
+                            app:backgroundTint="#2E3A2E"
+                            app:cornerRadius="12dp" />
+
+                        <!-- Импорт файла + проверка архива -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:orientation="horizontal">
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnSideloadImport"
+                                android:layout_width="0dp"
+                                android:layout_height="42dp"
+                                android:layout_weight="1"
+                                android:insetTop="0dp"
+                                android:insetBottom="0dp"
+                                android:text="@string/layout_sideload_import"
+                                android:textAllCaps="false"
+                                android:textColor="@color/text_primary"
+                                android:textSize="12sp"
+                                android:textStyle="bold"
+                                android:fontFamily="monospace"
+                                app:backgroundTint="@color/cool_accent_dim"
+                                app:strokeColor="#8059B9E7"
+                                app:strokeWidth="1dp"
+                                app:cornerRadius="12dp"
+                                app:icon="@drawable/ic_nf_import"
+                                app:iconGravity="textStart"
+                                app:iconSize="20dp"
+                                app:iconTint="@null" />
+
+                            <com.google.android.material.button.MaterialButton
+                                style="@style/Widget.NekoFlash.SecondaryAction"
+                                android:id="@+id/btnSideloadCheckArchive"
+                                android:layout_width="0dp"
+                                android:layout_height="42dp"
+                                android:layout_weight="1"
+                                android:layout_marginStart="8dp"
+                                android:text="@string/layout_sideload_check_archive"
+                                android:textSize="12sp"
+                                android:fontFamily="monospace" />
+                        </LinearLayout>
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:background="@color/bg_console"
+                            android:padding="10dp"
+                            android:text="@string/layout_sideload_hash_note"
+                            android:textColor="#69C779"
+                            android:textSize="11sp"
+                            android:fontFamily="monospace" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <!-- Памятка: как импортировать файлы -->
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    app:cardBackgroundColor="@color/bg_card"
+                    app:cardCornerRadius="16dp"
+                    app:strokeColor="#F2B766"
+                    app:strokeWidth="1dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:padding="14dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/sideload_memo_icon"
+                            android:textSize="22sp"
+                            android:layout_marginEnd="12dp" />
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/sideload_memo_text"
+                            android:textColor="#F2B766"
+                            android:textSize="12sp"
+                            android:lineSpacingExtra="3dp"
+                            android:fontFamily="monospace" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+
+            </LinearLayout>
+        </ScrollView>
+
+
+        <!-- Полноэкранный терминал -->
+        <LinearLayout android:id="@+id/pageReports"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone"
+            android:orientation="vertical"
+            android:background="@color/bg_console">
+
+            <!-- Панель инструментов терминала -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:background="@color/bg_header"
+                android:gravity="center_vertical"
+                android:paddingHorizontal="10dp"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/terminal_title"
+                    android:textColor="@color/accent"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.1"
+                    android:fontFamily="monospace" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnTerminalMinimize"
+                    android:layout_width="wrap_content"
+                    android:layout_height="32dp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:minWidth="0dp"
+                    android:paddingHorizontal="10dp"
+                    android:text="@string/terminal_minimize"
+                    android:textAllCaps="false"
+                    android:textColor="@color/text_primary"
+                    android:textSize="11sp"
+                    android:fontFamily="monospace"
+                    app:backgroundTint="@color/bg_elevated"
+                    app:cornerRadius="9dp" />
+
+                <!-- Фильтр уровня лога -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnTerminalFilter"
+                    android:layout_marginStart="6dp"
+                    android:layout_width="wrap_content"
+                    android:layout_height="32dp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:minWidth="0dp"
+                    android:paddingHorizontal="10dp"
+                    android:text="@string/terminal_filter_all"
+                    android:textAllCaps="false"
+                    android:textColor="@color/text_primary"
+                    android:textSize="11sp"
+                    android:fontFamily="monospace"
+                    app:backgroundTint="@color/bg_elevated"
+                    app:cornerRadius="9dp" />
+
+                <!-- Автопрокрутка -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnTerminalAutoscroll"
+                    android:layout_width="wrap_content"
+                    android:layout_height="32dp"
+                    android:layout_marginStart="6dp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:minWidth="0dp"
+                    android:paddingHorizontal="10dp"
+                    android:text="@string/terminal_autoscroll_on"
+                    android:textAllCaps="false"
+                    android:textColor="#69C779"
+                    android:textSize="11sp"
+                    android:fontFamily="monospace"
+                    app:backgroundTint="@color/bg_elevated"
+                    app:cornerRadius="9dp" />
+
+                <!-- Очистить -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnTerminalClear"
+                    android:layout_width="wrap_content"
+                    android:layout_height="32dp"
+                    android:layout_marginStart="6dp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:minWidth="0dp"
+                    android:paddingHorizontal="10dp"
+                    android:text="@string/terminal_clear"
+                    android:textAllCaps="false"
+                    android:textColor="#E06C75"
+                    android:textSize="11sp"
+                    android:fontFamily="monospace"
+                    app:backgroundTint="#32171A"
+                    app:cornerRadius="9dp" />
+            </LinearLayout>
+
+            <!-- Полноэкранный лог -->
+            <ScrollView
+                android:id="@+id/scrollTerminalLog"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:fillViewport="true"
+                android:paddingHorizontal="12dp"
+                android:paddingTop="8dp">
+
+                <TextView
+                    android:id="@+id/tvTerminalLog"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:lineSpacingExtra="2dp"
+                    android:textColor="#9FAAB6"
+                    android:textSize="12sp"
+                    android:textIsSelectable="true" />
+            </ScrollView>
+
+            <!-- Строка ввода команды -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:background="@color/bg_header"
+                android:gravity="center_vertical"
+                android:paddingHorizontal="8dp"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/layout_prompt"
+                    android:textColor="@color/accent"
+                    android:textSize="16sp"
+                    android:fontFamily="monospace"
+                    android:layout_marginEnd="6dp" />
+
+                <EditText
+                    android:id="@+id/etTerminalCommand"
+                    android:layout_width="0dp"
+                    android:layout_height="38dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_console_input"
+                    android:fontFamily="monospace"
+                    android:hint="@string/layout_command_hint"
+                    android:textColorHint="@color/text_muted"
+                    android:textColor="@color/text_primary"
+                    android:textSize="13sp"
+                    android:imeOptions="actionSend"
+                    android:inputType="textNoSuggestions"
+                    android:maxLines="1"
+                    android:paddingHorizontal="10dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnTerminalSend"
+                    android:layout_width="50dp"
+                    android:layout_height="38dp"
+                    android:layout_marginStart="7dp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:minWidth="0dp"
+                    android:contentDescription="@string/terminal_send"
+                    android:text=""
+                    app:backgroundTint="@color/bg_elevated"
+                    app:cornerRadius="13dp"
+                    app:icon="@drawable/ic_send"
+                    app:iconGravity="textStart"
+                    app:iconPadding="0dp"
+                    app:iconSize="21dp"
+                    app:iconTint="@color/accent"
+                    app:strokeColor="#806A4428"
+                    app:strokeWidth="1dp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- ── НАСТРОЙКИ (Settings) — наполняется программно ─────────── -->
+        <ScrollView
+            android:id="@+id/pageSettings"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:overScrollMode="ifContentScrolls"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:id="@+id/settingsContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="14dp" />
+        </ScrollView>
+
+        <!-- ── РАЗБЛОКИРОВКА ЗАГРУЗЧИКА (Mi Unlock) — наполняется программно ── -->
+        <ScrollView
+            android:id="@+id/pageUnlock"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:overScrollMode="ifContentScrolls"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:id="@+id/unlockContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="14dp" />
+        </ScrollView>
+
+
+    </FrameLayout>
+
+    <!-- ═══ ЛОГ — СВОРАЧИВАЕМАЯ НИЖНЯЯ КОНСОЛЬ ══════════════════════ -->
+    <!-- Console is a normal sibling in the vertical root: it reserves its own
+         space and can never cover the scrollable page above it. -->
+    <LinearLayout
+        android:id="@+id/consolePanel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_bottom_sheet"
+        android:orientation="vertical">
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="12dp">
+
+            <View
+                android:layout_width="46dp"
+                android:layout_height="4dp"
+                android:layout_gravity="center"
+                android:background="@drawable/bg_console_handle" />
+        </FrameLayout>
+
+        <!-- Заголовок CONSOLE — кликабельный, сворачивает/разворачивает -->
+        <LinearLayout
+            android:id="@+id/consoleHeader"
+            android:layout_width="match_parent"
+            android:layout_height="46dp"
+            android:background="@drawable/bg_console_header"
+            android:gravity="center_vertical"
+            android:paddingStart="14dp"
+            android:paddingEnd="12dp"
+            android:orientation="horizontal"
+            android:clickable="true"
+            android:focusable="true">
+
+            <!-- Стрелка состояния (▼ развёрнуто / ▲ свёрнуто) -->
+            <TextView
+                android:id="@+id/tvConsoleToggle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/layout_icon_down"
+                android:textColor="@color/accent"
+                android:textSize="11sp"
+                android:layout_marginEnd="8dp"
+                android:fontFamily="monospace" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/layout_console_title"
+                android:textColor="@color/accent"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.15"
+                android:fontFamily="monospace" />
+
+            <!-- Превью последней строки (видно когда свёрнуто) -->
+            <TextView
+                android:id="@+id/tvConsolePeek"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="10dp"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:textColor="@color/text_muted"
+                android:textSize="10sp"
+                android:fontFamily="monospace" />
+
+            <!-- Кнопки истории (видны когда развёрнуто) -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnHistoryUp"
+                android:visibility="gone"
+                android:layout_width="28dp"
+                android:layout_height="26dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:text="@string/layout_icon_up"
+                android:textSize="10sp"
+                android:textColor="@color/text_muted"
+                app:backgroundTint="@color/bg_card"
+                app:cornerRadius="9dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnHistoryDown"
+                android:visibility="gone"
+                android:layout_width="28dp"
+                android:layout_height="26dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:text="@string/layout_icon_down"
+                android:textSize="10sp"
+                android:textColor="@color/text_muted"
+                android:layout_marginStart="4dp"
+                app:backgroundTint="@color/bg_card"
+                app:cornerRadius="9dp" />
+
+            <!-- Кнопка вызова терминала из консоли (видна всегда) -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnConsoleTerminal"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:paddingHorizontal="12dp"
+                android:text="@string/console_open_terminal_btn"
+                android:textSize="10sp"
+                app:textAllCaps="false"
+                android:textColor="@color/text_primary"
+                android:layout_marginStart="8dp"
+                app:backgroundTint="@color/bg_elevated"
+                app:cornerRadius="10dp"
+                app:icon="@drawable/ic_terminal_keyboard"
+                app:iconGravity="textStart"
+                app:iconPadding="6dp"
+                app:iconSize="16dp"
+                app:iconTint="@color/accent"
+                app:strokeColor="#996A4428"
+                app:strokeWidth="1dp" />
+        </LinearLayout>
+
+        <!-- Тело консоли: лог + ввод (скрывается при сворачивании) -->
+        <LinearLayout
+            android:id="@+id/consoleBody"
+            android:layout_width="match_parent"
+            android:layout_height="220dp"
+            android:orientation="vertical">
+
+            <!-- Лог -->
+            <ScrollView
+                android:id="@+id/scrollViewLog"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:fillViewport="true"
+                android:paddingHorizontal="10dp"
+                android:paddingTop="4dp"
+                android:paddingBottom="2dp">
+
+                <TextView
+                    android:id="@+id/tvLog"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:lineSpacingExtra="1dp"
+                    android:textColor="#69C779"
+                    android:textSize="10sp" />
+            </ScrollView>
+
+            <!-- Строка ввода команды (показывается только в Expert) -->
+            <LinearLayout
+                android:id="@+id/consoleInputBar"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:background="@color/bg_header"
+                android:gravity="center_vertical"
+                android:paddingHorizontal="8dp"
+                android:orientation="horizontal"
+                android:visibility="gone">
+
+                <EditText
+                    android:id="@+id/etCommand"
+                    android:layout_width="0dp"
+                    android:layout_height="38dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_console_input"
+                    android:fontFamily="monospace"
+                    android:hint="@string/layout_command_hint"
+                    android:textColorHint="@color/text_muted"
+                    android:textColor="@color/text_primary"
+                    android:textSize="12sp"
+                    android:imeOptions="actionSend"
+                    android:inputType="textNoSuggestions"
+                    android:maxLines="1"
+                    android:paddingHorizontal="10dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnSend"
+                    android:layout_width="50dp"
+                    android:layout_height="38dp"
+                    android:layout_marginStart="7dp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:contentDescription="@string/terminal_send"
+                    android:text=""
+                    app:backgroundTint="@color/bg_elevated"
+                    app:cornerRadius="13dp"
+                    app:icon="@drawable/ic_send"
+                    app:iconGravity="textStart"
+                    app:iconPadding="0dp"
+                    app:iconSize="21dp"
+                    app:iconTint="@color/accent"
+                    app:strokeColor="#806A4428"
+                    app:strokeWidth="1dp" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+
+</LinearLayout>

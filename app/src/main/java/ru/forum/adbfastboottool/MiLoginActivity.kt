@@ -1,0 +1,363 @@
+package ru.forum.adbfastboottool
+
+import android.annotation.SuppressLint
+import android.app.Activity
+import android.content.Intent
+import android.net.Uri
+import android.net.http.SslError
+import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.view.View
+import android.view.ViewGroup
+import android.view.WindowManager
+import android.webkit.CookieManager
+import android.webkit.RenderProcessGoneDetail
+import android.webkit.SslErrorHandler
+import android.webkit.WebResourceError
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
+import android.webkit.WebSettings
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import android.widget.Button
+import android.widget.LinearLayout
+import android.widget.ProgressBar
+import android.widget.TextView
+import androidx.activity.addCallback
+import androidx.appcompat.app.AppCompatActivity
+import java.io.ByteArrayInputStream
+
+/**
+ * Xiaomi Account login isolated in a hardened WebView.
+ *
+ * Only HTTPS top-level navigation under account.xiaomi.com is accepted.
+ * Third-party cookies and local file/content access are disabled. Authentication
+ * cookies are preserved until explicit logout so an already authenticated user
+ * can continue the official Mi Unlock flow without signing in again.
+ */
+class MiLoginActivity : AppCompatActivity() {
+
+    private val initialUrl =
+        "https://account.xiaomi.com/pass/serviceLogin?sid=unlockApi&checkSafeAddress=true"
+    private val endPattern = "{\"R\":\"\",\"S\":\"OK\"}"
+    private var monitoringEnded = false
+    private var webViewDestroyed = false
+    private var passToken: String? = null
+    private var deviceId: String? = null
+    private var userId: String? = null
+    private val handler = Handler(Looper.getMainLooper())
+
+    private lateinit var webView: WebView
+    private lateinit var continueButton: Button
+    private lateinit var logoutButton: Button
+    private lateinit var loginMessage: TextView
+    private lateinit var progressBar: ProgressBar
+
+    @SuppressLint("SetJavaScriptEnabled")
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        WebView.setWebContentsDebuggingEnabled(false)
+
+        val dp = { v: Int -> (v * resources.displayMetrics.density).toInt() }
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(android.graphics.Color.parseColor("#090B0F"))
+            setPadding(dp(12), dp(12), dp(12), dp(12))
+        }
+        loginMessage = TextView(this).apply {
+            setTextColor(android.graphics.Color.parseColor("#F5F5F7"))
+            textSize = 14f
+            typeface = android.graphics.Typeface.MONOSPACE
+            visibility = View.GONE
+            setPadding(dp(6), dp(6), dp(6), dp(10))
+        }
+        progressBar = ProgressBar(this).apply {
+            isIndeterminate = true
+        }
+        continueButton = Button(this).apply {
+            text = getString(R.string.mi_login_continue)
+            isAllCaps = false
+            visibility = View.GONE
+            setOnClickListener { returnResults() }
+        }
+        logoutButton = Button(this).apply {
+            text = getString(R.string.mi_login_logout)
+            isAllCaps = false
+            visibility = View.GONE
+            setOnClickListener { doLogout() }
+        }
+        webView = WebView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.MATCH_PARENT
+            )
+        }
+        root.addView(loginMessage)
+        root.addView(progressBar)
+        root.addView(continueButton)
+        root.addView(logoutButton)
+        root.addView(webView)
+        setContentView(root)
+
+        onBackPressedDispatcher.addCallback(this) { finish() }
+
+        if (checkExistingCookies()) {
+            webView.visibility = View.GONE
+            progressBar.visibility = View.GONE
+            continueButton.visibility = View.VISIBLE
+            logoutButton.visibility = View.VISIBLE
+            loginMessage.visibility = View.VISIBLE
+            loginMessage.text = getString(R.string.mi_login_already, userId ?: "")
+        } else {
+            setupWebView()
+        }
+    }
+
+    private fun checkExistingCookies(): Boolean {
+        val cookieString = CookieManager.getInstance().getCookie("https://account.xiaomi.com")
+            ?: return false
+        passToken = extractCookie(cookieString, "passToken")
+        deviceId = extractCookie(cookieString, "deviceId")
+        userId = extractCookie(cookieString, "userId")
+        return !userId.isNullOrEmpty() && !passToken.isNullOrEmpty() && !deviceId.isNullOrEmpty()
+    }
+
+    private fun extractCookie(cookieString: String, key: String): String? =
+        cookieString.split(';')
+            .asSequence()
+            .map { it.trim() }
+            .mapNotNull { item ->
+                val separator = item.indexOf('=')
+                if (separator <= 0) null else item.substring(0, separator) to item.substring(separator + 1)
+            }
+            .firstOrNull { it.first == key }
+            ?.second
+            ?.takeIf { it.isNotEmpty() }
+
+    @SuppressLint("SetJavaScriptEnabled")
+    private fun setupWebView() {
+        webView.visibility = View.VISIBLE
+        progressBar.visibility = View.VISIBLE
+        webView.settings.apply {
+            javaScriptEnabled = true
+            domStorageEnabled = true
+            userAgentString = "(Android) Mobile"
+            loadWithOverviewMode = true
+            useWideViewPort = true
+            setSupportZoom(false)
+            builtInZoomControls = false
+            displayZoomControls = false
+            allowFileAccess = false
+            allowContentAccess = false
+            allowFileAccessFromFileURLs = false
+            allowUniversalAccessFromFileURLs = false
+            javaScriptCanOpenWindowsAutomatically = false
+            setSupportMultipleWindows(false)
+            mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+            cacheMode = WebSettings.LOAD_NO_CACHE
+            databaseEnabled = false
+            setGeolocationEnabled(false)
+            mediaPlaybackRequiresUserGesture = true
+            safeBrowsingEnabled = true
+        }
+
+        webView.webViewClient = object : WebViewClient() {
+            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+                val raw = request.url.toString()
+                if (request.isForMainFrame) {
+                    return if (MiAccountSecurityPolicy.isAllowedAccountUrl(raw)) {
+                        false
+                    } else {
+                        blockUnsafeNavigation(raw)
+                        true
+                    }
+                }
+                return request.url.scheme?.equals("https", ignoreCase = true) != true
+            }
+
+            @Suppress("DEPRECATION")
+            override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean {
+                return if (MiAccountSecurityPolicy.isAllowedAccountUrl(url)) {
+                    false
+                } else {
+                    blockUnsafeNavigation(url)
+                    true
+                }
+            }
+
+            override fun shouldInterceptRequest(
+                view: WebView,
+                request: WebResourceRequest
+            ): WebResourceResponse? {
+                val scheme = request.url.scheme?.lowercase().orEmpty()
+                return if (scheme in setOf("http", "file", "content")) {
+                    emptyBlockedResponse()
+                } else {
+                    null
+                }
+            }
+
+            override fun onPageStarted(view: WebView, url: String, favicon: android.graphics.Bitmap?) {
+                if (!MiAccountSecurityPolicy.isAllowedAccountUrl(url)) {
+                    blockUnsafeNavigation(url)
+                    return
+                }
+                progressBar.visibility = View.VISIBLE
+                handler.removeCallbacksAndMessages(null)
+            }
+
+            override fun onPageFinished(view: WebView, url: String) {
+                if (!MiAccountSecurityPolicy.isAllowedAccountUrl(url)) {
+                    blockUnsafeNavigation(url)
+                    return
+                }
+                if (!monitoringEnded) {
+                    progressBar.visibility = View.GONE
+                    extractCookies()
+                    checkForEndSignal(view)
+                }
+            }
+
+            override fun onReceivedError(
+                view: WebView,
+                request: WebResourceRequest,
+                error: WebResourceError
+            ) {
+                if (!request.isForMainFrame) return
+                failLogin(getString(R.string.mi_login_network_error))
+            }
+
+            override fun onReceivedSslError(
+                view: WebView,
+                handler: SslErrorHandler,
+                error: SslError
+            ) {
+                handler.cancel()
+                failLogin(getString(R.string.mi_login_ssl_error))
+            }
+
+            override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
+                failLogin(getString(R.string.mi_login_webview_error))
+                return true
+            }
+        }
+
+        CookieManager.getInstance().run {
+            setAcceptCookie(true)
+            setAcceptThirdPartyCookies(webView, false)
+            flush()
+        }
+        webView.loadUrl(initialUrl)
+    }
+
+    private fun emptyBlockedResponse(): WebResourceResponse =
+        WebResourceResponse(
+            "text/plain",
+            "UTF-8",
+            ByteArrayInputStream(ByteArray(0))
+        )
+
+    private fun blockUnsafeNavigation(rawUrl: String) {
+        val host = runCatching { Uri.parse(rawUrl).host }.getOrNull().orEmpty()
+        failLogin(getString(R.string.mi_login_blocked_host, host.ifBlank { "?" }))
+    }
+
+    private fun failLogin(message: String) {
+        if (monitoringEnded || isFinishing || isDestroyed) return
+        monitoringEnded = true
+        if (::webView.isInitialized && !webViewDestroyed) webView.stopLoading()
+        progressBar.visibility = View.GONE
+        continueButton.visibility = View.GONE
+        logoutButton.visibility = View.GONE
+        loginMessage.visibility = View.VISIBLE
+        loginMessage.text = message
+        setResult(Activity.RESULT_CANCELED)
+        handler.removeCallbacksAndMessages(null)
+        handler.postDelayed({ if (!isFinishing && !isDestroyed) finish() }, 1800)
+    }
+
+    private fun extractCookies() {
+        CookieManager.getInstance().getCookie("https://account.xiaomi.com")?.let { cookieString ->
+            passToken = passToken ?: extractCookie(cookieString, "passToken")
+            deviceId = deviceId ?: extractCookie(cookieString, "deviceId")
+            userId = userId ?: extractCookie(cookieString, "userId")
+        }
+    }
+
+    private fun checkForEndSignal(view: WebView) {
+        if (monitoringEnded || webViewDestroyed) return
+        view.evaluateJavascript("document.documentElement.outerHTML") { html ->
+            if (monitoringEnded || webViewDestroyed) return@evaluateJavascript
+            val cleaned = html.replace("\\u003C", "<").replace("\\u003E", ">")
+                .replace("\\\"", "\"").replace("\\\\", "\\")
+            if (cleaned.contains(endPattern)) {
+                if (passToken.isNullOrEmpty() || deviceId.isNullOrEmpty() || userId.isNullOrEmpty()) {
+                    view.loadUrl(initialUrl)
+                } else {
+                    monitoringEnded = true
+                    loginMessage.text = getString(R.string.mi_login_success, userId ?: "")
+                    loginMessage.visibility = View.VISIBLE
+                    handler.postDelayed({ returnResults() }, 1500)
+                }
+            }
+        }
+    }
+
+    private fun doLogout() {
+        monitoringEnded = true
+        CookieManager.getInstance().removeAllCookies {
+            clearSensitiveFields()
+            setResult(Activity.RESULT_CANCELED)
+            finish()
+        }
+        CookieManager.getInstance().flush()
+    }
+
+    private fun returnResults() {
+        val token = passToken
+        val device = deviceId
+        val user = userId
+        val ok = !token.isNullOrEmpty() && !device.isNullOrEmpty() && !user.isNullOrEmpty()
+        if (ok) {
+            setResult(Activity.RESULT_OK, Intent().apply {
+                putExtra("passToken", token)
+                putExtra("deviceId", device)
+                putExtra("userId", user)
+            })
+            clearSensitiveFields()
+            finish()
+        } else if (!webViewDestroyed) {
+            monitoringEnded = false
+            webView.loadUrl(initialUrl)
+        }
+    }
+
+    private fun clearSensitiveFields() {
+        passToken = null
+        deviceId = null
+        userId = null
+    }
+
+    private fun destroyWebViewSafely() {
+        if (!::webView.isInitialized || webViewDestroyed) return
+        webViewDestroyed = true
+        runCatching { webView.stopLoading() }
+        runCatching { webView.webViewClient = WebViewClient() }
+        runCatching { webView.clearHistory() }
+        runCatching { webView.clearCache(true) }
+        runCatching { webView.clearFormData() }
+        runCatching { webView.clearSslPreferences() }
+        (webView.parent as? ViewGroup)?.removeView(webView)
+        runCatching { webView.removeAllViews() }
+        runCatching { webView.destroy() }
+    }
+
+    override fun onDestroy() {
+        handler.removeCallbacksAndMessages(null)
+        destroyWebViewSafely()
+        clearSensitiveFields()
+        super.onDestroy()
+    }
+}

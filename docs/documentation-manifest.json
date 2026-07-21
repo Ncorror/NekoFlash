@@ -1,0 +1,82 @@
+{
+  "schema": 1,
+  "canonical_documents": {
+    "README.md": {
+      "role": "Краткое описание продукта и навигация",
+      "update_when": "Меняются пользовательские возможности или основные ссылки"
+    },
+    "PROJECT_MASTER_TRACKER.md": {
+      "role": "Единственный живой статус и следующий шаг",
+      "update_when": "Каждая рабочая сессия с изменением кода, статуса или плана"
+    },
+    "CHANGELOG.md": {
+      "role": "История активной линии V6",
+      "update_when": "Меняется версия или release milestone"
+    },
+    "BUILDING.md": {
+      "role": "Сборка и локальные проверки",
+      "update_when": "Меняются команды, CI или signing"
+    },
+    "docs/README.md": {
+      "role": "Карта канонической документации",
+      "update_when": "Добавляется или удаляется документ"
+    },
+    "docs/ARCHITECTURE.md": {
+      "role": "Текущие компоненты и границы ответственности",
+      "update_when": "Меняется архитектура активных функций"
+    },
+    "docs/SAFETY_MODEL.md": {
+      "role": "Минимальные safety-инварианты реальных функций",
+      "update_when": "Меняется mutation/sideload/unlock policy"
+    },
+    "docs/HARDWARE_VALIDATION.md": {
+      "role": "Sanitised hardware summary и открытые gates",
+      "update_when": "Выполнен новый аппаратный тест"
+    },
+    "docs/RELEASE_PROCESS.md": {
+      "role": "CI, hardware, signing и публикация",
+      "update_when": "Меняются release gates"
+    },
+    "docs/USB_PROTOCOL.md": {
+      "role": "ADB/Fastboot/USB ownership и invariants",
+      "update_when": "Меняется transport или protocol lifecycle"
+    },
+    "docs/WELCOME_ASSET_LOCK.md": {
+      "role": "Защита welcome artwork",
+      "update_when": "Только после отдельного решения изменить artwork"
+    },
+    "docs/LAUNCHER_IDENTITY.md": {
+      "role": "Launcher resources и asset lock",
+      "update_when": "Меняется launcher identity"
+    },
+    "docs/SCOPE.md": {
+      "role": "Границы четырёх функций V6",
+      "update_when": "Меняется продуктовый scope"
+    },
+    "docs/V6_AUDIT.md": {
+      "role": "Результат source cleanup audit",
+      "update_when": "Проводится новый полный cleanup audit"
+    }
+  },
+  "generated_artifacts": {
+    "SHA256SUMS": "scripts/update-checksums.py + scripts/checksum_inventory.py"
+  },
+  "forbidden_live_files": [
+    "AUDIT.md",
+    "HARDWARE_VALIDATION.md",
+    "KNOWN_ISSUES.md",
+    "NEXT_CHAT_HANDOFF.md",
+    "PROJECT_HANDOFF.md",
+    "PROJECT_JOURNAL.md",
+    "PROJECT_STATE.md",
+    "REFACTOR_ROADMAP.md",
+    "RELEASE_CHECKLIST.md",
+    "docs/DEVICE_VALIDATION_LEDGER.md"
+  ],
+  "root_markdown_allowlist": [
+    "BUILDING.md",
+    "CHANGELOG.md",
+    "PROJECT_MASTER_TRACKER.md",
+    "README.md"
+  ]
+}

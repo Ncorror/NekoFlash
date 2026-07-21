@@ -1,0 +1,472 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">NekoFlash</string>
+    <string name="app_name_neko">Neko</string>
+    <string name="app_name_flash">Flash</string>
+    <string name="status_no_device">● No device</string>
+    <string name="language_dialog_title">Interface language</string>
+    <string name="language_system">System default</string>
+    <string name="language_russian">Russian</string>
+    <string name="language_english">English</string>
+
+    <string name="status_connecting">● Connecting...</string>
+    <string name="status_fastboot">● FASTBOOT • BOOTLOADER</string>
+    <string name="status_adb_system">● ADB • SYSTEM</string>
+    <string name="status_adb_recovery">● ADB • RECOVERY</string>
+    <string name="status_adb_sideload">● ADB • SIDELOAD</string>
+    <string name="status_adb_unknown">● ADB • UNKNOWN</string>
+    <string name="status_fastboot_unknown">● FASTBOOT • UNKNOWN</string>
+    <string name="status_error">● Error</string>
+    <string name="language_changed">Language changed. Interface restarted.</string>
+    <string name="cancel_upper">CANCEL</string>
+    <string name="close_upper">CLOSE</string>
+    <string name="ok_understood_upper">OK</string>
+    <string name="flash_upper">FLASH</string>
+    <string name="start_upper">START</string>
+    <string name="share_upper">SHARE</string>
+    <string name="copy_path_upper">COPY PATH</string>
+    <string name="share_file_upper">SHARE FILE</string>
+    <string name="copy_sha256_upper">COPY SHA-256</string>
+    <string name="to_log_upper">TO LOG</string>
+    <string name="open_upper">OPEN</string>
+    <string name="later_upper">LATER</string>
+    <string name="dialog_usb_choose_title">Choose USB device</string>
+    <string name="dialog_file_choose_title">Choose file</string>
+    <string name="dialog_analysis_title">File inspection</string>
+    <string name="dialog_destructive_fastboot_title">Confirm dangerous Fastboot command</string>
+    <string name="dialog_destructive_fastboot_message">Command:
+%1$s
+
+Risk:
+%2$s
+
+The whitelist is not restored, but destructive commands require manual confirmation.</string>
+    <string name="typed_confirm_message">%1$s
+
+Safety gate: type exactly `%2$s` to continue.</string>
+    <string name="typed_confirm_error">Type exactly: %1$s</string>
+    <string name="typed_confirm_failed_log">Typed confirmation failed: %1$s</string>
+    <string name="dialog_sideload_confirm_title">Confirm ADB Sideload</string>
+    <string name="dialog_report_title">Forum report</string>
+    <string name="dialog_log_title">Operation log</string>
+    <string name="dialog_help_title">How to use</string>
+    <string name="dialog_battery_title">Battery optimization</string>
+    <string name="language_dialog_message">Choose the app interface language. System default follows Android language settings.</string>
+    <string name="help_long">1. Install the APK on the host phone.
+2. Connect the target device through USB OTG.
+3. Put the second device into Fastboot or Recovery Sideload.
+4. Put .img/.zip files into /sdcard/Download/NekoFlash or press “Import”.
+5. Press “Scan USB”. If several devices are found, choose the required one.
+6. Grant USB access. If Android does not respond within 30 seconds, reconnect OTG.
+
+Cable and OTG:
+• the host phone must support USB OTG;
+• USB-C ↔ USB-C works only if the cable transfers data;
+• microUSB requires an OTG adapter;
+• if the device is not found, try another data cable or a powered USB hub.
+
+Fastboot:
+• “Flash .IMG” remains available for guided download → flash;
+• manual terminal accepts fastboot getvar/flash/erase/format/oem/flashing/reboot and raw commands;
+• fastboot flash &lt;partition&gt; &lt;file.img&gt; uses /sdcard/Download/NekoFlash for relative paths;
+• file-based operations still check getvar, max-download-size, and sidecar .sha256/.md5.
+
+Forum diagnostics:
+• “Auto” checks USB every 3 seconds and reports new devices;
+• “Debug” adds detailed USB/Fastboot lines to the log;
+• “Report” creates a ZIP with log.txt, usb-info.txt, fastboot-info.txt, and app-info.txt.
+
+Files and logs:
+• “Import” copies .img/.zip/.bin/.sha256/.md5 into /sdcard/Download/NekoFlash;
+• “Inspect” checks boot/vendor_boot/vbmeta/sparse/zip before flashing;
+• “Log” shares the log as a .txt file through FileProvider;
+• “Battery” opens battery optimization settings for long operations.
+
+ADB:
+• ADB Sideload remains a dedicated recovery/sideload action;
+• manual terminal supports adb shell, adb exec, adb reboot, and raw ADB service;
+• push/pull/sync require the separate ADB sync protocol and are not emulated yet.
+
+Device profiles:
+• folder: /sdcard/Download/NekoFlash/profiles;
+• sample is created automatically;
+• a profile warns if the selected partition is not listed in allowed_partitions.</string>
+
+    <string name="analysis_file_title">Inspection: %1$s</string>
+    <string name="analysis_header">=== FIRMWARE FILE INSPECTION ===</string>
+    <string name="sha256_copied">SHA-256 copied</string>
+    <string name="report_created_message">File created:
+%1$s
+
+Includes logs, USB/ADB/Fastboot details, app information, and explicitly selected diagnostic files. Attach it to a bug report when needed.</string>
+    <string name="share_file_chooser">Send file</string>
+    <string name="share_file_text">File: %1$s</string>
+    <string name="log_file_not_created">ERROR: log file has not been created yet</string>
+    <string name="log_dialog_message">File:
+%1$s
+
+The log is saved automatically. You can copy the path or send the log as a .txt file through the system menu.</string>
+    <string name="log_path_copied">Log path copied</string>
+    <string name="battery_optimization_already_disabled">✅ Battery optimization is already disabled for the app</string>
+    <string name="battery_optimization_message">For long flashing, it is better to disable battery restrictions for this app. This lowers the risk that Android stops the process during file transfer.</string>
+    <string name="battery_optimization_open_error">ERROR: could not open battery settings: %1$s</string>
+    <string name="system_terminal_ready">[System] Terminal ready...</string>
+    <string name="security_full_terminal_active">[Terminal] Full ADB/Fastboot mode is active. Whitelist removed.</string>
+    <string name="log_cleared">[Log cleared]</string>
+    <string name="connection_status_header">=== CONNECTION STATUS ===</string>
+    <string name="state_label">State: %1$s</string>
+    <string name="device_not_connected">Device: not connected</string>
+    <string name="log_auto_saved">Log is saved automatically: %1$s</string>
+    <string name="log_folder_not_ready">log folder is not created yet</string>
+    <string name="debug_enabled">Detailed log enabled</string>
+    <string name="debug_disabled">Detailed log disabled</string>
+    <string name="notif_fastboot_diagnostics">Fastboot diagnostics</string>
+    <string name="notif_updating_device">Updating device data</string>
+    <string name="error_no_fastboot">ERROR: No Fastboot connection</string>
+    <string name="notif_file_analysis">File inspection</string>
+    <string name="notif_checking_file">Checking %1$s</string>
+    <string name="notif_fastboot_command">Fastboot command</string>
+    <string name="notif_adb_command">ADB command</string>
+    <string name="notif_executing">Executing: %1$s</string>
+    <string name="notif_flash_img">Flashing .IMG</string>
+    <string name="notif_flashing_partition">Flashing %1$s to partition %2$s. Do not disconnect the cable.</string>
+    <string name="notif_adb_sideload">ADB Sideload</string>
+    <string name="notif_sideload_sending">Sending %1$s. Do not disconnect the cable.</string>
+    <string name="error_no_adb">ERROR: No ADB connection</string>
+    <string name="operation_error">ERROR during operation: %1$s</string>
+    <string name="operation_cancelled">⚠️ Operation cancelled</string>
+    <string name="service_default_text">Operation is running. Do not disconnect the cable.</string>
+    <string name="service_channel_name">ADB Fastboot operations</string>
+    <string name="service_channel_description">Notification shown during flashing or ADB Sideload</string>
+    <string name="dialog_permissions_title">Permissions and safety</string>
+    <string name="permissions_dialog_message">Current status:
+
+All files access: %1$s
+Notifications: %2$s
+Battery optimization exception: %3$s
+Overlay protection: %4$s
+
+Used permissions:
+• All files access — reads .img/.zip/.sha256/.md5 from /sdcard/Download/NekoFlash.
+• Notifications — shows a foreground operation notification.
+• Wake lock — keeps CPU awake only during flashing or sideload and is released after the operation.
+• Hide overlay windows — on Android 12+ blocks other apps from drawing over this app during sensitive actions.
+
+Not requested:
+• Draw over other apps / SYSTEM_ALERT_WINDOW.
+• Internet access.
+• Contacts, SMS, microphone, camera, phone, or location.</string>
+    <string name="permission_status_granted">granted</string>
+    <string name="permission_status_not_granted">not granted</string>
+    <string name="permission_status_optional">optional / recommended for long operations</string>
+    <string name="permission_status_not_required">not required on this Android version</string>
+    <string name="permission_status_enabled">enabled</string>
+    <string name="permission_status_not_supported">not supported on this Android version</string>
+    <string name="open_app_settings_upper">APP SETTINGS</string>
+    <string name="app_settings_open_error">ERROR: could not open app settings: %1$s</string>
+    <string name="overlay_protection_enabled">✅ Overlay protection enabled: other apps cannot cover this app window.</string>
+    <string name="overlay_protection_error">⚠️ Overlay protection could not be enabled: %1$s</string>
+    <string name="overlay_protection_unsupported">Overlay protection is not available before Android 12.</string>
+    <string name="wake_lock_acquired">✅ WakeLock active for this operation.</string>
+    <string name="wake_lock_released">✅ WakeLock released.</string>
+    <string name="wake_lock_error">⚠️ WakeLock could not be acquired: %1$s</string>
+    <string name="wake_lock_release_error">⚠️ WakeLock release error: %1$s</string>
+    <string name="log_init_v20">Interface v2.1: full ADB/Fastboot terminal enabled without strict whitelist. SYSTEM_ALERT_WINDOW is not requested.</string>
+
+    <!-- UX v3 full-window redesign -->
+    <string name="device_workspace_placeholder">Workspace: /sdcard/Download/NekoFlash</string>
+    <string name="flash_queue_empty">Queue is empty. Choose a partition below and select an .img file.</string>
+    <string name="flash_queue_confirm_title">Confirm flash queue</string>
+    <string name="flash_queue_confirm_message">The app will flash these images in order:\n\n%1$s\n\nChecks: Fastboot connection, getvar cache, max-download-size, and sidecar SHA-256/MD5 files. The strict partition list is removed; verify model and slot before continuing.</string>
+    <string name="flash_queue_typed_confirm_message">The following flash queue will be executed:
+
+%1$s
+
+This writes images to bootloader partitions. Review model, slot, and file names before confirming.</string>
+    <string name="flash_queue_empty_log">ОШИБКА: очередь прошивки пуста</string>
+    <string name="flash_queue_updated_log">Queue updated: %1$s → %2$s</string>
+    <string name="flash_queue_cleared_log">Flash queue cleared</string>
+    <string name="flash_queue_filename_warning">Warning: %1$s looks like %2$s, but you selected partition %3$s.</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_subtitle">Прошивальщик Android через USB Host</string>
+    <string name="onboarding_bg_desc">Фоновое изображение запуска</string>
+    <string name="onboarding_grant_button">Дать доступ к файлам</string>
+    <string name="perm_storage">Доступ к файлам</string>
+    <string name="perm_notifications">Уведомления</string>
+    <string name="perm_battery_opt">Игнор оптимизации батареи</string>
+    <string name="onboarding_ready_short">Все готово для входа</string>
+    <string name="onboarding_ready_battery_recommended">Можно войти. Ограничение батареи лучше отключить</string>
+    <string name="onboarding_need_storage_short">Нужен доступ к файлам</string>
+    <string name="onboarding_ready_notifications_optional">Можно войти. Уведомления необязательны</string>
+    <string name="onboarding_agree_text_short">Я понимаю риски прошивки</string>
+    <string name="onboarding_enter_button">Войти в NekoFlash</string>
+    <string name="onboarding_battery_settings_button">Открыть настройки батареи</string>
+    <string name="onboarding_miui_hint_short">На MIUI переход может не открыться автоматически.</string>
+    <string name="onboarding_confirm_risk_first">Сначала отметьте согласие с рисками прошивки.</string>
+    <string name="onboarding_miui_battery_fallback_toast">Если MIUI не открыла батарею: Настройки → Приложения → NekoFlash → Батарея → Без ограничений.</string>
+    <string name="onboarding_gate_save_failed">Не удалось сохранить подтверждение онбординга. Повторите вход.</string>
+    <string name="onboarding_notifications_open_settings">Уведомления были отклонены несколько раз. Откройте настройки NekoFlash и разрешите их вручную; вход в приложение не заблокирован.</string>
+    <!-- Preflight -->
+    <string name="preflight_title">Предполётная проверка</string>
+    <string name="preflight_proceed">Прошить</string>
+    <string name="preflight_blocked">Старт заблокирован: есть критические ошибки</string>
+    <string name="double_check_title">Двойное подтверждение</string>
+    <string name="double_check_message">Раздел «%1$s» критичен. Ошибка может привести к bootloop. Подтвердите ещё раз.</string>
+    <!-- Layout text extracted from activity_main.xml -->
+    <string name="layout_status_no_device">● No device</string>
+    <string name="layout_icon_scan">🔌</string>
+    <string name="layout_icon_cancel">✕</string>
+    <string name="layout_icon_home">⌂
+Главная</string>
+    <string name="layout_icon_fastboot">⚡
+Прошить</string>
+    <string name="layout_icon_adb">↯
+Sideload</string>
+    <string name="layout_device_title">DEVICE INFORMATION</string>
+    <string name="layout_mode_empty">Mode: —</string>
+    <string name="layout_model_empty">Model: —</string>
+    <string name="layout_slot_empty">Slot: —</string>
+    <string name="layout_bl_empty">BL: —</string>
+    <string name="layout_max_dl_empty">Max DL: —</string>
+    <string name="layout_refresh">↻ Refresh</string>
+    <string name="layout_partitions">☷ Partitions</string>
+    <string name="partition_inventory_title">Partition inventory</string>
+    <string name="partition_inventory_empty">The inventory has not been collected yet. Connect a device in Fastboot and tap Refresh.</string>
+    <string name="partition_inventory_filter_hint">Filter by name or type</string>
+    <string name="partition_inventory_filter_all">All partitions</string>
+    <string name="partition_inventory_filter_normal">Normal</string>
+    <string name="partition_inventory_filter_advanced">Advanced</string>
+    <string name="partition_inventory_filter_critical">Critical</string>
+    <string name="partition_inventory_filter_logical">Logical only</string>
+    <string name="partition_inventory_filter_physical">Physical only</string>
+    <string name="partition_inventory_no_matches">No partitions match the selected filter.</string>
+    <string name="partition_inventory_read_only_note">Read-only: this list does not authorize or start flashing.</string>
+    <string name="partition_inventory_close">Close</string>
+    <string name="layout_reboot_system">System</string>
+    <string name="layout_reboot_bootloader">Bootloader</string>
+    <string name="layout_reboot_recovery">Recovery</string>
+    <string name="layout_flash_partition_title">FLASH PARTITION</string>
+    <string name="layout_partition_boot">boot</string>
+    <string name="layout_partition_init_boot">init_boot</string>
+    <string name="layout_partition_recovery">recovery</string>
+    <string name="layout_partition_vendor_boot">vendor_boot</string>
+    <string name="layout_partition_dtbo">dtbo</string>
+    <string name="layout_flash_queue_title">FLASH QUEUE</string>
+    <string name="layout_add_boot">+ boot</string>
+    <string name="layout_add_init_boot">+ init_boot</string>
+    <string name="layout_add_recovery">+ recovery</string>
+    <string name="layout_add_vendor_boot">+ vendor_boot</string>
+    <string name="layout_add_dtbo">+ dtbo</string>
+    <string name="layout_queue_added">✓ %1$s</string>
+    <string name="layout_queue_empty_short">Queue is empty</string>
+    <string name="layout_start_queue">▶ START QUEUE</string>
+    <string name="layout_clear">✕ Clear</string>
+    <string name="layout_adb_sideload_title">ADB SIDELOAD</string>
+    <string name="layout_sideload_recovery_hint">Recovery → Apply update → Apply from ADB</string>
+    <string name="layout_choose_zip_sideload">▶  Choose .zip for Sideload</string>
+    <string name="layout_sideload_hash_note">Before transfer, the app checks SHA-256/MD5 if a .sha256 or .md5 file is next to the archive.</string>
+    <string name="layout_console_title">CONSOLE</string>
+    <string name="layout_icon_up">▲</string>
+    <string name="layout_icon_down">▼</string>
+    <string name="layout_prompt">➤</string>
+    <string name="layout_command_hint">adb shell / adb shell getprop / fastboot getvar all</string>
+<string name="continue_upper">CONTINUE</string>
+
+    <!-- 2.5.1 Classic Recovery UI -->
+
+    <!-- 2.5.2 Operation Center UI -->
+    <string name="layout_operation_center_title">OPERATION CENTER</string>
+    <string name="layout_operation_center_idle">IDLE — no active write operation</string>
+    <string name="layout_operation_center_running">RUNNING — keep screen on and do not disconnect USB/OTG</string>
+    <string name="layout_operation_center_completed">COMPLETED — review the log/report before rebooting</string>
+    <string name="layout_operation_center_failed">FAILED — stop and inspect the report before retrying</string>
+    <string name="layout_operation_center_warning">WARNING — review the last event before continuing</string>
+    <string name="layout_operation_center_last_event_empty">Last event: —</string>
+    <string name="layout_operation_center_last_event">Last event: %1$s</string>
+    <string name="layout_operation_console">Console</string>
+    <string name="layout_operation_cancel">Cancel operation</string>
+
+    <string name="layout_operation_steps_empty">Step queue: no active plan yet</string>
+    <string name="layout_operation_steps_more">… and %1$d more step(s)</string>
+
+    <string name="layout_safety_profile_title">SAFETY PROFILE</string>
+    <string name="safety_profile_novice">Novice</string>
+    <string name="safety_profile_novice_desc">NOVICE: guided operations are available; manual terminal input is hidden; high-risk actions stay blocked.</string>
+    <string name="safety_profile_changed_log">Safety profile changed: %1$s</string>
+    <string name="safety_high_risk_locked">High-risk actions: locked</string>
+    <string name="safety_high_risk_unlocked">High-risk actions: unlocked for this session</string>
+    <string name="safety_high_risk_title">Enable high-risk actions</string>
+    <string name="safety_high_risk_message">This enables destructive actions such as clean all, writes to super/userdata/metadata, and dangerous Fastboot terminal commands. Use only after checking the ROM, product, bootloader state, and recovery path.</string>
+    <string name="safety_high_risk_enabled_log">High-risk actions unlocked.</string>
+    <string name="safety_high_risk_disabled_log">High-risk actions locked.</string>
+    <string name="safety_blocked_title">Blocked by safety profile</string>
+    <string name="safety_high_risk_blocked_message">Action blocked: %1$s. Current profile: %2$s. Switch to Pro and unlock High Risk to continue.</string>
+    <string name="safety_action_blocked_log">Safety profile blocked action: %1$s</string>
+
+    <string name="layout_reboot_menu">⟳ Reboot</string>
+    <string name="layout_reboot_fastbootd">Fastbootd</string>
+    <string name="layout_reports_menu">📋 Reports</string>
+    <string name="reports_sheet_title">📋 Reports &amp; Logs</string>
+    <string name="reports_open_folder">📂  Open reports folder</string>
+    <string name="reports_forum_zip">📦  Create forum report (zip)</string>
+    <string name="reports_log_actions">📄  Log: export / clear</string>
+    <string name="reports_selftest">🧪  Self-test report</string>
+    <string name="reports_selftest_forum">🧪  Self-test forum bundle</string>
+    <string name="settings_section_profile">Safety profile</string>
+    <string name="settings_open_language">🌐  Language</string>
+    <string name="settings_open_permissions">🔐  Permissions</string>
+    <string name="settings_open_battery">🔋  Battery optimization</string>
+    <string name="terminal_title">TERMINAL</string>
+    <string name="terminal_batch_syntax_hint">💡 This looks like PC batch/shell script syntax ("%1$s"), not a fastboot/adb command — the device has no such wire command. Open the .bat/.sh file and run its fastboot/adb commands one at a time, skipping control lines like echo/if/for/set/pause/labels.</string>
+    <string name="terminal_filter_all">All</string>
+    <string name="terminal_filter_info">Info</string>
+    <string name="terminal_filter_warn">Warn</string>
+    <string name="terminal_filter_error">Error</string>
+    <string name="terminal_autoscroll_on">↓ Auto</string>
+    <string name="terminal_autoscroll_off">↓ Off</string>
+    <string name="terminal_clear">Clear</string>
+    <string name="layout_fastboot_terminal">Open terminal</string>
+    <string name="layout_sideload_import">Import file</string>
+    <string name="layout_sideload_check_archive">🔍 Check archive</string>
+    <string name="flash_choose_target_button">Choose target</string>
+    <string name="flash_target_selector_title">Flash target for %1$s</string>
+    <string name="flash_target_active">Active slot (%1$s)</string>
+    <string name="flash_target_slot_a">Slot A only</string>
+    <string name="flash_target_slot_b">Slot B only</string>
+    <string name="flash_target_both">Both slots A + B</string>
+
+    <string name="settings_section_system">SYSTEM</string>
+    <string name="settings_section_service">SERVICE</string>
+    <string name="settings_clear_workspace">🗑 Clear workspace folder</string>
+    <string name="settings_clear_workspace_sub">Delete imported files from the working folder</string>
+    <string name="settings_clear_workspace_confirm">Delete all files in:
+%1$s
+
+This cannot be undone.</string>
+    <string name="settings_clear_workspace_do">Delete</string>
+    <string name="settings_clear_workspace_done">🗑 Workspace cleared: %1$d file(s) deleted</string>
+    <string name="settings_about">ℹ️ About NekoFlash</string>
+    <string name="settings_about_sub">Version %1$s</string>
+    <string name="settings_about_body">NekoFlash v%1$s
+
+Android USB-host flashing tool (ADB/Fastboot).
+Flash without a PC — phone flashes phone.
+
+Use at your own risk. Flashing can brick a device.</string>
+    <string name="layout_icon_settings_tab">⚙
+Настр.</string>
+    <string name="layout_flash_reboot_mode">Reboot</string>
+    <string name="sideload_memo_text">To flash: first import the file into the app folder via the Import file button, then select the .zip for Sideload. On the device, enter Recovery → Apply update → Apply from ADB.</string>
+    <string name="sideload_memo_icon">💡</string>
+    <string name="slot_hint_ab_device">🔁 A/B-capable device detected (slot-count=2). Choose Active, A, B, or Both; NekoFlash will verify the concrete partition target before writing.</string>
+    <string name="slot_hint_single_device">📱 Single-slot device confirmed (slot-count=1, no A/B). The both-slots option is hidden — just use the regular flash button.</string>
+    <string name="slot_hint_runtime_topology">🧭 Slot-count does not prove A/B. NekoFlash will verify has-slot and partition-size before writing. If a single-slot base partition is confirmed, it will flash the base target without A/B selection.</string>
+    <string name="flash_progress_writing">Writing...</string>
+    <string name="flash_progress_title">⚡ Flashing in progress</string>
+    <string name="flash_progress_warning">⚠️ Do not disconnect the cable or minimize the app</string>
+    <string name="flash_progress_done_ok">✅ Operation completed</string>
+    <string name="flash_progress_done_fail">❌ Operation failed</string>
+    <string name="flash_progress_cancel">Cancel</string>
+    <string name="flash_progress_close">Close</string>
+    <string name="flash_progress_cancel_confirm_title">Cancel operation?</string>
+    <string name="flash_progress_cancel_confirm_body">Interrupting a flash mid-write can leave the partition in a broken state. Cancel anyway?</string>
+    <string name="status_fastbootd">● FASTBOOT • FASTBOOTD</string>
+    <string name="otg_status_checking">🔌 OTG: checking...</string>
+    <string name="otg_status_unsupported">🔌 OTG: not supported by this phone</string>
+    <string name="otg_status_active">🔌 OTG: active · device detected</string>
+    <string name="otg_status_no_device">🔌 OTG: no devices · check cable or enable OTG in settings</string>
+    <string name="perm_open_settings_manually">Could not open settings automatically. Grant "All files access" to NekoFlash manually in Settings → Apps.</string>
+<string name="layout_icon_unlock_tab">🔓
+Unlock</string>
+    <string name="console_open_terminal_btn">Terminal</string>
+    <string name="mi_login_continue">Continue</string>
+    <string name="mi_login_logout">Log out</string>
+    <string name="mi_login_already">Already logged in as ID: %1$s</string>
+    <string name="mi_login_success">Logged in as ID: %1$s</string>
+    <string name="usb_generic_fastboot_title">Unverified USB interface</string>
+    <string name="usb_generic_fastboot_message">This interface has a vendor-specific bulk IN/OUT pair, but its descriptors do not confirm Android Fastboot. Continue only if the target device is visibly in Fastboot mode.
+
+%s</string>
+    <string name="safety_profile_pro">Pro</string>
+    <string name="safety_profile_pro_desc">PRO: full terminal and advanced tools are available. High Risk stays locked until separately confirmed.</string>
+    <string name="safety_profile_pro_unlocked_desc">PRO + HIGH RISK: full terminal and high-risk actions are enabled. Typed confirmations are still required.</string>
+    <string name="safety_high_risk_pro_only">High-risk actions are available only in Pro profile. Switch to Pro first, then unlock High Risk.</string>
+    <string name="safety_not_pro_toast">This action requires Pro profile with the necessary safety level enabled.</string>
+    <string name="terminal_minimize">Minimize</string>
+    <string name="layout_fastboot_data_self_test_title">FASTBOOT DATA SELF-TEST</string>
+    <string name="layout_fastboot_data_self_test_desc">Safe download-only transport test. No partition is selected and no flash, boot, stage, or update-super command is sent.</string>
+    <string name="layout_fastboot_data_qualify_image_button">Qualify selected .img size</string>
+    <string name="fastboot_data_qualify_transport_title">Exact-size DATA qualification</string>
+    <string name="fastboot_data_qualify_confirm_title">Confirm exact-size download-only qualification</string>
+    <string name="fastboot_data_qualify_confirm_message">Product: %1$s
+File: %2$s
+Exact size: %3$s
+Transport: %4$s
+
+The selected file is first copied into private internal staging, fsynced, and SHA-256 verified. Only the verified staged copy is sent to Fastboot\'s volatile download buffer. No partition is selected and no flash, boot, stage, or update-super command is sent. Qualification is bound to this exact SHA-256, transport, and current USB session. Native USBFS is diagnostic-only and does not authorize real flashing.</string>
+    <string name="fastboot_data_qualify_run">Run exact-size test</string>
+    <string name="layout_fastboot_data_self_test_button">Run safe DATA self-test</string>
+    <string name="fastboot_data_self_test_dialog_title">Safe Fastboot DATA Self-Test</string>
+    <string name="fastboot_data_self_test_option">%1$s · %2$s</string>
+    <string name="fastboot_data_self_test_confirm_title">Confirm download-only test</string>
+    <string name="fastboot_data_self_test_confirm_message">Product: %1$s
+Size: %2$s
+Transport: %3$s
+
+No partition is selected. No write command will be sent. The test stops after the final response to the DATA phase. Native USBFS is diagnostic-only.</string>
+    <string name="fastboot_data_self_test_run">Run test</string>
+    <string name="layout_fastboot_data_shared_probe_button">Run internal-staging DATA probe</string>
+    <string name="fastboot_data_shared_probe_dialog_title">Internal-staging DATA probe</string>
+    <string name="fastboot_data_shared_probe_confirm_title">Confirm internal-staging download-only probe</string>
+    <string name="fastboot_data_shared_probe_confirm_message">Product: %1$s
+File: %2$s
+Size: %3$s
+Transport: %4$s
+Folder: %5$s
+
+The app will create a deterministic .img in shared storage, copy it to private internal storage, fsync it, verify source and staged SHA-256, delete the shared source, and send only the private staged copy to Fastboot\'s volatile download buffer. No flash, boot, stage, or update-super command is sent.
+
+This validates internal Fastboot DATA staging without writing any partition.</string>
+    <string name="fastboot_data_shared_probe_run">Run staging probe</string>
+    <string name="layout_fastboot_data_auto_matrix_button">Auto Matrix 100 MB</string>
+    <string name="layout_fastboot_data_content_probe_button">Content probe selected .img</string>
+    <string name="fastboot_data_auto_matrix_title">Automatic Native USBFS Matrix</string>
+    <string name="fastboot_data_auto_matrix_message">Product: %1$s
+Size: %2$s
+
+The app will test all Native USBFS profiles sequentially in one fresh Fastboot session. It will not send flash, boot, stage, or update-super. If any profile fails, the session is closed and the automatic test stops.</string>
+    <string name="fastboot_data_auto_matrix_run">Run auto test</string>
+    <string name="fastboot_data_content_probe_title">Content probe .img</string>
+    <string name="fastboot_data_content_probe_message">File: %1$s
+Size: %2$s
+Transport: %3$s
+
+The app will create private diagnostic prefix files from the selected .img and test the first 1/2/3/4/8/16 MB via download-only. This helps identify which file region breaks DATA. No write command is sent.</string>
+    <string name="fastboot_data_content_probe_run">Run content probe</string>
+    <string name="fastboot_data_transport_async">UsbRequest</string>
+    <string name="fastboot_data_transport_sync">sync bulkTransfer</string>
+    <string name="fastboot_data_transport_native_usbfs_single_64k">Native USBFS single 64 KiB (diagnostic-only)</string>
+    <string name="fastboot_data_transport_native_usbfs_single_256k">Native USBFS single 256 KiB (diagnostic-only)</string>
+    <string name="fastboot_data_transport_native_usbfs_pipeline_16k">Native USBFS pipeline 2×16 KiB (diagnostic-only)</string>
+    <string name="fastboot_data_transport_native_usbfs_pipeline_64k">Native USBFS pipeline 2×64 KiB (diagnostic-only)</string>
+    <string name="fastboot_data_transport_native_usbfs_pipeline_128k">Native USBFS pipeline 2×128 KiB (diagnostic-only)</string>
+    <string name="fastboot_data_transport_native_usbfs_pipeline_256k">Native USBFS pipeline 2×256 KiB (diagnostic-only)</string>
+    <string name="terminal_send">Send command</string>
+    <string name="mi_login_blocked_host">Login was stopped: navigation to an untrusted host (%1$s) was blocked.</string>
+    <string name="mi_login_network_error">The Xiaomi Account page could not be loaded.</string>
+    <string name="mi_login_ssl_error">Login was stopped because the Xiaomi Account TLS certificate could not be verified.</string>
+    <string name="mi_login_webview_error">The secure login component stopped unexpectedly. Please try again.</string>
+
+    <string name="home_open_workspace">Open folder</string>
+    <string name="home_copy_workspace">Copy path</string>
+    <string name="home_workspace_opening">Opening workspace: %1$s</string>
+    <string name="home_workspace_open_failed">Could not open the folder. The path was copied.</string>
+    <string name="home_workspace_path_copied">Workspace path copied</string>
+    <string name="home_primary_actions_title">MAIN TOOLS</string>
+    <string name="home_action_terminal">Terminal</string>
+    <string name="home_action_quick_flash">Quick Flash</string>
+    <string name="home_action_sideload">ADB Sideload</string>
+    <string name="home_action_mi_unlock">Mi Unlock</string>
+
+</resources>

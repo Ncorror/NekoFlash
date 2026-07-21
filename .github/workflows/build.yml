@@ -1,0 +1,204 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Validate Gradle Wrapper
+        uses: gradle/actions/wrapper-validation@v4
+
+      - name: Set up Gradle cache
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Make scripts executable
+        run: |
+          chmod +x gradlew
+          chmod +x scripts/*.sh || true
+
+      - name: Static project, correctness and USB safety checks
+        run: |
+          set -o pipefail
+          SAFETY_LOG="$RUNNER_TEMP/safety-checks.log"
+          trap 'cp "$SAFETY_LOG" safety-checks.log 2>/dev/null || true' EXIT
+          {
+            python3 scripts/check_project.py
+            python3 scripts/check-documentation.py
+            python3 scripts/test-checksum-inventory.py
+            python3 scripts/check-ab-safety.py
+            python3 scripts/check-usb-connectivity.py
+            python3 scripts/check-flash-safety.py
+            python3 scripts/check-diagnostic-logging.py
+                      } 2>&1 | tee "$SAFETY_LOG"
+
+      - name: Set up Kotlin compiler for protocol tests
+        run: |
+          set -e
+          if command -v kotlinc >/dev/null 2>&1; then
+            echo "kotlinc already installed: $(kotlinc -version 2>&1)"
+          else
+            KOTLIN_VERSION=1.9.24
+            curl -fsSL -o /tmp/kotlin.zip \
+              "https://github.com/JetBrains/kotlin/releases/download/v${KOTLIN_VERSION}/kotlin-compiler-${KOTLIN_VERSION}.zip"
+            unzip -q /tmp/kotlin.zip -d /opt
+            echo "/opt/kotlinc/bin" >> "$GITHUB_PATH"
+          fi
+
+      - name: Run protocol/policy unit tests
+        run: |
+          set -o pipefail
+          bash scripts/run-tests.sh 2>&1 | tee protocol-tests.log
+
+      - name: Print Gradle version
+        run: ./gradlew --version
+
+      - name: Prepare optional release signing
+        env:
+          NEKOFLASH_KEYSTORE_BASE64: ${{ secrets.NEKOFLASH_KEYSTORE_BASE64 }}
+          NEKOFLASH_STORE_PASSWORD: ${{ secrets.NEKOFLASH_STORE_PASSWORD }}
+          NEKOFLASH_KEY_ALIAS: ${{ secrets.NEKOFLASH_KEY_ALIAS }}
+          NEKOFLASH_KEY_PASSWORD: ${{ secrets.NEKOFLASH_KEY_PASSWORD }}
+        run: |
+          set -e
+          CONFIGURED=0
+          [ -n "$NEKOFLASH_KEYSTORE_BASE64" ] && CONFIGURED=$((CONFIGURED + 1))
+          [ -n "$NEKOFLASH_STORE_PASSWORD" ] && CONFIGURED=$((CONFIGURED + 1))
+          [ -n "$NEKOFLASH_KEY_ALIAS" ] && CONFIGURED=$((CONFIGURED + 1))
+          [ -n "$NEKOFLASH_KEY_PASSWORD" ] && CONFIGURED=$((CONFIGURED + 1))
+
+          if [ "$CONFIGURED" -eq 0 ]; then
+            echo "No signing secrets configured: release APK will be unsigned."
+            echo "NEKOFLASH_RELEASE_SIGNED=false" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          if [ "$CONFIGURED" -ne 4 ]; then
+            echo "Partial signing configuration is not allowed. Configure all four NEKOFLASH signing secrets or none."
+            exit 1
+          fi
+
+          KEYSTORE_PATH="$RUNNER_TEMP/nekoflash-release.keystore"
+          printf '%s' "$NEKOFLASH_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
+          test -s "$KEYSTORE_PATH"
+
+          echo "NEKOFLASH_KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"
+          echo "NEKOFLASH_STORE_PASSWORD=$NEKOFLASH_STORE_PASSWORD" >> "$GITHUB_ENV"
+          echo "NEKOFLASH_KEY_ALIAS=$NEKOFLASH_KEY_ALIAS" >> "$GITHUB_ENV"
+          echo "NEKOFLASH_KEY_PASSWORD=$NEKOFLASH_KEY_PASSWORD" >> "$GITHUB_ENV"
+          echo "NEKOFLASH_RELEASE_SIGNED=true" >> "$GITHUB_ENV"
+
+      - name: Print runner memory before Android build
+        run: |
+          echo "CPUs: $(nproc)"
+          free -h
+          df -h .
+
+      - name: Android lint
+        timeout-minutes: 15
+        run: |
+          set -o pipefail
+          ./gradlew :app:lintDebug --no-daemon --stacktrace --console=plain 2>&1 | tee lint_log.txt
+
+      - name: Build Debug APK
+        timeout-minutes: 15
+        run: |
+          set -o pipefail
+          ./gradlew :app:assembleDebug --no-daemon --stacktrace --console=plain 2>&1 | tee debug_build_log.txt
+
+      - name: Build Release APK
+        timeout-minutes: 20
+        run: |
+          set -o pipefail
+          ./gradlew :app:assembleRelease --no-daemon --stacktrace --console=plain 2>&1 | tee release_build_log.txt
+
+      - name: Show build errors if failed
+        if: failure()
+        run: |
+          echo "==================== BUILD ERRORS ===================="
+          for log in lint_log.txt debug_build_log.txt release_build_log.txt; do
+            if [ -f "$log" ]; then
+              echo "---- $log ----"
+              grep -E "^e: |error:|FAILED|What went wrong|Unresolved|Caused by|resource .* not found|garbage collector is thrashing|OutOfMemoryError" "$log" | head -120 || true
+            fi
+          done
+          echo "======================================================"
+
+      - name: Prepare release artifacts
+        run: |
+          set -e
+          VERSION_NAME=$(grep -E 'versionName "' app/build.gradle | sed -E 's/.*versionName "([^"]+)".*/\1/')
+          DEBUG_APK=$(find app/build/outputs/apk/debug -name "*.apk" | head -1)
+          RELEASE_APK=$(find app/build/outputs/apk/release -name "*.apk" | head -1)
+          test -n "$DEBUG_APK" && test -f "$DEBUG_APK"
+          test -n "$RELEASE_APK" && test -f "$RELEASE_APK"
+
+          mkdir -p forum-build
+          cp "$DEBUG_APK" "forum-build/NekoFlash-${VERSION_NAME}-debug.apk"
+          if [ "${NEKOFLASH_RELEASE_SIGNED:-false}" = "true" ]; then
+            cp "$RELEASE_APK" "forum-build/NekoFlash-${VERSION_NAME}-release-signed.apk"
+          else
+            cp "$RELEASE_APK" "forum-build/NekoFlash-${VERSION_NAME}-release-unsigned.apk"
+          fi
+
+          VERSION_CODE=$(grep -E 'versionCode [0-9]+' app/build.gradle | sed -E 's/.*versionCode ([0-9]+).*/\1/')
+          cat > forum-build/build-info.txt <<EOF
+          NekoFlash build
+          versionName=$VERSION_NAME
+          versionCode=$VERSION_CODE
+          gitCommit=${GITHUB_SHA}
+          gitRunId=${GITHUB_RUN_ID}
+          gitRunNumber=${GITHUB_RUN_NUMBER}
+          releaseSigned=${NEKOFLASH_RELEASE_SIGNED:-false}
+          EOF
+
+          cd forum-build
+          sha256sum *.apk > checksums-sha256.txt
+          ls -lh
+          cat build-info.txt
+          cat checksums-sha256.txt
+
+      - name: Upload APKs and checksums
+        uses: actions/upload-artifact@v4
+        with:
+          name: NekoFlash-${{ github.sha }}-apk
+          path: |
+            forum-build/*.apk
+            forum-build/checksums-sha256.txt
+            forum-build/build-info.txt
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload test and lint reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: NekoFlash-${{ github.sha }}-reports
+          path: |
+            *-test.log
+            protocol-tests.log
+            safety-checks.log
+            lint_log.txt
+            debug_build_log.txt
+            release_build_log.txt
+            app/build/reports/lint-results-*.html
+            app/build/reports/lint-results-*.xml
+          if-no-files-found: ignore
+          retention-days: 30

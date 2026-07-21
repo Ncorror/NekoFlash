@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- API 27+ override. Explicit parent prevents dotted-name implicit inheritance from @style/Theme. -->
+    <style name="Theme.NekoFlash" parent="@style/NekoFlashThemeBase">
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+</resources>

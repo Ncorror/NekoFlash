@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_launcher_background">#05070A</color>
+
+    <!-- NekoFlash V6 — restrained cyber-dark palette -->
+    <color name="bg_base">#080D13</color>
+    <color name="bg_card">#121A24</color>
+    <color name="bg_elevated">#192431</color>
+    <color name="bg_console">#080D13</color>
+    <color name="bg_input">#111A24</color>
+    <color name="bg_header">#0D141D</color>
+
+    <color name="stroke">#324052</color>
+    <color name="stroke_soft">#243142</color>
+    <color name="stroke_orange">#805D351D</color>
+
+    <color name="text_primary">#F3F6FA</color>
+    <color name="text_secondary">#AEB8C5</color>
+    <color name="text_muted">#738092</color>
+
+    <color name="accent">#E9782B</color>
+    <color name="accent_pressed">#CC5D18</color>
+    <color name="accent_dim">#2B1B12</color>
+    <color name="accent_soft">#F1A56D</color>
+    <color name="on_accent">#0A0D12</color>
+
+    <color name="cool_accent">#59B9E7</color>
+    <color name="cool_accent_dim">#102B3A</color>
+    <color name="teal_accent">#62B8B0</color>
+
+    <color name="log_info">#A7B2BF</color>
+    <color name="log_success">#68C979</color>
+    <color name="log_warning">#DCAA58</color>
+    <color name="log_error">#D96870</color>
+    <color name="log_command">#E9934F</color>
+    <color name="log_system">#758397</color>
+
+    <color name="status_none">#758397</color>
+    <color name="status_connecting">#DCAA58</color>
+    <color name="status_active">#68C979</color>
+    <color name="status_info">#59B9E7</color>
+    <color name="status_error">#D96870</color>
+
+    <color name="danger">#D96870</color>
+    <color name="danger_dim">#35191E</color>
+</resources>
