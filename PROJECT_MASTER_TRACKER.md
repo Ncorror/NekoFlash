@@ -1,6 +1,6 @@
 # NekoFlash — единый трекер проекта
 
-Последнее обновление: **2026-07-21**  
+Последнее обновление: **2026-07-22**  
 Текущий milestone: **V6.0.0 — alpha5 Recovery-first Quick Flash**  
 Версия: **`6.0.0-alpha5-dev-nekoflash`**  
 Version code: **`217`**
@@ -38,9 +38,9 @@ NekoFlash остаётся компактным Android-инструментом
 | HOMEACTIONS-001 | Четыре главных перехода на Home | DONE_CODE | Android UI smoke test |
 | TERMINAL-001 | Проверить ADB/Fastboot terminal на устройстве | OPEN | Команды read-only и экспорт лога |
 | POLISH-WELCOME-001 | Упростить welcome permissions/risk gate | DONE_CODE | Android smoke test кликабельных status chips |
-| POLISH-SIDELOAD-001 | Упростить ADB Sideload card | DONE_CODE | Android UI + transfer/cancel retest |
+| POLISH-SIDELOAD-001 | Упростить ADB Sideload card | DONE_CODE | Android UI: нейтральная note до verify + transfer/cancel retest |
 | POLISH-DATA-001 | Свернуть Fastboot DATA diagnostics | DONE_CODE | Без-device log и Fastboot hardware retest |
-| UNLOCK-LOGIN-001 | Исправить Mi Account completion callback | DONE_CODE | Реальный login retest и новый sanitised log |
+| UNLOCK-LOGIN-001 | Исправить Mi Account completion и unlockApi `/sts` exchange | FIXED_CODE | Реальный login/token exchange retest и новый sanitised log |
 | FLASH-001 | Recovery-first Quick Flash | DONE_CI | Sanitised hardware retest Terminal/Sideload/Quick Flash |
 | SIDELOAD-001 | Подтвердить ADB Sideload в V6 | RETEST_REQUIRED | ZIP transfer, cancel, recovery result |
 | UNLOCK-001 | Провести отдельный аудит Mi Unlock | IN_PROGRESS | Retest официального Mi Account callback и затем разделение unlock flows |
@@ -78,9 +78,10 @@ NekoFlash остаётся компактным Android-инструментом
 - Android CI не подтверждает реальную прошивку; hardware gate остаётся открытым.
 - Первый Android smoke test зафиксировал Recovery-first UI как неизменяемый эталон.
 - Welcome gate уплотнён: status chips ведут в свои settings, отдельная battery button удалена, risk row кликабельна.
-- Sideload memo card удалена; Import/Verify выровнены, checksum note сокращена без изменения transfer logic.
+- Sideload memo card удалена; Import/Verify выровнены, checksum note нейтральна до фактической проверки и не показывает ложную зелёную галочку.
 - Fastboot DATA card показывает один основной self-test; specialized diagnostics скрыты в отдельном dialog, а no-device taps журналируются.
-- Mi Login принимает только точный официальный completion callback `https://unlock.update.miui.com/sts`, возвращает конкретную ошибку и поддерживает retry.
+- Android smoke build `0747c4ec72e3.29866798716` подтвердил вход в Mi Account, но token exchange блокировался policy на `https://unlock.update.miui.com/sts` после успешного получения user ID.
+- Mi Login WebView по-прежнему принимает только точный completion callback `https://unlock.update.miui.com/sts`; background clientSign exchange теперь отдельно допускает только exact `/sts` на пяти известных региональных unlock hosts и не передаёт account `passToken` на `miui.com`.
 
 ## Текущий следующий шаг
 
@@ -88,11 +89,10 @@ NekoFlash остаётся компактным Android-инструментом
 Основной Recovery-first scope и acceptance criteria остаются в [`docs/RECOVERY_FIRST_PLAN.md`](docs/RECOVERY_FIRST_PLAN.md).
 Safety-инварианты остаются в [`docs/SAFETY_MODEL.md`](docs/SAFETY_MODEL.md), canonical guard запускается через `scripts/check-documentation.py`, архивная база — `archive/full-miflash-v5.9.17`.
 
-1. Опубликовать welcome/Sideload/Fastboot diagnostics/Mi Login patch в `feature/recovery-first-quick-flash` через push-only Termux workflow.
+1. Опубликовать focused Mi Unlock `/sts` exchange + neutral Sideload note patch в `feature/recovery-first-quick-flash` через push-only Termux workflow.
 2. Получить новый зелёный GitHub Actions evidence для static/pure/lint/debug/release.
-3. На Android проверить компактный welcome: каждый status chip открывает собственные settings, risk row и Continue работают.
-4. Проверить Sideload layout и отказ/логи без подключённого устройства.
-5. Повторить Mi Account login; при failure экспортировать compact log с конкретной причиной, а не общим «отменён».
-6. После UI/login retest перейти к Terminal/Sideload и одному контролируемому Quick Flash hardware gate.
+3. На Android повторить Mi Account login: ожидается прохождение clientSign `/sts` exchange и получение `serviceToken`; при новом server-side отказе экспортировать compact log.
+4. Проверить Sideload: до выбора/verify ZIP не должно быть зелёной success-индикации.
+5. После login/Sideload retest вернуться к облегчению welcome panel и затем к Terminal/Sideload/Quick Flash hardware gate.
 
 Реальная прошивка всегда требует подключённого Fastboot-устройства, существующего раздела, корректного slot, проверенного файла и явного подтверждения. Автоматического повторения mutation-команд нет.

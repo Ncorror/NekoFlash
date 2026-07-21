@@ -316,7 +316,7 @@ Fingerprint плана: %10$s
     <string name="layout_adb_sideload_title">ADB SIDELOAD</string>
     <string name="layout_sideload_recovery_hint">Recovery → Apply update → Apply from ADB</string>
     <string name="layout_choose_zip_sideload">Выбрать ZIP для Sideload</string>
-    <string name="layout_sideload_hash_note">SHA-256/MD5 проверится автоматически, если файл контрольной суммы лежит рядом.</string>
+    <string name="layout_sideload_hash_note">Проверка SHA-256/MD5 выполняется после выбора ZIP; соседний .sha256/.md5 будет сравнен автоматически.</string>
     <string name="layout_console_title">CONSOLE</string>
     <string name="layout_icon_up">▲</string>
     <string name="layout_icon_down">▼</string>

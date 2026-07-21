@@ -222,7 +222,7 @@ object MiAccountClient {
         // В unlock API не отправляем passToken/deviceId. Оставляем только
         // service cookies, которые использует актуальный MiUnlockTool/migate.
         val serviceCookies = linkedMapOf<String, String>()
-        jar.entriesFor(second.finalUrl).forEach { (name, value) ->
+        jar.serviceEntries().forEach { (name, value) ->
             if (
                 name == "serviceToken" ||
                 name == "userId" ||
@@ -262,7 +262,7 @@ object MiAccountClient {
         jar: MiAccountCookieJar,
         followRedirects: Boolean
     ): HttpResponse {
-        var currentUrl = MiAccountSecurityPolicy.requireAllowedAccountUrl(urlStr, "request")
+        var currentUrl = MiAccountSecurityPolicy.requireAllowedAuthFlowUrl(urlStr, "request")
         var redirects = 0
 
         while (true) {
@@ -292,7 +292,7 @@ object MiAccountClient {
                     if (redirects > MAX_REDIRECTS) {
                         throw IOException("Too many redirects during Xiaomi service login")
                     }
-                    currentUrl = MiAccountSecurityPolicy.resolveAllowedRedirect(currentUrl, location)
+                    currentUrl = MiAccountSecurityPolicy.resolveAllowedAuthRedirect(currentUrl, location)
                     continue
                 }
 

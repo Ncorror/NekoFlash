@@ -24,7 +24,7 @@
 
 - жёлтая памятка с лампочкой удаляется;
 - Import и Verify имеют одинаковую геометрию и визуальный вес;
-- checksum note становится короткой нейтральной строкой;
+- checksum note становится короткой нейтральной строкой без зелёной success-иконки до фактического verify;
 - transfer/cancel/recovery-result logic не меняется.
 
 ### POLISH-DATA-001 — свёрнутая диагностика
@@ -41,7 +41,9 @@
 - callback не загружается как произвольная web-страница, а завершает cookie extraction;
 - ошибки больше не сворачиваются в безымянное «вход отменён»;
 - экран показывает причину и даёт повторить вход;
-- callback/path/host confusion покрывается pure policy tests.
+- callback/path/host confusion покрывается pure policy tests;
+- background clientSign exchange отдельно допускает только exact `/sts` на известных China/Singapore/India/Russia/Europe unlock hosts;
+- account cookies остаются host-scoped и не передаются на unlock hosts; из `/sts` принимаются только ожидаемые unlockApi service-cookie names.
 
 ### LOG-UI-001 — baseline без устройства
 

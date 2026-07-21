@@ -316,7 +316,7 @@ Plan fingerprint: %10$s
     <string name="layout_adb_sideload_title">ADB SIDELOAD</string>
     <string name="layout_sideload_recovery_hint">Recovery → Apply update → Apply from ADB</string>
     <string name="layout_choose_zip_sideload">▶  Choose .zip for Sideload</string>
-    <string name="layout_sideload_hash_note">Before transfer, the app checks SHA-256/MD5 if a .sha256 or .md5 file is next to the archive.</string>
+    <string name="layout_sideload_hash_note">SHA-256/MD5 is checked after a ZIP is selected; a neighboring .sha256/.md5 file is compared automatically.</string>
     <string name="layout_console_title">CONSOLE</string>
     <string name="layout_icon_up">▲</string>
     <string name="layout_icon_down">▼</string>

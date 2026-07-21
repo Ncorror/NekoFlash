@@ -2,6 +2,9 @@
 
 ## V6.0.0-alpha5 development baseline — `6.0.0-alpha5-dev-nekoflash` (`217`)
 
+- Исправлена вторая стадия Mi Account login: background clientSign exchange принимает только точные региональные Xiaomi Mi Unlock `/sts` endpoints вместо ошибочной account-only блокировки.
+- Account `passToken` остаётся host-only для `account.xiaomi.com` и не отправляется на unlock hosts; service cookies принимаются только для ожидаемых `serviceToken`/`userId`/`cUserId`/`unlockApi_*` имён.
+- Sideload checksum note больше не показывает зелёную галочку до фактической проверки ZIP.
 - Первый Android smoke test оформлен как отдельный hardware-polish gate; Recovery-first Quick Flash зафиксирован как защищённый эталон без изменений.
 - Welcome panel стала компактнее: Files/Notifications/Battery status chips кликабельны и открывают собственные системные настройки, отдельная battery button удалена.
 - ADB Sideload card упрощена: удалена жёлтая памятка, Import/Verify выровнены, checksum note сокращена.

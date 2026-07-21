@@ -905,10 +905,11 @@ def check_mi_account_and_share_hardening() -> None:
             "pathMatches",
         ),
         client: (
-            "MiAccountSecurityPolicy.requireAllowedAccountUrl",
-            "MiAccountSecurityPolicy.resolveAllowedRedirect",
+            "MiAccountSecurityPolicy.requireAllowedAuthFlowUrl",
+            "MiAccountSecurityPolicy.resolveAllowedAuthRedirect",
             "jar.headerFor(currentUrl)",
             "jar.capture(currentUrl",
+            "jar.serviceEntries()",
         ),
         login: (
             "setAcceptThirdPartyCookies(webView, false)",
@@ -1494,6 +1495,15 @@ def check_alpha5_hardware_polish() -> None:
     for token in ('@+id/btnSideloadImport', '@+id/btnSideloadCheckArchive', '@drawable/ic_nf_verify'):
         if token not in layout_text:
             fail(f"Sideload compact action token missing: {token}")
+    sideload_note = re.search(
+        r'<TextView\s+[^>]*android:text="@string/layout_sideload_hash_note"[^>]*/>',
+        layout_text,
+        re.S,
+    )
+    if not sideload_note:
+        fail("Sideload neutral checksum note is missing")
+    elif 'ic_status_check_green' in sideload_note.group(0):
+        fail("Sideload pre-verification note must not show a green success icon")
 
     for token in ('@+id/btnFastbootDataSelfTest', '@+id/btnFastbootDataAdvanced'):
         if token not in layout_text:
@@ -1510,9 +1520,18 @@ def check_alpha5_hardware_polish() -> None:
         if token not in main_text:
             fail(f"Fastboot DATA logging/collapse token missing: {token}")
 
-    for token in ('UNLOCK_CALLBACK_HOST = "unlock.update.miui.com"', 'UNLOCK_CALLBACK_PATH = "/sts"', 'isOfficialUnlockCallbackUrl'):
+    for token in (
+        'UNLOCK_CALLBACK_HOST = "unlock.update.miui.com"',
+        'UNLOCK_CALLBACK_PATH = "/sts"',
+        'isOfficialUnlockCallbackUrl',
+        'unlockServiceHosts = setOf(',
+        'isAllowedUnlockServiceUrl',
+        'requireAllowedAuthFlowUrl',
+        'resolveAllowedAuthRedirect',
+        'isAllowedUnlockServiceCookieName',
+    ):
         if token not in policy_text:
-            fail(f"Mi Unlock callback policy token missing: {token}")
+            fail(f"Mi Unlock callback/service policy token missing: {token}")
     for token in ('handleOfficialCompletion', 'EXTRA_LOGIN_ERROR', 'mi_login_missing_cookies', 'mi_login_retry'):
         if token not in login_text:
             fail(f"Mi Login observable callback token missing: {token}")

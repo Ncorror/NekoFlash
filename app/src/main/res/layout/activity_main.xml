@@ -1345,8 +1345,6 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="8dp"
-                            android:drawableStart="@drawable/ic_status_check_green"
-                            android:drawablePadding="7dp"
                             android:fontFamily="sans-serif"
                             android:gravity="center_vertical"
                             android:text="@string/layout_sideload_hash_note"
