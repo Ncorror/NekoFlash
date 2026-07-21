@@ -497,6 +497,36 @@ def check_android_compile_regressions() -> None:
     if main_text.count("FrameLayout.LayoutParams(") < 1:
         fail("Android compile hotfix missing FrameLayout child LayoutParams replacement")
 
+    pending_models = {
+        "PendingUnlockVerification": (
+            "product: String",
+            "serial: String?",
+            "expectedUnlocked: Boolean",
+            "operationLabel: String",
+            "createdAtMs: Long",
+        ),
+        "PendingSideloadVerification": (
+            "packageName: String",
+            "packageSize: Long",
+            "packageSha256: String?",
+            "device: String?",
+            "createdAtMs: Long",
+        ),
+    }
+    for model, fields in pending_models.items():
+        match = re.search(
+            rf"private\s+data\s+class\s+{model}\s*\((.*?)\n\s*\)",
+            vm_text,
+            flags=re.S,
+        )
+        if not match:
+            fail(f"Android compile regression: missing private data class {model}")
+            continue
+        body = match.group(1)
+        for field in fields:
+            if field not in body:
+                fail(f"Android compile regression: {model} missing field {field}")
+
     print("Android compile regression guard: OK")
 
 

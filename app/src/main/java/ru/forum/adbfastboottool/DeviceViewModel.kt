@@ -173,6 +173,22 @@ class DeviceViewModel(
         val bytes: Long
     )
 
+    private data class PendingUnlockVerification(
+        val product: String,
+        val serial: String?,
+        val expectedUnlocked: Boolean,
+        val operationLabel: String,
+        val createdAtMs: Long
+    )
+
+    private data class PendingSideloadVerification(
+        val packageName: String,
+        val packageSize: Long,
+        val packageSha256: String?,
+        val device: String?,
+        val createdAtMs: Long
+    )
+
     private fun text(resId: Int, vararg args: Any): String =
         getApplication<Application>().getString(resId, *args)
 

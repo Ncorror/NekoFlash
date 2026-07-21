@@ -2,7 +2,8 @@
 
 Дата: **2026-07-21**  
 База: `V6.0.0-alpha2`  
-Результат: `V6.0.0-alpha3`
+Результат очистки: `V6.0.0-alpha3`  
+Compilation hotfix: `V6.0.0-alpha4`
 
 ## Метод
 
@@ -40,3 +41,6 @@
 ## Не подтверждено локально
 
 Android lint/compile/assemble требуют доступного Gradle/SDK или GitHub Actions. Аппаратные verdicts требуют нового V6 retest. Эти статусы нельзя заменять результатами pure/JVM guards.
+## Исправление после первого Android CI
+
+Первый CI run `29829689137` подтвердил static checks и матрицу 19/19, но остановился на `:app:compileDebugKotlin`: после cleanup отсутствовали две private transient-модели, которые используются проверкой Mi Unlock и ADB Sideload. В alpha4 восстановлены только `PendingUnlockVerification` и `PendingSideloadVerification`; удалённый Mi Flash и legacy-подсистемы не возвращались. В `check_project.py` добавлен постоянный regression guard для обеих моделей и их полей.

@@ -1,5 +1,12 @@
 # История изменений NekoFlash
 
+## V6.0.0-alpha4 — `6.0.0-alpha4-nekoflash` (`216`)
+
+- Исправлена Android compilation regression после scope cleanup: восстановлены transient-модели `PendingUnlockVerification` и `PendingSideloadVerification`.
+- Устранены каскадные `Unresolved reference` в проверке результата Mi Unlock и ADB Sideload.
+- Static compile guard теперь требует обе модели и полный набор их полей, чтобы дефект не вернулся.
+- Product scope, верхняя панель, Home device info, Terminal, Quick Flash, Sideload и Mi Unlock функционально не изменены.
+
 ## V6.0.0-alpha3 — `6.0.0-alpha3-nekoflash` (`215`)
 
 - Проведён полный V6 source audit после удаления Mi Flash.

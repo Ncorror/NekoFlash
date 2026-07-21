@@ -2,14 +2,14 @@ fe1bc654c6873f92935d1cd7998c35aa586d18d8277a86669217b596275ce170  ./.gitattribut
 0455110f7ea5367c3c77c5c332d02bcebcaed5539f3fccc4b992d1e251cbfba2  ./.github/workflows/build.yml
 9418ddb89ba142a3e6045fbc35b08c3d033be96c9a9d523d10db089e49fd7be3  ./.gitignore
 c8ae8925d46f537eb73357eb1cdba6bf20a68b4a1cace0525b6866d9f8199035  ./BUILDING.md
-010a8ce96d94f4ed663db60df9f4eb977d9f66a392dd680c1f2f9295041e7607  ./CHANGELOG.md
+0e3fe9aa82135c62672f597d9a634c484c9b772371da782734e69315a2fbb3ff  ./CHANGELOG.md
 435bc24d77d54c83c59e1c8d963e65e9f88cb37cd50965ad38728d83bc509dca  ./LAUNCHER_ARTWORK_SHA256.txt
 8930600167fcaf83ec7219886d710f6b915ad82e10eb7846bb6c1047c3a6ac01  ./LICENSE
 c27202cec34aa6a86b334992b529395cd7cd1fd08ba6b36c3cc2f215e96c2f93  ./NOTICE
-7094296d01e4ccf1dcc90bc01c7d7dce3127587734fc2303ba9f5287d928973f  ./PROJECT_MASTER_TRACKER.md
-6dbb7d11eae0792aba67df3fb8f5b3ad6a3dc5e62ab4fbcf3d9592b1d43ee6af  ./README.md
+ca0f94680ed1fe98dcb787de4f67ae271b6cf88f64a2f54280e200753d44f9df  ./PROJECT_MASTER_TRACKER.md
+42e3ef859dc782d5f8a2fbe39afde845a64ce7b3eb98b29bc6f41cb418aba418  ./README.md
 205548ffc217c71881a00da928b58086acb0fec43d1936060ca6c49b02f39821  ./WELCOME_ARTWORK_SHA256.txt
-ce2a24261a40391114f4023035aec8b2679551ebaaddb8c750f1b181629a6a28  ./app/build.gradle
+a76d996ece5f5155b08f8b1ec9b28fe61414f7fa32ee18210e11e3b23b954c38  ./app/build.gradle
 6e83455d7092b6fd29a6aac28433a8fc3cadc80aa86baa97529f289e9c6b35e0  ./app/proguard-rules.pro
 b05b4844f63e166cd8bc0da03fd325fe121d66abd79470dc810c7bc14fa1642e  ./app/src/main/AndroidManifest.xml
 e9c27e92fa6ccee517e65b8efe3b6624eafe6a13f45b688f2d70c2bc3d58f1f8  ./app/src/main/cpp/CMakeLists.txt
@@ -21,7 +21,7 @@ a81f5e3cfc5fdeeff90150dd8a46d6edbd8bfa1fad128331465b07f882867359  ./app/src/main
 212bb26c398d5116344ac42c58c7a95d66b300018514df34d67a6ed89daa6567  ./app/src/main/java/ru/forum/adbfastboottool/AdbReadOnlyPolicy.kt
 383da7bf46edb3e02cd138c37b5b468c9b2da7de9031bc755d8d5983330ab564  ./app/src/main/java/ru/forum/adbfastboottool/CompactLogRenderPolicy.kt
 17d6b13f68b029b275ef22bdbe1a995729b1d0d31430651f5a69ff4e1cc5a70c  ./app/src/main/java/ru/forum/adbfastboottool/ConnectionModeUiPolicy.kt
-f978439210f476970664305acfeab87d513c6651dde9cf2e5daff41b0a22b054  ./app/src/main/java/ru/forum/adbfastboottool/DeviceViewModel.kt
+09ad95f4453dc45f149f921611eef4b1fef56eca1bcd7b69c3d8a5b18cc3ad25  ./app/src/main/java/ru/forum/adbfastboottool/DeviceViewModel.kt
 645ad6234079085dd66a062de1e8dc89610cb788a1e7dfc2ad5a920a5bbd5257  ./app/src/main/java/ru/forum/adbfastboottool/DiagnosticArchiveVerifier.kt
 fca8fe1ce826db1ffed77fdb37c6d0dbc6cbdf039c965c01306eb17dfb94d220  ./app/src/main/java/ru/forum/adbfastboottool/DiagnosticCrashMarker.kt
 8d9bfb769619237c0899546751c7acc7ec1ab6e8cdb88c5881b162b62dbcd56b  ./app/src/main/java/ru/forum/adbfastboottool/DiagnosticJson.kt
@@ -146,7 +146,7 @@ c455378bf4702623da9ab9e4a5f84abac0cae159e72b771119a1872d5c3c65d8  ./docs/README.
 04d231fe19a6096cdae18d597b71953da189159cdbd9e0131c10a7ceb9756af2  ./docs/SAFETY_MODEL.md
 d1c170ac09e8ebd613831ae53b490c9f286f0ebb8e84a9ae9e90870ad4af2e6b  ./docs/SCOPE.md
 499da016a7247f8070761124e8fc02e63dad1fddfcb92e83598a003822cdbb04  ./docs/USB_PROTOCOL.md
-fab549e53789faf786eb0c8eb033370fb2f06eb2c3b9ddefee383458792d63b0  ./docs/V6_AUDIT.md
+f04e5c33f8f7fca5dafd58d6a027325add89f28444d2aacdb16e48184dcea01c  ./docs/V6_AUDIT.md
 41b0b35e4548d35ac0135056363068cb9623e7d3189e2fa24526503ce29ce4e1  ./docs/WELCOME_ASSET_LOCK.md
 80d42e03821b64d26e512c72c3112b921195c79963b702f59045559eb2a3b826  ./docs/artwork/nekoflash_launcher_monochrome_v5.9.13.svg
 d9f3e27393429378070745b850380b8d32c77aa0996094b629ed138ab17f57f4  ./docs/artwork/nekoflash_launcher_safe_zone_preview_v5.9.13.png
@@ -165,7 +165,7 @@ b996c9f306404db994e431ab6402534cf90b8d1c74b35c57f8524909f3f44dc1  ./scripts/buil
 72ac2bd83569f14bd06eb13f06bb1130fdf58ab399ef9163d4798aef26de8853  ./scripts/check-documentation.py
 195befa98e0dd168d4ea02ebe7296ad1b3fa89a5efffdf160a1dead763a676b2  ./scripts/check-flash-safety.py
 582f9b3abe5708c2f53f111491f60566bbe8ec0bbc5a38bbb1a103756cfbdb92  ./scripts/check-usb-connectivity.py
-a52043a4d477ddd8bd5530277b2817827f997ad1bd9d18828f23798cc5486901  ./scripts/check_project.py
+5cf8cf83119320ae9951b9875e375b99ad7d1dc00a6c7e4da70978589f7d2584  ./scripts/check_project.py
 472f9f90152b96abb0277d39024eb1374f90571912d1011733e3400b45e8667b  ./scripts/checksum_inventory.py
 803ebcd26a90e2ad44614813048773bca891b086dd41b6b2ce96777b2358f5ac  ./scripts/run-tests.sh
 4532afceedaef7f34e55c9b58da348f26903cf1d1b02b6c7a0377463d5e44c5e  ./scripts/run-with-timeout.py

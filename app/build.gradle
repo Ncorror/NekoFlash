@@ -29,13 +29,13 @@ android {
         applicationId "ru.forum.adbfastboottool"
         minSdk 26
         targetSdk 34
-        versionCode 215
-        versionName "6.0.0-alpha3-nekoflash"
+        versionCode 216
+        versionName "6.0.0-alpha4-nekoflash"
         def buildCommit = (System.getenv("GITHUB_SHA") ?: System.getenv("NEKOFLASH_BUILD_COMMIT") ?: "local").trim()
         def buildRunId = (System.getenv("GITHUB_RUN_ID") ?: System.getenv("NEKOFLASH_BUILD_RUN_ID") ?: "local").trim()
         buildConfigField "String", "BUILD_COMMIT", "\"${buildCommit.replace('\\', '_').replace('\"', '_')}\""
         buildConfigField "String", "BUILD_RUN_ID", "\"${buildRunId.replace('\\', '_').replace('\"', '_')}\""
-        buildConfigField "String", "BUILD_ID", "\"6.0.0-alpha3-nekoflash+${buildCommit.take(12)}.${buildRunId}\""
+        buildConfigField "String", "BUILD_ID", "\"6.0.0-alpha4-nekoflash+${buildCommit.take(12)}.${buildRunId}\""
         externalNativeBuild {
             cmake {
                 cppFlags "-std=c++17 -Wall -Wextra -Werror"
