@@ -43,6 +43,16 @@ object QuickFlashTopologyCandidateBuilder {
         val sessionBroken: Boolean = false
     )
 
+    /** Android/UI adapter input after the existing read-only inventory refresh. */
+    data class InventoryRequest(
+        val inventory: FastbootPartitionInventory.Snapshot,
+        val imageDisplayName: String,
+        val expertModeEnabled: Boolean = false,
+        val manualPartitionName: String? = null,
+        val maxPointQueries: Int = 0,
+        val sessionBroken: Boolean = false
+    )
+
     data class Result(
         val status: Status,
         val inventory: FastbootPartitionInventory.Snapshot,
@@ -59,6 +69,51 @@ object QuickFlashTopologyCandidateBuilder {
                     it == Error.IMAGE_ARCHIVE_REQUIRES_SIDELOAD ||
                     it == Error.SLOT_TOPOLOGY_UNKNOWN
             }
+    }
+
+    /**
+     * Reuses an already collected read-only inventory without issuing Android or
+     * Fastboot calls. GETVAR variables are reconstructed as parser evidence and
+     * point-query entries remain explicit point probes.
+     */
+    fun buildFromInventory(request: InventoryRequest): Result {
+        val source = FastbootGetVarAllParser.parse(
+            lines = request.inventory.variables.entries.map { (name, value) -> "$name:$value" },
+            complete = request.inventory.complete,
+            finalStatus = request.inventory.finalStatus,
+            finalMessage = request.inventory.finalMessage
+        )
+        val pointProbes = request.inventory.entries
+            .filter { FastbootPartitionInventory.EvidenceSource.POINT_QUERY in it.evidenceSources }
+            .map { entry ->
+                val resolved = linkedSetOf<FastbootGetVarAllParser.MetadataField>()
+                if (entry.sizeBytes != null) resolved += FastbootGetVarAllParser.MetadataField.SIZE
+                if (entry.type != null) resolved += FastbootGetVarAllParser.MetadataField.TYPE
+                if (entry.logical != null) resolved += FastbootGetVarAllParser.MetadataField.LOGICAL
+                if (entry.hasSlot != null) resolved += FastbootGetVarAllParser.MetadataField.HAS_SLOT
+                FastbootPartitionInventory.PointProbe(
+                    name = entry.name,
+                    sizeBytes = entry.sizeBytes,
+                    type = entry.type,
+                    logical = entry.logical,
+                    hasSlot = entry.hasSlot,
+                    attemptedFields = resolved,
+                    resolvedFields = resolved
+                )
+            }
+        return build(
+            Request(
+                source = source,
+                imageDisplayName = request.imageDisplayName,
+                fallbackProduct = request.inventory.product,
+                pointProbes = pointProbes,
+                collectionWarnings = request.inventory.warnings,
+                expertModeEnabled = request.expertModeEnabled,
+                manualPartitionName = request.manualPartitionName,
+                maxPointQueries = request.maxPointQueries,
+                sessionBroken = request.sessionBroken
+            )
+        )
     }
 
     fun build(request: Request): Result {

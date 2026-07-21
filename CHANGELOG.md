@@ -2,6 +2,12 @@
 
 ## V6.0.0-alpha5 development baseline — `6.0.0-alpha5-dev-nekoflash` (`217`)
 
+- Реализован Slice C Recovery-first UI: Recovery — главный target, primary и expert actions разделены, Expert Mode выключен по умолчанию.
+- UI выбирает image первым, вычисляет SHA-256 и показывает только concrete partitions из `QuickFlashTopologyCandidateBuilder.buildFromInventory`; filename не авторизует target.
+- Для A/B пользователь выбирает один точный partition (`_a` или `_b`); вариант `BOTH` и legacy multi-flash queue скрыты из активного Quick Flash.
+- Inventory evidence и confirmation связаны одним transport session ID; смена USB/Fastboot-сессии инвалидирует candidate flow.
+- Добавлен pure regression module `quick-flash-ui`, static guard защищает порядок Recovery-first, hidden Expert Mode, candidate-only flow и protected Home components.
+- Pure runner совместим с bounded K2: `flash-operation-draft` использует top-level entry point и корректно упаковывается как executable test JAR.
 - Termux publish разделён с проверками и CI: `termux-publish.sh` теперь выполняет только безопасный импорт source ZIP, commit и push feature-ветки; локальные тесты и Android CI запускаются отдельно.
 - Реализован Slice A Recovery-first Quick Flash: pure модели target/candidate/plan и fail-closed validator без Android UI dependencies.
 - Реализован Slice B: `QuickFlashTopologyCandidateBuilder` объединяет concrete partition inventory, slot resolver и bounded point-query; filename остаётся только hint.

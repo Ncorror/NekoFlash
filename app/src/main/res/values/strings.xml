@@ -246,10 +246,64 @@ Sideload</string>
     <string name="layout_reboot_system">System</string>
     <string name="layout_reboot_bootloader">Bootloader</string>
     <string name="layout_reboot_recovery">Recovery</string>
-    <string name="layout_flash_partition_title">FLASH PARTITION</string>
+
+    <!-- Recovery-first Quick Flash (Slice C) -->
+    <string name="quick_flash_recovery_first_title">RECOVERY-FIRST QUICK FLASH</string>
+    <string name="quick_flash_recovery_first_desc">Choose one image and one confirmed partition. No ROM batch flashing and no automatic retry.</string>
+    <string name="quick_flash_primary_recovery">Flash recovery image</string>
+    <string name="quick_flash_other_targets">OTHER PRIMARY TARGETS</string>
+    <string name="quick_flash_expert_toggle">Expert Mode</string>
+    <string name="quick_flash_expert_off">Expert targets are hidden. dtbo, vbmeta, vendor_kernel_boot and manual partition are unavailable.</string>
+    <string name="quick_flash_expert_on">Expert targets are visible for this screen session. Every target still requires device evidence and confirmation.</string>
+    <string name="quick_flash_manual_target">Manual partition name</string>
+    <string name="layout_partition_vbmeta">vbmeta</string>
+    <string name="layout_partition_vendor_kernel_boot">vendor_kernel_boot</string>
+    <string name="quick_flash_manual_title">Manual Quick Flash target</string>
+    <string name="quick_flash_manual_message">Enter the exact partition name twice. Defined targets and full-ROM/radio/bootloader partitions are rejected.</string>
+    <string name="quick_flash_manual_hint">Partition name</string>
+    <string name="quick_flash_manual_repeat_hint">Repeat partition name</string>
+    <string name="quick_flash_manual_mismatch">The two partition names do not match.</string>
+    <string name="quick_flash_manual_forbidden">This partition is not allowed in manual Quick Flash.</string>
+    <string name="quick_flash_expert_required">Enable Expert Mode before selecting this target.</string>
+    <string name="quick_flash_inventory_required_title">Partition inventory required</string>
+    <string name="quick_flash_inventory_required_message">Run the read-only Fastboot data refresh first. Quick Flash will not guess a partition or slot.</string>
+    <string name="quick_flash_refresh">Refresh data</string>
+    <string name="quick_flash_hashing">Calculating SHA-256 for %1$s…</string>
+    <string name="quick_flash_candidate_title">Choose concrete target for %1$s</string>
+    <string name="quick_flash_candidate_message">File: %1$s
+Size: %2$s
+SHA-256: %3$s
+
+Only partitions confirmed by the read-only topology builder are shown.</string>
+    <string name="quick_flash_candidate_slot_unslotted">unslotted</string>
+    <string name="quick_flash_candidate_slot_a">slot A</string>
+    <string name="quick_flash_candidate_slot_b">slot B</string>
+    <string name="quick_flash_candidate_evidence_inventory">inventory</string>
+    <string name="quick_flash_candidate_evidence_point">point query</string>
+    <string name="quick_flash_candidate_label">%1$s · %2$s · %3$s</string>
+    <string name="quick_flash_blocked_title">Quick Flash blocked</string>
+    <string name="quick_flash_no_candidate">No confirmed concrete partition exists for this target. Refresh Fastboot data and check the device topology.</string>
+    <string name="quick_flash_plan_title">Confirm one Quick Flash command</string>
+    <string name="quick_flash_plan_message">Device: %1$s
+Image: %2$s
+Size: %3$s
+SHA-256: %4$s
+Target: %5$s
+Concrete partition: %6$s
+Slot: %7$s
+Evidence: %8$s
+Command: %9$s
+Plan fingerprint: %10$s
+
+%11$s</string>
+    <string name="quick_flash_session_changed">The USB/Fastboot session changed after the plan was created. Build a new plan.</string>
+    <string name="quick_flash_expert_disabled_after_plan">Expert Mode was disabled after the plan was created. Select the target again.</string>
+    <string name="quick_flash_ui_enabled_log">Quick Flash Expert Mode enabled for the current screen session.</string>
+    <string name="quick_flash_ui_disabled_log">Quick Flash Expert Mode disabled; expert targets hidden.</string>
+    <string name="quick_flash_legacy_queue_hidden">Legacy multi-flash queue is hidden in Recovery-first Quick Flash.</string>
+
     <string name="layout_partition_boot">boot</string>
     <string name="layout_partition_init_boot">init_boot</string>
-    <string name="layout_partition_recovery">recovery</string>
     <string name="layout_partition_vendor_boot">vendor_boot</string>
     <string name="layout_partition_dtbo">dtbo</string>
     <string name="layout_flash_queue_title">FLASH QUEUE</string>

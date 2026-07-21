@@ -42,6 +42,8 @@ main_activity = read("app/src/main/java/ru/forum/adbfastboottool/MainActivity.kt
 manifest = read("tools/tests.manifest")
 quick_flash_plan = read("app/src/main/java/ru/forum/adbfastboottool/QuickFlashPlan.kt")
 quick_flash_topology = read("app/src/main/java/ru/forum/adbfastboottool/QuickFlashTopologyCandidateBuilder.kt")
+quick_flash_ui = read("app/src/main/java/ru/forum/adbfastboottool/QuickFlashUiPolicy.kt")
+main_layout = read("app/src/main/res/layout/activity_main.xml")
 
 # --- Fix A: single-URB is diagnostic-only for real DATA ---
 require("isSingleUrbDiagnostic" in protocol, "Fix A: isSingleUrbDiagnostic present")
@@ -127,6 +129,42 @@ require(
     "Quick Flash: candidates require exact concrete inventory and slot match",
 )
 require("quick-flash-topology" in manifest, "Quick Flash: Slice B pure regression module registered")
+
+# --- Recovery-first Quick Flash Slice C ---
+require(
+    "QuickFlashTarget.RECOVERY" in quick_flash_ui and
+    quick_flash_ui.index("QuickFlashTarget.RECOVERY") < quick_flash_ui.index("QuickFlashTarget.BOOT"),
+    "Quick Flash: Recovery is the first primary UI target",
+)
+require(
+    "legacyQueueVisible: Boolean = false" in quick_flash_ui and
+    'android:id="@+id/legacyFlashQueueCard"' in main_layout and
+    'android:visibility="gone"' in main_layout.split('android:id="@+id/legacyFlashQueueCard"', 1)[1][:300],
+    "Quick Flash: legacy multi-flash queue is hidden",
+)
+require(
+    'android:id="@+id/containerQuickFlashExpertTargets"' in main_layout and
+    'android:visibility="gone"' in main_layout.split('android:id="@+id/containerQuickFlashExpertTargets"', 1)[1][:500],
+    "Quick Flash: expert targets are hidden by default",
+)
+require(
+    "QuickFlashTopologyCandidateBuilder.buildFromInventory" in main_activity and
+    "selectedPartitionName = candidate.partitionName" in main_activity,
+    "Quick Flash: UI uses concrete Slice B candidates",
+)
+quick_flash_ui_body = main_activity.split("private fun startQuickFlashTargetFlow", 1)[-1].split("private fun showFlashConfirmation", 1)[0]
+require(
+    "FastbootSlotResolver.RequestedSlot.BOTH" not in quick_flash_ui_body and
+    "viewModel.runFlash(plan.partitionName, file)" in quick_flash_ui_body,
+    "Quick Flash: new UI confirms one concrete partition, never BOTH",
+)
+require(
+    "currentTransportSessionId() != inventorySessionId" in quick_flash_ui_body and
+    "expectedSessionId = inventorySessionId" in quick_flash_ui_body and
+    "currentTransportSessionId() != expectedSessionId" in quick_flash_ui_body,
+    "Quick Flash: inventory candidates remain bound to one transport session",
+)
+require("quick-flash-ui" in manifest, "Quick Flash: Slice C pure regression module registered")
 
 # --- Read-only partition inventory ---
 require("object FastbootPartitionInventory" in inventory, "Inventory: model present")

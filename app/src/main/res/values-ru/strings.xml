@@ -246,10 +246,64 @@ Sideload</string>
     <string name="layout_reboot_system">Система</string>
     <string name="layout_reboot_bootloader">Загрузчик</string>
     <string name="layout_reboot_recovery">Recovery</string>
-    <string name="layout_flash_partition_title">ПРОШИТЬ РАЗДЕЛ</string>
+
+    <!-- Recovery-first Quick Flash (Slice C) -->
+    <string name="quick_flash_recovery_first_title">RECOVERY-FIRST QUICK FLASH</string>
+    <string name="quick_flash_recovery_first_desc">Выберите один образ и один подтверждённый раздел. Пакетной прошивки ROM и автоматического повтора нет.</string>
+    <string name="quick_flash_primary_recovery">Прошить образ Recovery</string>
+    <string name="quick_flash_other_targets">ДРУГИЕ ОСНОВНЫЕ ЦЕЛИ</string>
+    <string name="quick_flash_expert_toggle">Экспертный режим</string>
+    <string name="quick_flash_expert_off">Экспертные цели скрыты: dtbo, vbmeta, vendor_kernel_boot и ручной раздел недоступны.</string>
+    <string name="quick_flash_expert_on">Экспертные цели видимы только в этой сессии экрана. Для каждой цели всё равно нужны доказательства устройства и подтверждение.</string>
+    <string name="quick_flash_manual_target">Ручное имя раздела</string>
+    <string name="layout_partition_vbmeta">vbmeta</string>
+    <string name="layout_partition_vendor_kernel_boot">vendor_kernel_boot</string>
+    <string name="quick_flash_manual_title">Ручная цель Quick Flash</string>
+    <string name="quick_flash_manual_message">Введите точное имя раздела дважды. Определённые цели, full-ROM, radio и bootloader-разделы отклоняются.</string>
+    <string name="quick_flash_manual_hint">Имя раздела</string>
+    <string name="quick_flash_manual_repeat_hint">Повторите имя раздела</string>
+    <string name="quick_flash_manual_mismatch">Введённые имена раздела не совпадают.</string>
+    <string name="quick_flash_manual_forbidden">Этот раздел запрещён для ручного Quick Flash.</string>
+    <string name="quick_flash_expert_required">Сначала включите Экспертный режим.</string>
+    <string name="quick_flash_inventory_required_title">Нужна инвентаризация разделов</string>
+    <string name="quick_flash_inventory_required_message">Сначала обновите read-only данные Fastboot. Quick Flash не будет угадывать раздел или слот.</string>
+    <string name="quick_flash_refresh">Обновить данные</string>
+    <string name="quick_flash_hashing">Вычисляется SHA-256 для %1$s…</string>
+    <string name="quick_flash_candidate_title">Выберите точную цель для %1$s</string>
+    <string name="quick_flash_candidate_message">Файл: %1$s
+Размер: %2$s
+SHA-256: %3$s
+
+Показаны только разделы, подтверждённые read-only topology builder.</string>
+    <string name="quick_flash_candidate_slot_unslotted">без слота</string>
+    <string name="quick_flash_candidate_slot_a">слот A</string>
+    <string name="quick_flash_candidate_slot_b">слот B</string>
+    <string name="quick_flash_candidate_evidence_inventory">inventory</string>
+    <string name="quick_flash_candidate_evidence_point">точечный запрос</string>
+    <string name="quick_flash_candidate_label">%1$s · %2$s · %3$s</string>
+    <string name="quick_flash_blocked_title">Quick Flash заблокирован</string>
+    <string name="quick_flash_no_candidate">Для этой цели нет подтверждённого конкретного раздела. Обновите Fastboot-данные и проверьте topology устройства.</string>
+    <string name="quick_flash_plan_title">Подтвердите одну команду Quick Flash</string>
+    <string name="quick_flash_plan_message">Устройство: %1$s
+Образ: %2$s
+Размер: %3$s
+SHA-256: %4$s
+Цель: %5$s
+Точный раздел: %6$s
+Слот: %7$s
+Доказательство: %8$s
+Команда: %9$s
+Fingerprint плана: %10$s
+
+%11$s</string>
+    <string name="quick_flash_session_changed">USB/Fastboot-сессия изменилась после создания плана. Создайте новый план.</string>
+    <string name="quick_flash_expert_disabled_after_plan">Экспертный режим был выключен после создания плана. Выберите цель заново.</string>
+    <string name="quick_flash_ui_enabled_log">Экспертный режим Quick Flash включён для текущей сессии экрана.</string>
+    <string name="quick_flash_ui_disabled_log">Экспертный режим Quick Flash выключен; экспертные цели скрыты.</string>
+    <string name="quick_flash_legacy_queue_hidden">Старая очередь нескольких прошивок скрыта в Recovery-first Quick Flash.</string>
+
     <string name="layout_partition_boot">boot</string>
     <string name="layout_partition_init_boot">init_boot</string>
-    <string name="layout_partition_recovery">recovery</string>
     <string name="layout_partition_vendor_boot">vendor_boot</string>
     <string name="layout_partition_dtbo">dtbo</string>
     <string name="layout_flash_queue_title">ОЧЕРЕДЬ ПРОШИВКИ</string>

@@ -35,7 +35,7 @@ NekoFlash остаётся компактным Android-инструментом
 | HOMEINFO-001 | Сохранить карточку устройства и рабочей папки | DONE_CODE | Android UI smoke test |
 | HOMEACTIONS-001 | Четыре главных перехода на Home | DONE_CODE | Android UI smoke test |
 | TERMINAL-001 | Проверить ADB/Fastboot terminal на устройстве | OPEN | Команды read-only и экспорт лога |
-| FLASH-001 | Recovery-first Quick Flash | IN_PROGRESS | Slice C: Recovery-first UI без изменения protected Home components |
+| FLASH-001 | Recovery-first Quick Flash | IN_PROGRESS | Slice D: передать подтверждённый QuickFlashPlan в mutation gate |
 | SIDELOAD-001 | Подтвердить ADB Sideload в V6 | RETEST_REQUIRED | ZIP transfer, cancel, recovery result |
 | UNLOCK-001 | Провести отдельный аудит Mi Unlock | OPEN | Разделить стандартный Fastboot unlock и Xiaomi flow |
 | TEST-001 | Сокращённая релевантная test matrix | DONE_CI | Alpha4: 19/19 + Android CI; alpha5 local: 21/21, Android CI pending |
@@ -59,6 +59,10 @@ NekoFlash остаётся компактным Android-инструментом
 - Pure module `quick-flash-topology` покрывает legacy A-only, A/B, unknown topology, point-query evidence, expert/manual gates, archive redirect и broken-session fail-closed.
 - Python cache исключён через `.gitignore`; Termux publisher остаётся push-only и не запускает локальную сборку либо CI.
 - Slice A/B имеют `DONE_CODE` и локальное pure evidence; Android lint/assemble и аппаратная прошивка этим не подтверждены.
+- Slice C реализован в `QuickFlashUiPolicy.kt`, `activity_main.xml` и `MainActivity`: Recovery расположен первым, primary/expert targets разделены, Expert Mode выключен по умолчанию.
+- Новый UI сначала выбирает image, вычисляет SHA-256, затем показывает только concrete candidates из `QuickFlashTopologyCandidateBuilder.buildFromInventory`; слот `BOTH` не предлагается.
+- Legacy multi-flash queue сохранён только для совместимости внутренних ID/state, но скрыт из активного Recovery-first UI.
+- Inventory evidence, candidate selector и confirmation связаны одним transport session ID; смена USB/Fastboot-сессии блокирует план fail-closed.
 
 ## Текущий следующий шаг
 
@@ -66,9 +70,9 @@ NekoFlash остаётся компактным Android-инструментом
 
 1. Сверить в Git remote наличие annotated tag `v6.0.0-alpha4` на green commit `90871fb`; source ZIP не содержит `.git` и не доказывает состояние тега.
 2. Считать Slice A и Slice B `DONE_CODE`, сохраняя их pure и независимыми от Android UI.
-3. Реализовать Slice C: Recovery-first UI, используя только candidates из `QuickFlashTopologyCandidateBuilder`.
-4. Сохранить `TOPBAR-001`, `HOMEINFO-001` и `HOMEACTIONS-001`; expert targets должны оставаться скрытыми до явного включения.
-5. После UI перейти к Slice D mutation gate: один подтверждённый `QuickFlashPlan` — одна команда без retry и повторного staging.
+3. Считать Slice C `DONE_CODE`: Recovery-first UI использует только candidates из `QuickFlashTopologyCandidateBuilder`, Expert Mode скрыт по умолчанию, legacy queue не виден.
+4. Сохранить `TOPBAR-001`, `HOMEINFO-001` и `HOMEACTIONS-001`; Android UI smoke test остаётся отдельным evidence gate.
+5. Реализовать Slice D mutation gate: передать один подтверждённый `QuickFlashPlan` в flash service, сверить session/file identity и выполнить ровно одну команду без retry и повторного staging.
 6. Публиковать без локальной сборки через `scripts/termux-publish.sh`, а CI и сбор логов выполнять отдельно через `scripts/termux-ci.sh`; перед новым чатом создавать `scripts/export-chat-context.sh`.
 7. После зелёного Android CI провести отдельный sanitised hardware retest Terminal/Sideload и контролируемый Quick Flash.
 

@@ -3,9 +3,7 @@ package ru.forum.adbfastboottool
 import java.io.File
 import java.nio.file.Files
 
-object FlashOperationDraftTest {
-    @JvmStatic
-    fun main(args: Array<String>) {
+fun main() {
         val root = Files.createTempDirectory("nekoflash-draft-").toFile()
         try {
             val boot = File(root, "boot.img").apply { writeBytes(ByteArray(4096) { (it % 251).toByte() }) }
@@ -77,4 +75,3 @@ object FlashOperationDraftTest {
             root.deleteRecursively()
         }
     }
-}

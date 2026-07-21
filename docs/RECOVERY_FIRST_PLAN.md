@@ -56,9 +56,9 @@ Expert Mode:
 
 Добавлен pure `QuickFlashTopologyCandidateBuilder`, который строит candidates только из concrete inventory evidence, проверяет slot mapping через `FastbootSlotResolver` и выдаёт bounded read-only point-query plan для недостающих данных. `PartitionNameResolver` задаёт лишь порядок подсказок и никогда не выбирает target. Unknown topology, archive input и broken session закрываются fail-closed; legacy A-only не получает синтетические `_a`/`_b`.
 
-### Slice C — UI
+### Slice C — UI (`DONE_CODE`)
 
-Сделать Recovery главным target, остальные основные targets отдельными действиями, а expert targets скрыть за явным переключателем. Сохранить `TOPBAR-001`, `HOMEINFO-001` и `HOMEACTIONS-001`.
+Recovery стал главным target, остальные primary targets представлены отдельными действиями, а `dtbo`, `vbmeta`, `vendor_kernel_boot` и ручное имя скрыты за выключенным по умолчанию Expert Mode. UI выбирает image первым, вычисляет SHA-256 и показывает только concrete candidates из `QuickFlashTopologyCandidateBuilder`; filename остаётся hint. Inventory evidence, candidate selector и confirmation привязаны к одному transport session ID, поэтому detach или смена устройства блокируют план. Legacy multi-flash queue скрыт, выбор `BOTH` отсутствует. `TOPBAR-001`, `HOMEINFO-001` и `HOMEACTIONS-001` не изменены.
 
 ### Slice D — mutation gate
 
@@ -84,7 +84,7 @@ Expert Mode:
 
 1. Slice A с pure tests — `DONE_CODE`.
 2. Slice B с inventory/slot regression tests — `DONE_CODE`.
-3. Slice C без изменения protected Home components — следующий шаг.
-4. Slice D и end-to-end policy tests.
+3. Slice C без изменения protected Home components — `DONE_CODE`.
+4. Slice D и end-to-end policy tests — следующий шаг.
 5. Android CI.
 6. Sanitised hardware validation.

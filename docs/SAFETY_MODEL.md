@@ -15,7 +15,9 @@ Safety V6 должен быть небольшим и непосредствен
 - показ пользователю файла и итогового раздела;
 - явное финальное подтверждение.
 
-При detach, смене режима или устройства draft инвалидируется. Mutation-команда не повторяется автоматически после ошибки.
+Recovery-first UI показывает только concrete candidates из read-only inventory/topology builder. Expert targets скрыты до явного включения, а multi-flash queue и выбор обоих слотов не доступны в активном UI.
+
+При detach, смене режима или устройства draft инвалидируется. Recovery-first UI фиксирует transport session до хеширования и не разрешает использовать inventory/candidate evidence после смены сессии. Mutation-команда не повторяется автоматически после ошибки.
 
 ## Recovery topology
 

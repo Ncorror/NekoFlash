@@ -5,6 +5,7 @@ fun main() {
     abInventoryExposesOnlyConcreteSlotCandidates()
     unknownTopologyFailsClosedAndPlansBoundedReads()
     pointQueryEvidenceCanConfirmOneConcreteCandidate()
+    collectedInventoryCanBeReusedByUiWithoutNewTransportCalls()
     expertAndManualTargetsStayBehindExplicitGates()
     archiveAndBrokenSessionAreBlocked()
     println("QUICK FLASH TOPOLOGY CANDIDATE BUILDER TESTS: OK")
@@ -117,6 +118,32 @@ private fun pointQueryEvidenceCanConfirmOneConcreteCandidate() {
     check(candidate.slot == QuickFlashSlot.SLOT_A)
     check(candidate.evidence == QuickFlashCandidateEvidence.POINT_QUERY)
     check(result.candidates.none { it.partitionName == "recovery_b" })
+}
+
+private fun collectedInventoryCanBeReusedByUiWithoutNewTransportCalls() {
+    val original = build(
+        lines = listOf(
+            "INFOproduct:marble",
+            "INFOslot-count:2",
+            "INFOcurrent-slot:a",
+            "INFOhas-slot:boot:yes",
+            "INFOpartition-size:boot_a:0x06000000",
+            "INFOpartition-size:boot_b:0x06000000"
+        ),
+        image = "boot.img"
+    )
+    val reused = QuickFlashTopologyCandidateBuilder.buildFromInventory(
+        QuickFlashTopologyCandidateBuilder.InventoryRequest(
+            inventory = original.inventory,
+            imageDisplayName = "boot.img"
+        )
+    )
+
+    check(reused.status == QuickFlashTopologyCandidateBuilder.Status.READY)
+    check(reused.candidates == original.candidates) {
+        "reused=${reused.candidates}, original=${original.candidates}"
+    }
+    check(reused.pointQueryPlan.requests.isEmpty())
 }
 
 private fun expertAndManualTargetsStayBehindExplicitGates() {

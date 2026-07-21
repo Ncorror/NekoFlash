@@ -1082,6 +1082,8 @@ def check_quick_flash_topology_slice() -> None:
         "IMAGE_ARCHIVE_REQUIRES_SIDELOAD",
         "MANUAL_PARTITION_REQUIRES_EXPERT_MODE",
         "inventory.topology != FastbootPartitionInventory.SlotTopology.UNKNOWN",
+        "data class InventoryRequest",
+        "fun buildFromInventory",
     )
     for token in required:
         if token not in builder_text:
@@ -1109,6 +1111,100 @@ def check_quick_flash_topology_slice() -> None:
 
     if not ERRORS:
         print("Quick Flash Slice B topology builder: OK")
+
+def check_quick_flash_ui_slice() -> None:
+    policy = ROOT / "app/src/main/java/ru/forum/adbfastboottool/QuickFlashUiPolicy.kt"
+    test = ROOT / "tools/quick-flash-ui-test/ru/forum/adbfastboottool/QuickFlashUiPolicyTest.kt"
+    layout = ROOT / "app/src/main/res/layout/activity_main.xml"
+    main = ROOT / "app/src/main/java/ru/forum/adbfastboottool/MainActivity.kt"
+    manifest = ROOT / "tools/tests.manifest"
+    for path in (policy, test, layout, main, manifest):
+        if not path.is_file():
+            fail(f"Missing FLASH-001 Slice C file: {path.relative_to(ROOT)}")
+            return
+
+    policy_text = policy.read_text(encoding="utf-8")
+    required_policy = (
+        "object QuickFlashUiPolicy",
+        "QuickFlashTarget.RECOVERY",
+        "QuickFlashTarget.BOOT",
+        "QuickFlashTarget.INIT_BOOT",
+        "QuickFlashTarget.VENDOR_BOOT",
+        "QuickFlashTarget.DTBO",
+        "QuickFlashTarget.VBMETA",
+        "QuickFlashTarget.VENDOR_KERNEL_BOOT",
+        "QuickFlashTarget.MANUAL",
+        "legacyQueueVisible: Boolean = false",
+    )
+    for token in required_policy:
+        if token not in policy_text:
+            fail(f"FLASH-001 Slice C policy token missing: {token}")
+    if any(token in policy_text for token in ("android.", "androidx.")):
+        fail("FLASH-001 Slice C UI policy must remain pure")
+
+    layout_text = layout.read_text(encoding="utf-8")
+    layout_tokens = (
+        '@+id/cardQuickFlashRecoveryFirst',
+        '@+id/btnFlashRecovery',
+        '@+id/btnFlashBoot',
+        '@+id/btnFlashInitBoot',
+        '@+id/btnFlashVendorBoot',
+        '@+id/switchQuickFlashExpert',
+        '@+id/containerQuickFlashExpertTargets',
+        '@+id/btnFlashDtbo',
+        '@+id/btnFlashVbmeta',
+        '@+id/btnFlashVendorKernelBoot',
+        '@+id/btnFlashManual',
+        '@+id/legacyFlashQueueCard',
+    )
+    for token in layout_tokens:
+        if token not in layout_text:
+            fail(f"FLASH-001 Slice C layout token missing: {token}")
+    if layout_text.index('@+id/btnFlashRecovery') > layout_text.index('@+id/btnFlashBoot'):
+        fail("Recovery must remain the first primary Quick Flash target")
+    expert_match = re.search(
+        r'android:id="@\+id/containerQuickFlashExpertTargets"[\s\S]{0,500}?android:visibility="gone"',
+        layout_text,
+    )
+    if not expert_match:
+        fail("Expert Quick Flash targets must be hidden by default")
+    queue_match = re.search(
+        r'android:id="@\+id/legacyFlashQueueCard"[\s\S]{0,300}?android:visibility="gone"',
+        layout_text,
+    )
+    if not queue_match:
+        fail("Legacy multi-flash queue must remain hidden in Recovery-first UI")
+    if layout_text.index('@+id/cardQuickFlashRecoveryFirst') > layout_text.index('@+id/btnFastbootDataSelfTest'):
+        fail("Recovery-first card must appear before diagnostic-only Fastboot DATA tools")
+
+    main_text = main.read_text(encoding="utf-8")
+    main_tokens = (
+        "QuickFlashUiPolicy.isVisible",
+        "QuickFlashTopologyCandidateBuilder.buildFromInventory",
+        "QuickFlashPlanValidator.validate",
+        "selectedPartitionName = candidate.partitionName",
+        "viewModel.runFlash(plan.partitionName, file)",
+        "currentTransportSessionId() != inventorySessionId",
+        "expectedSessionId = inventorySessionId",
+        "currentTransportSessionId() != expectedSessionId",
+        "currentTransportSessionId() != plan.deviceSessionId",
+        "showManualQuickFlashTargetDialog",
+    )
+    for token in main_tokens:
+        if token not in main_text:
+            fail(f"FLASH-001 Slice C MainActivity token missing: {token}")
+    if "fun flashPartBtn(" in main_text:
+        fail("Legacy target-first Quick Flash button flow must not return")
+    if 'FastbootSlotResolver.RequestedSlot.BOTH' in main_text[main_text.find("private fun startQuickFlashTargetFlow"):main_text.find("private fun showFlashConfirmation")]:
+        fail("Recovery-first UI must not expose a hidden both-slots mutation")
+
+    manifest_text = manifest.read_text(encoding="utf-8")
+    if not re.search(r"^quick-flash-ui\t", manifest_text, re.M):
+        fail("Quick Flash UI pure test module missing from manifest")
+
+    if not ERRORS:
+        print("Quick Flash Slice C Recovery-first UI: OK")
+
 
 def check_flash_operation_draft_state() -> None:
     draft = ROOT / "app/src/main/java/ru/forum/adbfastboottool/FlashOperationDraft.kt"
@@ -1309,6 +1405,7 @@ def main() -> int:
     check_termux_workflow()
     check_quick_flash_plan_slice()
     check_quick_flash_topology_slice()
+    check_quick_flash_ui_slice()
     check_flash_operation_draft_state()
     check_v6_scope_reset()
     check_device_viewmodel_api_refs()

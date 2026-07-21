@@ -51,6 +51,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.switchmaterial.SwitchMaterial
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -108,6 +109,7 @@ class MainActivity : AppCompatActivity() {
     private var terminalReturnWindow = "home"
     private var restoringWindowState = false
     private var highRiskActionsUnlocked = false
+    private var quickFlashExpertModeEnabled = false
     private var overlayProtectionLogged = false
     private var redirectingToWelcome = false
 
@@ -404,15 +406,45 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btnQueueClear).setOnClickListener { clearFlashQueue() }
         guardClick(R.id.btnQueueStart) { confirmFlashQueue() }
 
-        // v4 UI: прямые кнопки разделов (vbmeta УДАЛЕНА)
-        fun flashPartBtn(partition: String) {
-            showFileSelector(".img") { file -> showFlashConfirmation(partition, file) }
+        // Slice C: Recovery-first UI. Expert targets are hidden by default and
+        // all visible actions are resolved through QuickFlashTopologyCandidateBuilder.
+        val expertSwitch = findViewById<SwitchMaterial>(R.id.switchQuickFlashExpert)
+        expertSwitch.isChecked = false
+        renderQuickFlashExpertMode(false)
+        expertSwitch.setOnCheckedChangeListener { _, enabled ->
+            renderQuickFlashExpertMode(enabled)
+            viewModel.log(
+                getString(
+                    if (enabled) R.string.quick_flash_ui_enabled_log
+                    else R.string.quick_flash_ui_disabled_log
+                )
+            )
         }
-        findViewById<View>(R.id.btnFlashBoot).setOnClickListener       { flashPartBtn("boot") }
-        findViewById<View>(R.id.btnFlashInitBoot).setOnClickListener   { flashPartBtn("init_boot") }
-        findViewById<View>(R.id.btnFlashRecovery).setOnClickListener   { flashPartBtn("recovery") }
-        findViewById<View>(R.id.btnFlashVendorBoot).setOnClickListener { flashPartBtn("vendor_boot") }
-        findViewById<View>(R.id.btnFlashDtbo).setOnClickListener       { flashPartBtn("dtbo") }
+        findViewById<View>(R.id.btnFlashRecovery).setOnClickListener {
+            startQuickFlashTargetFlow(QuickFlashTarget.RECOVERY)
+        }
+        findViewById<View>(R.id.btnFlashBoot).setOnClickListener {
+            startQuickFlashTargetFlow(QuickFlashTarget.BOOT)
+        }
+        findViewById<View>(R.id.btnFlashInitBoot).setOnClickListener {
+            startQuickFlashTargetFlow(QuickFlashTarget.INIT_BOOT)
+        }
+        findViewById<View>(R.id.btnFlashVendorBoot).setOnClickListener {
+            startQuickFlashTargetFlow(QuickFlashTarget.VENDOR_BOOT)
+        }
+        findViewById<View>(R.id.btnFlashDtbo).setOnClickListener {
+            startQuickFlashTargetFlow(QuickFlashTarget.DTBO)
+        }
+        findViewById<View>(R.id.btnFlashVbmeta).setOnClickListener {
+            startQuickFlashTargetFlow(QuickFlashTarget.VBMETA)
+        }
+        findViewById<View>(R.id.btnFlashVendorKernelBoot).setOnClickListener {
+            startQuickFlashTargetFlow(QuickFlashTarget.VENDOR_KERNEL_BOOT)
+        }
+        findViewById<View>(R.id.btnFlashManual).setOnClickListener {
+            showManualQuickFlashTargetDialog()
+        }
+        viewModel.log(getString(R.string.quick_flash_legacy_queue_hidden))
 
         // Единое меню Reboot (BottomSheet) — собирает все варианты перезагрузки.
         findViewById<Button>(R.id.btnAdbSideload).setOnClickListener {
@@ -2614,6 +2646,316 @@ class MainActivity : AppCompatActivity() {
                 viewModel.log("ОШИБКА: не удалось проанализировать файл: ${e.message ?: e.javaClass.simpleName}")
             }
         }
+    }
+
+    private fun renderQuickFlashExpertMode(enabled: Boolean) {
+        quickFlashExpertModeEnabled = enabled
+        findViewById<View>(R.id.containerQuickFlashExpertTargets).visibility =
+            if (enabled) View.VISIBLE else View.GONE
+        findViewById<TextView>(R.id.tvQuickFlashExpertState).setText(
+            if (enabled) R.string.quick_flash_expert_on else R.string.quick_flash_expert_off
+        )
+    }
+
+    private fun startQuickFlashTargetFlow(
+        target: QuickFlashTarget,
+        manualPartitionName: String? = null,
+        manualPartitionConfirmation: String? = null
+    ) {
+        if (!QuickFlashUiPolicy.isVisible(target, quickFlashExpertModeEnabled)) {
+            blockQuickFlash(getString(R.string.quick_flash_expert_required))
+            return
+        }
+        showFileSelector(".img") { file ->
+            val inventorySessionId = viewModel.currentTransportSessionId()?.takeIf { it.isNotBlank() }
+            val inventory = viewModel.currentFastbootPartitionInventory()
+            if (inventorySessionId == null || inventory == null) {
+                MaterialAlertDialogBuilder(this)
+                    .setTitle(getString(R.string.quick_flash_inventory_required_title))
+                    .setMessage(getString(R.string.quick_flash_inventory_required_message))
+                    .setNegativeButton(getString(R.string.cancel_upper), null)
+                    .setPositiveButton(getString(R.string.quick_flash_refresh)) { _, _ ->
+                        refreshDeviceDataFromUi()
+                    }
+                    .show()
+                return@showFileSelector
+            }
+
+            viewModel.log(getString(R.string.quick_flash_hashing, file.name))
+            lifecycleScope.launch {
+                val sha256 = withContext(Dispatchers.IO) {
+                    runCatching { HashUtils.calculateSha256(file) }
+                }.getOrElse { error ->
+                    blockQuickFlash("SHA-256: ${error.message ?: error.javaClass.simpleName}")
+                    return@launch
+                }
+
+                if (viewModel.currentTransportSessionId() != inventorySessionId) {
+                    blockQuickFlash(getString(R.string.quick_flash_session_changed))
+                    return@launch
+                }
+
+                val result = QuickFlashTopologyCandidateBuilder.buildFromInventory(
+                    QuickFlashTopologyCandidateBuilder.InventoryRequest(
+                        inventory = inventory,
+                        imageDisplayName = file.name,
+                        expertModeEnabled = quickFlashExpertModeEnabled,
+                        manualPartitionName = manualPartitionName,
+                        sessionBroken = viewModel.fastbootProtocol?.isSessionBroken == true
+                    )
+                )
+                val candidates = result.candidates.filter { it.target == target }
+                if (!result.canChooseTarget || candidates.isEmpty()) {
+                    val technical = result.errors.joinToString().ifBlank { result.status.name }
+                    blockQuickFlash(
+                        getString(R.string.quick_flash_no_candidate) + "\n\n" + technical
+                    )
+                    return@launch
+                }
+                showQuickFlashCandidateSelector(
+                    target = target,
+                    candidates = candidates,
+                    file = file,
+                    sha256 = sha256,
+                    expectedSessionId = inventorySessionId,
+                    manualPartitionConfirmation = manualPartitionConfirmation
+                )
+            }
+        }
+    }
+
+    private fun showManualQuickFlashTargetDialog() {
+        if (!quickFlashExpertModeEnabled) {
+            blockQuickFlash(getString(R.string.quick_flash_expert_required))
+            return
+        }
+        val padding = (16 * resources.displayMetrics.density).toInt()
+        val first = EditText(this).apply {
+            hint = getString(R.string.quick_flash_manual_hint)
+            inputType = InputType.TYPE_CLASS_TEXT
+            setSingleLine(true)
+        }
+        val repeated = EditText(this).apply {
+            hint = getString(R.string.quick_flash_manual_repeat_hint)
+            inputType = InputType.TYPE_CLASS_TEXT
+            setSingleLine(true)
+        }
+        val body = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(padding, 0, padding, 0)
+            addView(first)
+            addView(repeated)
+        }
+        MaterialAlertDialogBuilder(this)
+            .setTitle(getString(R.string.quick_flash_manual_title))
+            .setMessage(getString(R.string.quick_flash_manual_message))
+            .setView(body)
+            .setNegativeButton(getString(R.string.cancel_upper), null)
+            .setPositiveButton(getString(R.string.continue_upper)) { _, _ ->
+                val partition = first.text?.toString()?.trim()?.lowercase(Locale.US).orEmpty()
+                val confirmation = repeated.text?.toString()?.trim()?.lowercase(Locale.US).orEmpty()
+                when {
+                    partition != confirmation -> blockQuickFlash(getString(R.string.quick_flash_manual_mismatch))
+                    !QuickFlashPlanValidator.isManualPartitionAllowed(partition) -> {
+                        blockQuickFlash(getString(R.string.quick_flash_manual_forbidden))
+                    }
+                    else -> startQuickFlashTargetFlow(
+                        target = QuickFlashTarget.MANUAL,
+                        manualPartitionName = partition,
+                        manualPartitionConfirmation = confirmation
+                    )
+                }
+            }
+            .show()
+    }
+
+    private fun showQuickFlashCandidateSelector(
+        target: QuickFlashTarget,
+        candidates: List<QuickFlashCandidate>,
+        file: File,
+        sha256: String,
+        expectedSessionId: String,
+        manualPartitionConfirmation: String?
+    ) {
+        if (candidates.size == 1) {
+            showQuickFlashPlanConfirmation(
+                target,
+                candidates,
+                candidates.single(),
+                file,
+                sha256,
+                expectedSessionId,
+                manualPartitionConfirmation
+            )
+            return
+        }
+        val items = candidates.map(::quickFlashCandidateLabel).toTypedArray()
+        MaterialAlertDialogBuilder(this)
+            .setTitle(getString(R.string.quick_flash_candidate_title, target.name.lowercase(Locale.US)))
+            .setMessage(
+                getString(
+                    R.string.quick_flash_candidate_message,
+                    file.name,
+                    formatFileSize(file.length()),
+                    sha256
+                )
+            )
+            .setItems(items) { _, which ->
+                showQuickFlashPlanConfirmation(
+                    target,
+                    candidates,
+                    candidates[which],
+                    file,
+                    sha256,
+                    expectedSessionId,
+                    manualPartitionConfirmation
+                )
+            }
+            .setNegativeButton(getString(R.string.cancel_upper), null)
+            .show()
+    }
+
+    private fun showQuickFlashPlanConfirmation(
+        target: QuickFlashTarget,
+        candidates: List<QuickFlashCandidate>,
+        candidate: QuickFlashCandidate,
+        file: File,
+        sha256: String,
+        expectedSessionId: String,
+        manualPartitionConfirmation: String?
+    ) {
+        if (!ensureGuidedFlashAllowed(candidate.basePartition)) return
+        if (viewModel.fastbootProtocol?.isConnected != true) {
+            blockQuickFlash(getString(R.string.error_no_fastboot))
+            return
+        }
+        if (viewModel.currentTransportSessionId() != expectedSessionId) {
+            blockQuickFlash(getString(R.string.quick_flash_session_changed))
+            return
+        }
+        val sessionId = expectedSessionId
+        val diagnostics = viewModel.currentFastbootDiagnostics()
+        if (diagnostics?.unlocked?.equals("no", ignoreCase = true) == true) {
+            blockQuickFlash("Bootloader unlocked = no")
+            return
+        }
+        val deviceLabel = viewModel.currentConnectionInfo()
+            ?.takeIf { it.isNotBlank() }
+            ?: diagnostics?.product?.takeIf { it.isNotBlank() }
+            ?: "Fastboot device"
+        val validation = QuickFlashPlanValidator.validate(
+            QuickFlashPlanRequest(
+                deviceSessionId = sessionId,
+                deviceDisplayName = deviceLabel,
+                target = target,
+                selectedPartitionName = candidate.partitionName,
+                candidates = candidates,
+                imageUri = file.toURI().toString(),
+                imageDisplayName = file.name,
+                imageSizeBytes = file.length(),
+                imageSha256 = sha256,
+                expertModeEnabled = quickFlashExpertModeEnabled,
+                manualPartitionConfirmation = manualPartitionConfirmation
+            )
+        )
+        val plan = validation.plan
+        if (!validation.canProceed || plan == null) {
+            blockQuickFlash(validation.errors.joinToString())
+            return
+        }
+
+        val preflight = PreflightValidator.validateFlash(
+            context = this,
+            partition = candidate.basePartition,
+            file = file,
+            currentSlot = diagnostics?.currentSlot,
+            safePartitions = setOf(candidate.basePartition)
+        )
+        preflight.toDisplayText().lines().forEach { line ->
+            if (line.isNotBlank()) viewModel.log(line)
+        }
+        val slotLabel = quickFlashSlotLabel(candidate.slot)
+        val evidenceLabel = quickFlashEvidenceLabel(candidate.evidence)
+        val builder = MaterialAlertDialogBuilder(this)
+            .setTitle(getString(R.string.quick_flash_plan_title))
+            .setIcon(R.drawable.ic_nf_recovery_green)
+            .setMessage(
+                getString(
+                    R.string.quick_flash_plan_message,
+                    plan.deviceDisplayName,
+                    plan.imageDisplayName,
+                    formatFileSize(plan.imageSizeBytes),
+                    plan.imageSha256,
+                    plan.target.name.lowercase(Locale.US),
+                    plan.partitionName,
+                    slotLabel,
+                    evidenceLabel,
+                    plan.commandPreview,
+                    plan.confirmationFingerprint().take(16),
+                    preflight.toDisplayText()
+                )
+            )
+            .setNegativeButton(getString(R.string.cancel_upper), null)
+
+        if (preflight.canProceed) {
+            builder.setPositiveButton(getString(R.string.preflight_proceed)) { _, _ ->
+                val execute = {
+                    when {
+                        viewModel.currentTransportSessionId() != plan.deviceSessionId -> {
+                            blockQuickFlash(getString(R.string.quick_flash_session_changed))
+                        }
+                        plan.target.isExpert && !quickFlashExpertModeEnabled -> {
+                            blockQuickFlash(getString(R.string.quick_flash_expert_disabled_after_plan))
+                        }
+                        !QuickFlashPlanValidator.validatePlan(plan).canProceed -> {
+                            blockQuickFlash(getString(R.string.quick_flash_no_candidate))
+                        }
+                        else -> viewModel.runFlash(plan.partitionName, file)
+                    }
+                }
+                if (PreflightValidator.requiresDoubleConfirm(plan.basePartition)) {
+                    confirmCriticalFlash(plan.basePartition, execute)
+                } else {
+                    execute()
+                }
+            }
+        } else {
+            builder.setPositiveButton(getString(R.string.preflight_blocked), null)
+        }
+        builder.show()
+    }
+
+    private fun quickFlashCandidateLabel(candidate: QuickFlashCandidate): String =
+        getString(
+            R.string.quick_flash_candidate_label,
+            candidate.partitionName,
+            quickFlashSlotLabel(candidate.slot),
+            quickFlashEvidenceLabel(candidate.evidence)
+        )
+
+    private fun quickFlashSlotLabel(slot: QuickFlashSlot): String = getString(
+        when (slot) {
+            QuickFlashSlot.UNSLOTTED -> R.string.quick_flash_candidate_slot_unslotted
+            QuickFlashSlot.SLOT_A -> R.string.quick_flash_candidate_slot_a
+            QuickFlashSlot.SLOT_B -> R.string.quick_flash_candidate_slot_b
+        }
+    )
+
+    private fun quickFlashEvidenceLabel(evidence: QuickFlashCandidateEvidence): String = getString(
+        when (evidence) {
+            QuickFlashCandidateEvidence.POINT_QUERY -> R.string.quick_flash_candidate_evidence_point
+            QuickFlashCandidateEvidence.INVENTORY,
+            QuickFlashCandidateEvidence.UNCONFIRMED -> R.string.quick_flash_candidate_evidence_inventory
+        }
+    )
+
+    private fun blockQuickFlash(message: String) {
+        viewModel.log("⛔ Quick Flash: $message")
+        MaterialAlertDialogBuilder(this)
+            .setTitle(getString(R.string.quick_flash_blocked_title))
+            .setMessage(message)
+            .setPositiveButton(getString(R.string.close_upper), null)
+            .show()
     }
 
     private fun showFlashConfirmation(partition: String, file: File) {
