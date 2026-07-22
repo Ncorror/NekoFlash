@@ -229,15 +229,21 @@ class MiLoginActivity : AppCompatActivity() {
             }
 
             override fun onPageFinished(view: WebView, url: String) {
+                // WebView can deliver onPageFinished after shouldOverrideUrlLoading/onPageStarted
+                // already consumed the official /sts completion. Never let that stale callback
+                // overwrite a successful login with a blocked-host message.
+                if (monitoringEnded || isFinishing || isDestroyed) return
+                if (MiAccountSecurityPolicy.isOfficialUnlockCallbackUrl(url)) {
+                    handleOfficialCompletion(url)
+                    return
+                }
                 if (!MiAccountSecurityPolicy.isAllowedAccountUrl(url)) {
                     blockUnsafeNavigation(url)
                     return
                 }
-                if (!monitoringEnded) {
-                    progressBar.visibility = View.GONE
-                    extractCookies()
-                    checkForEndSignal(view)
-                }
+                progressBar.visibility = View.GONE
+                extractCookies()
+                checkForEndSignal(view)
             }
 
             override fun onReceivedError(
@@ -285,7 +291,9 @@ class MiLoginActivity : AppCompatActivity() {
     }
 
     private fun failLogin(message: String) {
-        if (isFinishing || isDestroyed) return
+        // Once completion succeeded, late WebView callbacks are stale and must not
+        // downgrade RESULT_OK into a visible/result cancellation state.
+        if (monitoringEnded || isFinishing || isDestroyed) return
         monitoringEnded = true
         lastFailureMessage = message
         if (::webView.isInitialized && !webViewDestroyed) webView.stopLoading()

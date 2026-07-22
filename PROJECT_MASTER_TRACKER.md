@@ -11,6 +11,7 @@ Version code: **`217`**
 
 ## Последнее подтверждённое доказательство
 
+- Mi Unlock login race fix: successful `/sts` completion is terminal; late WebView callbacks cannot downgrade it to cancellation.
 - Текущая development-версия: `6.0.0-alpha5-dev-nekoflash` (`217`).
 - GitHub Actions run: `29855091700` (`Build Android APK #14`).
 - Event/head branch: `pull_request` / `feature/recovery-first-quick-flash`.
@@ -40,7 +41,7 @@ NekoFlash остаётся компактным Android-инструментом
 | POLISH-WELCOME-001 | Упростить welcome permissions/risk gate | DONE_CODE | Android smoke test кликабельных status chips |
 | POLISH-SIDELOAD-001 | Упростить ADB Sideload card | DONE_CODE | Android UI: нейтральная note до verify + transfer/cancel retest |
 | POLISH-DATA-001 | Свернуть Fastboot DATA diagnostics | DONE_CODE | Без-device log и Fastboot hardware retest |
-| UNLOCK-LOGIN-001 | Исправить Mi Account completion и unlockApi `/sts` exchange | FIXED_CODE | Реальный login/token exchange retest и новый sanitised log |
+| UNLOCK-LOGIN-001 | Исправить Mi Account completion и unlockApi `/sts` exchange | FIXED_CODE | Fresh login без перезапуска и без stale blocked-host banner |
 | FLASH-001 | Recovery-first Quick Flash | DONE_CI | Sanitised hardware retest Terminal/Sideload/Quick Flash |
 | SIDELOAD-001 | Подтвердить ADB Sideload в V6 | RETEST_REQUIRED | ZIP transfer, cancel, recovery result |
 | UNLOCK-001 | Провести отдельный аудит Mi Unlock | IN_PROGRESS | Retest официального Mi Account callback и затем разделение unlock flows |
@@ -81,7 +82,8 @@ NekoFlash остаётся компактным Android-инструментом
 - Sideload memo card удалена; Import/Verify выровнены, checksum note нейтральна до фактической проверки и не показывает ложную зелёную галочку.
 - Fastboot DATA card показывает один основной self-test; specialized diagnostics скрыты в отдельном dialog, а no-device taps журналируются.
 - Android smoke build `0747c4ec72e3.29866798716` подтвердил вход в Mi Account, но token exchange блокировался policy на `https://unlock.update.miui.com/sts` после успешного получения user ID.
-- Mi Login WebView по-прежнему принимает только точный completion callback `https://unlock.update.miui.com/sts`; background clientSign exchange теперь отдельно допускает только exact `/sts` на пяти известных региональных unlock hosts и не передаёт account `passToken` на `miui.com`.
+- Android build `8d9923ec0878.29870485300` подтвердил успешный login/token exchange и получение `serviceToken`/`unlockApi_*` cookies. При первом проходе UI иногда показывал stale blocked-host banner: поздний `onPageFinished` повторно обрабатывал уже поглощённый `/sts` callback; после restart сохранённые cookies обходили гонку.
+- Mi Login WebView принимает только точный completion callback `https://unlock.update.miui.com/sts`; background clientSign exchange допускает только exact `/sts` на пяти известных региональных unlock hosts и не передаёт account `passToken` на `miui.com`. Successful completion теперь terminal: поздние WebView callbacks не могут заменить результат на cancellation.
 
 ## Текущий следующий шаг
 
@@ -89,10 +91,10 @@ NekoFlash остаётся компактным Android-инструментом
 Основной Recovery-first scope и acceptance criteria остаются в [`docs/RECOVERY_FIRST_PLAN.md`](docs/RECOVERY_FIRST_PLAN.md).
 Safety-инварианты остаются в [`docs/SAFETY_MODEL.md`](docs/SAFETY_MODEL.md), canonical guard запускается через `scripts/check-documentation.py`, архивная база — `archive/full-miflash-v5.9.17`.
 
-1. Опубликовать focused Mi Unlock `/sts` exchange + neutral Sideload note patch в `feature/recovery-first-quick-flash` через push-only Termux workflow.
+1. Опубликовать focused Mi Login first-pass race fix в `feature/recovery-first-quick-flash` через push-only Termux workflow.
 2. Получить новый зелёный GitHub Actions evidence для static/pure/lint/debug/release.
-3. На Android повторить Mi Account login: ожидается прохождение clientSign `/sts` exchange и получение `serviceToken`; при новом server-side отказе экспортировать compact log.
+3. На Android очистить Mi Login cookies через кнопку выхода либо выполнить fresh install, затем пройти login один раз без перезапуска приложения: blocked-host banner не должен появляться, а `serviceToken`/`unlockApi_*` cookies должны быть получены в том же проходе.
 4. Проверить Sideload: до выбора/verify ZIP не должно быть зелёной success-индикации.
-5. После login/Sideload retest вернуться к облегчению welcome panel и затем к Terminal/Sideload/Quick Flash hardware gate.
+5. После fresh-login/Sideload retest вернуться к облегчению welcome panel и затем к Terminal/Sideload/Quick Flash hardware gate.
 
 Реальная прошивка всегда требует подключённого Fastboot-устройства, существующего раздела, корректного slot, проверенного файла и явного подтверждения. Автоматического повторения mutation-команд нет.

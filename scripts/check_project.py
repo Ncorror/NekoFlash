@@ -1532,9 +1532,33 @@ def check_alpha5_hardware_polish() -> None:
     ):
         if token not in policy_text:
             fail(f"Mi Unlock callback/service policy token missing: {token}")
-    for token in ('handleOfficialCompletion', 'EXTRA_LOGIN_ERROR', 'mi_login_missing_cookies', 'mi_login_retry'):
+    for token in (
+        'handleOfficialCompletion',
+        'EXTRA_LOGIN_ERROR',
+        'mi_login_missing_cookies',
+        'mi_login_retry',
+        'if (monitoringEnded || isFinishing || isDestroyed) return',
+        'if (MiAccountSecurityPolicy.isOfficialUnlockCallbackUrl(url))',
+        'late WebView callbacks are stale',
+    ):
         if token not in login_text:
-            fail(f"Mi Login observable callback token missing: {token}")
+            fail(f"Mi Login observable callback/race token missing: {token}")
+    finished_block = re.search(
+        r'override fun onPageFinished\(view: WebView, url: String\) \{(?P<body>.*?)\n            \}',
+        login_text,
+        re.S,
+    )
+    if not finished_block:
+        fail('Mi Login onPageFinished guard is missing')
+    else:
+        body = finished_block.group('body')
+        terminal_guard = body.find('if (monitoringEnded || isFinishing || isDestroyed) return')
+        callback_guard = body.find('isOfficialUnlockCallbackUrl(url)')
+        account_guard = body.find('!MiAccountSecurityPolicy.isAllowedAccountUrl(url)')
+        if min(terminal_guard, callback_guard, account_guard) < 0 or not (
+            terminal_guard < callback_guard < account_guard
+        ):
+            fail('Mi Login onPageFinished must ignore terminal state, then consume /sts, then reject unrelated hosts')
     if 'getStringExtra(MiLoginActivity.EXTRA_LOGIN_ERROR)' not in main_text:
         fail("MainActivity must preserve the concrete Mi Login cancellation reason")
 

@@ -2,11 +2,11 @@ fe1bc654c6873f92935d1cd7998c35aa586d18d8277a86669217b596275ce170  ./.gitattribut
 0455110f7ea5367c3c77c5c332d02bcebcaed5539f3fccc4b992d1e251cbfba2  ./.github/workflows/build.yml
 7fe39b6cf158afc6a597695773b5a1a7ec7738b3e5f5723bf0deb759689c0699  ./.gitignore
 9e0d06064442474ba6eef9775e486d8d414f7f077cbbea6a8ea33438ec094c3e  ./BUILDING.md
-f536ab2a8a4de276793b5be059d94bca983ee23610b870fb96c4ef3654929d92  ./CHANGELOG.md
+6aefb79ddee9dc5215564367de4bc125b22a54e12477f471406668ecf2a4ff93  ./CHANGELOG.md
 435bc24d77d54c83c59e1c8d963e65e9f88cb37cd50965ad38728d83bc509dca  ./LAUNCHER_ARTWORK_SHA256.txt
 8930600167fcaf83ec7219886d710f6b915ad82e10eb7846bb6c1047c3a6ac01  ./LICENSE
 c27202cec34aa6a86b334992b529395cd7cd1fd08ba6b36c3cc2f215e96c2f93  ./NOTICE
-459a0366bbc985e46bd79072660655fcfbaf4426f531d4f7115984d465d6f52c  ./PROJECT_MASTER_TRACKER.md
+797f40dd98b901685f54f4354a4efc9d429c5c33ee256063efe56aa4e990d0f0  ./PROJECT_MASTER_TRACKER.md
 c321292c9e5aef6475ccf33d971e78fe5ab95cb0ea277a865d57bb036f287863  ./README.md
 205548ffc217c71881a00da928b58086acb0fec43d1936060ca6c49b02f39821  ./WELCOME_ARTWORK_SHA256.txt
 4a8cf41c311d45a376360e24cf7e8c732574bfe1c5634a0df2e2cdb831f0e00e  ./app/build.gradle
@@ -49,7 +49,7 @@ ecced73d420817fb1630b9467807c96e867a78615d9c32e7285a6e5a94374528  ./app/src/main
 eb5755da96ad2f608d50b9ae2803ed236c553c31b04f6712580b5e066ab30216  ./app/src/main/java/ru/forum/adbfastboottool/MainActivity.kt
 3c44abb55c0a3403c5ba4d4bf725350488af0919cbb16922cfeeccf9de843887  ./app/src/main/java/ru/forum/adbfastboottool/MiAccountClient.kt
 4a14f0098a31c2f418c119979d3a5c4dfa9f414a705efa7441e4ae9ff529e736  ./app/src/main/java/ru/forum/adbfastboottool/MiAccountSecurityPolicy.kt
-5d3f5e9d0e77a83afcb491bf9344000070dcb0d9c22fce3b0d3e7f4860c558f6  ./app/src/main/java/ru/forum/adbfastboottool/MiLoginActivity.kt
+973c917e099c39937bb86fa3a83a9d6123440d746499a0245a0437da1a6d056a  ./app/src/main/java/ru/forum/adbfastboottool/MiLoginActivity.kt
 5b5322c59a8f97054830b79136c5897a501bcf449f2c2c0e6e31e5a545f8b6ab  ./app/src/main/java/ru/forum/adbfastboottool/MiUnlockClient.kt
 8bb34597fd8549ffadc755025b0312747adc8b76143a0cecfe2894b6c1d28889  ./app/src/main/java/ru/forum/adbfastboottool/NativeUsbfsBackend.kt
 6f5340d82fd64cba94331ebbe0675dac2bcb5edef9453f1cee603c7c9f798013  ./app/src/main/java/ru/forum/adbfastboottool/OnboardingGate.kt
@@ -174,7 +174,7 @@ b996c9f306404db994e431ab6402534cf90b8d1c74b35c57f8524909f3f44dc1  ./scripts/buil
 ec2165516b2098db799f9774c309cd54a586aff3a9e31fcab7674655d23e0040  ./scripts/check-documentation.py
 db7f61793ffabfeb58bfb2321925ad50295e80e17124f738a39198d261e4e0c2  ./scripts/check-flash-safety.py
 582f9b3abe5708c2f53f111491f60566bbe8ec0bbc5a38bbb1a103756cfbdb92  ./scripts/check-usb-connectivity.py
-a09540956ef6d254e38556c88e2bba2302b56dfb09471bf8af79ea71677428ae  ./scripts/check_project.py
+8787787f15c1866802b6e5a45f23d621cd2a9c9d581c85cc6a41a10ac55d1375  ./scripts/check_project.py
 472f9f90152b96abb0277d39024eb1374f90571912d1011733e3400b45e8667b  ./scripts/checksum_inventory.py
 546da85e736deccecd79868d62d308ca6dfd53cb1bd48847c00ff1fe3e12ebb4  ./scripts/export-chat-context.sh
 803ebcd26a90e2ad44614813048773bca891b086dd41b6b2ce96777b2358f5ac  ./scripts/run-tests.sh

@@ -2,6 +2,8 @@
 
 ## V6.0.0-alpha5 development baseline — `6.0.0-alpha5-dev-nekoflash` (`217`)
 
+- Исправлена гонка Mi Login WebView: поздний `onPageFinished` для официального `/sts` callback больше не перезаписывает успешную авторизацию сообщением о недоверенном адресе.
+
 - Исправлена вторая стадия Mi Account login: background clientSign exchange принимает только точные региональные Xiaomi Mi Unlock `/sts` endpoints вместо ошибочной account-only блокировки.
 - Account `passToken` остаётся host-only для `account.xiaomi.com` и не отправляется на unlock hosts; service cookies принимаются только для ожидаемых `serviceToken`/`userId`/`cUserId`/`unlockApi_*` имён.
 - Sideload checksum note больше не показывает зелёную галочку до фактической проверки ZIP.
