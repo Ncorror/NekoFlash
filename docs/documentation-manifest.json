@@ -70,7 +70,7 @@
       "update_when": "Меняется scope, архитектурный slice или safety policy Quick Flash"
     },
     "docs/ALPHA5_HARDWARE_POLISH_PLAN.md": {
-      "role": "План исправлений по первому Android smoke test alpha5",
+      "role": "Активный статус UX/Mi Login smoke-polish alpha5",
       "update_when": "Меняется welcome, Sideload, Fastboot diagnostics или Mi Account login retest"
     }
   },

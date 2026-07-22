@@ -1,60 +1,62 @@
 # Alpha5 hardware smoke polish plan
 
-## Основание
+## Цель
 
-Первый запуск alpha5 на реальном Android-устройстве подтвердил, что Recovery-first Quick Flash визуально устраивает maintainer и не должен меняться. До аппаратной прошивки обнаружены четыре UX/diagnostic задачи и одна regression в Mi Account login.
+Закрыть UX и Mi Account defects, найденные на первых Android smoke tests, не меняя принятую Recovery-first Quick Flash card и её safety flow.
 
 ## Защищённая область
 
 `cardQuickFlashRecoveryFirst`, `TOPBAR-001`, `HOMEINFO-001` и `HOMEACTIONS-001` не меняются в этом этапе. Recovery-first layout считается эталонным.
 
-## Рабочие задачи
+## Статус задач
 
-### POLISH-WELCOME-001 — компактный вход
+| ID | Состояние | Что уже сделано | Что ещё требуется |
+|---|---|---|---|
+| POLISH-WELCOME-001 | IN_PROGRESS | Permission chips кликабельны, battery button удалена, risk row кликабельна | Сделать панель визуально легче/контурнее и проверить вертикальное положение |
+| POLISH-SIDELOAD-001 | FIXED_CODE | Жёлтая памятка удалена, Import/Verify выровнены, pre-verify icon нейтрализован | Android smoke, transfer/cancel/recovery-result retest |
+| POLISH-DATA-001 | DONE_CODE | Один основной self-test, advanced dialog, no-device taps в compact log | Fastboot hardware retest |
+| UNLOCK-LOGIN-001 | FIXED_CODE | Exact `/sts` allowlist, bounded service exchange, first-pass race guard | Новый Android CI и fresh login без restart/banner |
+| LOG-UI-001 | DONE_DEVICE | No-device Fastboot DATA taps различимы и безопасно отклоняются | Сохранить поведение при hardware retest |
 
-- три status chip остаются видимыми и становятся действиями;
-- Files открывает настройки доступа к файлам;
-- Notifications открывает permission flow или системные настройки уведомлений;
-- Battery открывает настройки battery optimization;
-- отдельная большая кнопка батареи удаляется;
-- risk acknowledgement переключается нажатием по всей строке;
-- панель становится ниже, а hero-композиция получает больше места.
+## POLISH-WELCOME-001
 
-### POLISH-SIDELOAD-001 — компактный Sideload
+- сохранить три status chips и их переходы в собственные system settings;
+- не возвращать отдельную большую кнопку battery settings;
+- сохранить обязательное подтверждение рисков;
+- сделать нижнюю панель визуально легче: контур/прозрачность и меньшее ощущение залитого блока;
+- не перекрывать ключевую композицию welcome artwork;
+- логика permissions и допуска к приложению не меняется.
 
-- жёлтая памятка с лампочкой удаляется;
-- Import и Verify имеют одинаковую геометрию и визуальный вес;
-- checksum note становится короткой нейтральной строкой без зелёной success-иконки до фактического verify;
-- transfer/cancel/recovery-result logic не меняется.
+## POLISH-SIDELOAD-001
 
-### POLISH-DATA-001 — свёрнутая диагностика
+- до выбора и фактического verify ZIP использовать только нейтральную подсказку;
+- зелёный success-status разрешён только после реального integrity result;
+- transfer, cancel и recovery-result logic не менять;
+- импортированный ZIP не считать recovery/OTA пакетом только по расширению.
 
-- на основном экране остаётся один безопасный Fastboot DATA self-test;
-- четыре специализированных инструмента доступны через «Дополнительные тесты»;
-- попытка запуска без Fastboot-устройства пишет точную причину в compact log;
+## POLISH-DATA-001
+
+- основной экран показывает один безопасный Fastboot DATA self-test;
+- staging/qualification/matrix/content probes остаются в «Дополнительных тестах»;
+- без Fastboot session действие завершается до operation и пишет точную sanitised причину;
 - download-only safety invariants сохраняются.
 
-### UNLOCK-LOGIN-001 — официальный completion callback
+## UNLOCK-LOGIN-001
 
-- login navigation остаётся ограниченной `account.xiaomi.com`;
-- разрешается только точный HTTPS completion callback `unlock.update.miui.com/sts`;
-- callback не загружается как произвольная web-страница, а завершает cookie extraction;
-- ошибки больше не сворачиваются в безымянное «вход отменён»;
-- экран показывает причину и даёт повторить вход;
-- callback/path/host confusion покрывается pure policy tests;
-- background clientSign exchange отдельно допускает только exact `/sts` на известных China/Singapore/India/Russia/Europe unlock hosts;
-- account cookies остаются host-scoped и не передаются на unlock hosts; из `/sts` принимаются только ожидаемые unlockApi service-cookie names.
+- top-level interactive login ограничен `account.xiaomi.com`;
+- completion распознаётся только для точного HTTPS callback `unlock.update.miui.com/sts`;
+- background clientSign exchange допускает только exact `/sts` на фиксированных regional unlock hosts;
+- account `passToken` не передаётся на unlock hosts;
+- успешное completion — terminal state: поздние WebView callbacks не могут заменить его cancellation/error;
+- в logs не сохраняются account ID, tokens или cookie values;
+- full Mi Unlock flow остаётся отдельным audit и не считается подтверждённым одним login.
 
-### LOG-UI-001 — baseline без устройства
+## Acceptance sequence
 
-Загруженный session summary показал 0 операций, 0 warnings и 0 errors; нажатия diagnostic buttons без transport session не были различимы. После исправления Fastboot DATA actions должны оставлять безопасное событие и понятный отказ без старта operation.
-
-## Проверки
-
-1. XML/static/documentation guards.
-2. `mi-account-security` pure test.
-3. Полная pure/JVM matrix.
-4. GitHub Actions: static, lintDebug, assembleDebug, assembleRelease.
-5. Повторный Android smoke test без устройства.
-6. Mi Account login retest.
+1. Canonical documentation/static/safety guards.
+2. Pure/JVM matrix `23/23`.
+3. Новый GitHub Actions run для текущего exact head SHA.
+4. Fresh Mi Account login без restart и stale blocked-host banner.
+5. Sideload pre-verify UI smoke.
+6. Welcome visual smoke после окончательной панели.
 7. Только затем Terminal/Sideload/Quick Flash hardware validation.

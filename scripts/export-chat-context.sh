@@ -22,6 +22,7 @@ mkdir -p "$(dirname "$OUTPUT")"
     PROJECT_MASTER_TRACKER.md \
     docs/RECOVERY_FIRST_PLAN.md \
     docs/ALPHA5_HARDWARE_POLISH_PLAN.md \
+    docs/HARDWARE_VALIDATION.md \
     docs/SCOPE.md \
     docs/SAFETY_MODEL.md \
     docs/TERMUX_WORKFLOW.md \

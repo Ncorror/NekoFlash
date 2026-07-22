@@ -57,7 +57,7 @@ bash scripts/termux-ci.sh
 ## Сбор уже существующего запуска
 
 ```bash
-bash scripts/termux-ci.sh --run-id 29832274659
+bash scripts/termux-ci.sh --run-id RUN_ID
 ```
 
 Новый run при этом не создаётся. Обычный режим сохраняет лёгкий evidence archive без APK.
@@ -65,7 +65,7 @@ bash scripts/termux-ci.sh --run-id 29832274659
 APK нужны только для установки или аппаратного теста. Для них используется явный флаг:
 
 ```bash
-bash scripts/termux-ci.sh --run-id 29832274659 --with-apk
+bash scripts/termux-ci.sh --run-id RUN_ID --with-apk
 ```
 
 При этом CI evidence остаётся отдельным `NekoFlash-CI-<RUN_ID>.zip`, а APK сохраняются отдельно в `NekoFlash-APK-<RUN_ID>.zip`.
@@ -96,7 +96,7 @@ Download/NekoFlash-CI-<RUN_ID>.zip
 bash scripts/export-chat-context.sh
 ```
 
-Скрипт объединяет каноническую точку входа, tracker, Recovery-first plan, scope, safety, Termux workflow и changelog в `Download/NekoFlash-chat-context.txt`. Generated-файл не коммитится и загружается в новый чат рядом с source ZIP.
+Скрипт объединяет точку входа, tracker, Recovery-first/hardware-polish планы, sanitised hardware summary, scope, safety, Termux workflow и changelog в `Download/NekoFlash-chat-context.txt`. Generated-файл не коммитится и загружается в новый чат рядом с source ZIP.
 
 ## Политика тегов
 

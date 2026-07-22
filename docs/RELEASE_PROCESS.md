@@ -46,8 +46,9 @@ Release требует production keystore, проверки certificate fingerp
 - обновить versionName/versionCode;
 - обновить tracker/changelog;
 - пересоздать `SHA256SUMS`;
-- получить CI PASS для точного commit SHA;
-- сравнить `headSha` run с commit, который будет tagged;
+- получить CI PASS для точного source head SHA;
+- для pull-request run различать PR `headSha` и synthetic merge checkout SHA;
+- сравнить подтверждённый source head с commit, который будет tagged;
 - создать annotated tag только после green CI;
 - приложить APK, source ZIP и checksum;
 - не публиковать raw device logs.

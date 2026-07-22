@@ -28,7 +28,7 @@
 
 ## Unlock
 
-`MiUnlockClient` и связанные Mi Account компоненты изолированы от Quick Flash. До аппаратного аудита они не считаются полностью подтверждённым flow.
+`MiLoginActivity`, `MiAccountSecurityPolicy` и `MiAccountClient` разделяют interactive account login и bounded unlockApi service exchange. Exact `/sts` completion является terminal state; account tokens не передаются на unlock hosts. `MiUnlockClient` изолирован от Quick Flash. Успешный login не считается подтверждением полного unlock flow: standard Fastboot unlock и Xiaomi account/server flow требуют отдельного аппаратного аудита.
 
 ## Logs
 

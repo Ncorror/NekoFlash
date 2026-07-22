@@ -1,8 +1,12 @@
 # Recovery-first Quick Flash: план V6.0.0-alpha5
 
+## Статус
+
+Slices A–D реализованы. Baseline Slice E прошёл Android CI run `29855091700`; hardware validation остаётся открытой. Последующие alpha5 hardware-polish/Mi Login изменения требуют нового Android CI, но не меняют Recovery-first architecture.
+
 ## Цель milestone
 
-Сделать короткий и понятный Quick Flash для отдельных recovery-related образов без возврата полного ROM flasher. Основной сценарий — выбрать образ, увидеть проверяемый target plan, подтвердить его и выполнить ровно одну контролируемую Fastboot mutation.
+Сделать короткий Quick Flash для одного recovery-related образа без возврата полного ROM flasher: выбрать image, увидеть проверяемый concrete target plan, подтвердить его и выполнить ровно одну контролируемую Fastboot mutation.
 
 ## Видимые targets
 
@@ -20,76 +24,71 @@ Expert Mode:
 - `vendor_kernel_boot`;
 - ручной partition name.
 
-`system`, `vendor`, `product`, `super`, radio/bootloader и полный Fastboot ROM workflow не добавляются на основной экран.
+`system`, `vendor`, `product`, `super`, radio/bootloader и полный Fastboot ROM workflow не входят в обычный Quick Flash.
 
 ## Пользовательский поток
 
-1. Пользователь выбирает локальный image-файл.
-2. Приложение показывает имя, размер и SHA-256.
-3. Image inspector выдаёт только подсказку о типе, но не авторизует target автоматически.
-4. Partition inventory и slot resolver формируют список существующих совместимых targets.
-5. Пользователь явно выбирает target и slot policy.
-6. Preflight показывает итоговую команду, устройство, partition, slot, размер и hash.
-7. Отдельное confirmation разрешает ровно одну mutation-команду.
+1. Выбор локального image-файла.
+2. Показ имени, размера и SHA-256.
+3. Image inspector даёт только hint и не авторизует target.
+4. Inventory и slot resolver строят список существующих concrete targets.
+5. Пользователь явно выбирает один target/slot.
+6. Preflight показывает итоговую команду и evidence.
+7. Отдельное confirmation разрешает одну mutation-команду.
 8. Результат сохраняется в sanitised log; reboot остаётся отдельным ручным действием.
 
 ## Safety-инварианты
 
-- filename или magic image не могут единолично выбрать partition;
-- неизвестная topology закрывает mutation, а не синтезирует target;
+- filename/magic не выбирают partition;
+- unknown topology закрывает mutation;
 - A/B suffix используется только при подтверждённой slot metadata;
-- legacy A-only device никогда не получает искусственные `_a`/`_b` targets;
-- target обязан присутствовать в inventory или пройти bounded point-query;
-- ручной partition доступен только в Expert Mode и требует повторного ввода имени;
+- A-only device не получает искусственные `_a`/`_b`;
+- target присутствует в inventory либо подтверждён bounded point-query;
+- manual partition доступен только в Expert Mode и требует повторного ввода;
 - `vbmeta` не получает скрытые disable-verification flags;
-- нет автоматического retry mutation-команды;
-- detach, timeout или transport `BROKEN` закрывают текущий operation;
-- один confirmation соответствует одной команде `flash`.
+- один confirmation соответствует одной `flash`-команде;
+- detach, timeout или `BROKEN` закрывают operation;
+- mutation retry отсутствует.
 
 ## Архитектурные slices
 
-### Slice A — модель плана (`DONE_CODE`)
+### Slice A — plan model (`DONE_CODE`)
 
-Добавлены pure Kotlin модели `QuickFlashTarget`, `QuickFlashCandidate`, `QuickFlashPlan`, детерминированный confirmation codec и fail-closed validator. Модель не зависит от Android UI. Один план содержит ровно один concrete partition и аргументы одной команды `flash`; A/B `both` не кодируется как скрытая multi-mutation операция.
+`QuickFlashTarget`, `QuickFlashCandidate`, `QuickFlashPlan`, deterministic confirmation codec и fail-closed validator. Один план содержит один concrete partition.
 
-### Slice B — topology resolver (`DONE_CODE`)
+### Slice B — topology builder (`DONE_CODE`)
 
-Добавлен pure `QuickFlashTopologyCandidateBuilder`, который строит candidates только из concrete inventory evidence, проверяет slot mapping через `FastbootSlotResolver` и выдаёт bounded read-only point-query plan для недостающих данных. `PartitionNameResolver` задаёт лишь порядок подсказок и никогда не выбирает target. Unknown topology, archive input и broken session закрываются fail-closed; legacy A-only не получает синтетические `_a`/`_b`.
+`QuickFlashTopologyCandidateBuilder` объединяет concrete inventory, `FastbootSlotResolver`, bounded point-query и filename hint. Unknown/archive/broken scenarios завершаются fail-closed.
 
-### Slice C — UI (`DONE_CODE`)
+### Slice C — Recovery-first UI (`DONE_CODE`)
 
-Recovery стал главным target, остальные primary targets представлены отдельными действиями, а `dtbo`, `vbmeta`, `vendor_kernel_boot` и ручное имя скрыты за выключенным по умолчанию Expert Mode. UI выбирает image первым, вычисляет SHA-256 и показывает только concrete candidates из `QuickFlashTopologyCandidateBuilder`; filename остаётся hint. Inventory evidence, candidate selector и confirmation привязаны к одному transport session ID, поэтому detach или смена устройства блокируют план. Legacy multi-flash queue скрыт, выбор `BOTH` отсутствует. `TOPBAR-001`, `HOMEINFO-001` и `HOMEACTIONS-001` не изменены.
+Recovery расположен первым; primary/expert targets разделены; Expert Mode выключен по умолчанию. UI показывает только concrete candidates. `BOTH` и legacy multi-flash queue отсутствуют в активном flow. `TOPBAR-001`, `HOMEINFO-001`, `HOMEACTIONS-001` не изменены.
 
-### Slice D — mutation gate (`DONE_CODE`)
+### Slice D — one-shot mutation gate (`DONE_CODE`)
 
-Добавлен pure `QuickFlashMutationGate` с одноразовым confirmation ticket. Перед execution повторно проверяются structural plan, transport session, Expert/read-only gates, image URI/size/SHA-256 и exact concrete candidate из текущего inventory. `DeviceViewModel.runConfirmedQuickFlash` использует существующий verified staging lifecycle и вызывает `FastbootProtocol.flashPartitionDetailed` ровно один раз; retry и mutation loop отсутствуют, а протокольный `FastbootMutationSafety` остаётся обязательным.
+`QuickFlashMutationGate` связывает confirmation с plan fingerprint, session, image identity и current concrete candidate. `DeviceViewModel.runConfirmedQuickFlash` использует существующий staging и выполняет один `FastbootProtocol.flashPartitionDetailed` без retry.
 
 ### Slice E — evidence (`DONE_CI`, hardware pending)
 
-Pure tests, static guards и Android lint/assemble подтверждены CI. Первый Android smoke test открыл отдельный UX/login polish gate, описанный в `ALPHA5_HARDWARE_POLISH_PLAN.md`; аппаратный Terminal/Sideload/Quick Flash retest остаётся незавершённым.
+Run `29855091700` подтвердил static/safety, pure/policy matrix, `lintDebug`, `assembleDebug`, `assembleRelease` для PR head `8a6dab5f81dd0ff117b3b6e27e6d528a45900e24`.
 
-## Evidence Slice E
+Это evidence для Recovery-first baseline, а не для последующих smoke-polish/Mi Login commits. Реальная прошивка и новый exact-head CI остаются отдельными gates.
 
-GitHub Actions run `29855091700` завершился `success` для PR head `8a6dab5f81dd0ff117b3b6e27e6d528a45900e24`: static/safety checks, pure/policy matrix, `lintDebug`, `assembleDebug` и `assembleRelease` зелёные. APK не входят в обычный CI evidence archive и скачиваются отдельно только для установки или hardware retest.
+## Acceptance criteria
 
-## Acceptance criteria alpha5
-
-- target plan воспроизводим и сериализуем для confirmation;
-- основные и expert targets разделены;
-- несуществующий или неоднозначный partition завершается fail-closed;
-- A/B и A-only tests покрывают основные targets;
+- plan воспроизводим и сериализуем;
+- primary/expert targets разделены;
+- отсутствующий/неоднозначный partition закрывается fail-closed;
+- A/B и A-only covered pure tests;
 - SHA-256 и размер видны до confirmation;
-- ровно одна flash-команда на одно подтверждение;
-- static/documentation/safety guards и pure/JVM matrix проходят;
-- Android `lintDebug`, `assembleDebug`, `assembleRelease` зелёные;
-- реальная прошивка остаётся отдельным hardware gate, а не условием source merge.
+- одна flash-команда на одно confirmation;
+- static/documentation/safety и pure/JVM проходят;
+- Android lint/debug/release зелёные для exact source head;
+- аппаратная прошивка подтверждается отдельным sanitised evidence.
 
-## Порядок реализации
+## Оставшийся порядок
 
-1. Slice A с pure tests — `DONE_CODE`.
-2. Slice B с inventory/slot regression tests — `DONE_CODE`.
-3. Slice C без изменения protected Home components — `DONE_CODE`.
-4. Slice D и end-to-end policy tests — `DONE_CODE`.
-5. Slice E: Android CI — `DONE_CI` для baseline до smoke-polish.
-6. Alpha5 hardware polish, повторный Android CI и sanitised login/UI retest.
-7. Sanitised Terminal/Sideload/Quick Flash hardware validation.
+1. Новый Android CI для текущего alpha5 source.
+2. Fresh Mi Login/Sideload/welcome smoke по [`ALPHA5_HARDWARE_POLISH_PLAN.md`](ALPHA5_HARDWARE_POLISH_PLAN.md).
+3. Sanitised Terminal и Sideload hardware validation.
+4. Контролируемый Quick Flash на восстанавливаемом устройстве.

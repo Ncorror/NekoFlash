@@ -21,7 +21,7 @@ python3 scripts/check-diagnostic-logging.py
 bash scripts/run-tests.sh
 ```
 
-Ожидаемый pure/JVM результат текущей baseline: `ALL TESTS PASSED (23 module(s))`.
+Ожидаемый pure/JVM результат текущего source: `ALL TESTS PASSED (23 module(s))`. Локальный PASS не заменяет Android CI для exact commit SHA.
 
 ## Android
 
