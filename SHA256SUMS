@@ -2,12 +2,12 @@ fe1bc654c6873f92935d1cd7998c35aa586d18d8277a86669217b596275ce170  ./.gitattribut
 0455110f7ea5367c3c77c5c332d02bcebcaed5539f3fccc4b992d1e251cbfba2  ./.github/workflows/build.yml
 7fe39b6cf158afc6a597695773b5a1a7ec7738b3e5f5723bf0deb759689c0699  ./.gitignore
 efe254a46c6cf59725b2c35bbd5400f4d393e9612d8f68c43a6d2abfab88745f  ./BUILDING.md
-a5e996e0e25e316cc6e0cda107e03443b69f6212ae5609a46352a6da87500946  ./CHANGELOG.md
+f375adaa873d60456c80f377346fd009f3ac9daa3174547a23ec720018e7b099  ./CHANGELOG.md
 435bc24d77d54c83c59e1c8d963e65e9f88cb37cd50965ad38728d83bc509dca  ./LAUNCHER_ARTWORK_SHA256.txt
 8930600167fcaf83ec7219886d710f6b915ad82e10eb7846bb6c1047c3a6ac01  ./LICENSE
 c27202cec34aa6a86b334992b529395cd7cd1fd08ba6b36c3cc2f215e96c2f93  ./NOTICE
-4b1f461e3dfd49ff6dac59d0e0ea09e53ac32eb64dd2df1888b9239d658f1dce  ./PROJECT_MASTER_TRACKER.md
-1ae49b3d907d0c29e7b7e0314cf22358fdfca0d9701dba539b6ef11631bbce55  ./README.md
+f0c81fe8e07c5edac78cf29438c7300d6eb2eef4106cfae48096e7bb6ade2c94  ./PROJECT_MASTER_TRACKER.md
+2a8ce506e020553336a2dc4ab85cd29cf0b8fe84308b16c37e9e3a6617b7fbe8  ./README.md
 205548ffc217c71881a00da928b58086acb0fec43d1936060ca6c49b02f39821  ./WELCOME_ARTWORK_SHA256.txt
 4a8cf41c311d45a376360e24cf7e8c732574bfe1c5634a0df2e2cdb831f0e00e  ./app/build.gradle
 6e83455d7092b6fd29a6aac28433a8fc3cadc80aa86baa97529f289e9c6b35e0  ./app/proguard-rules.pro
@@ -46,7 +46,7 @@ abc2d6819b2f5fd9e72eb10081603e36f86ae7b00a6b3a53b79841ae445ef90c  ./app/src/main
 d88914b4c6cd78e8fc70c48ce3d24a29a389a7b2374ce06b0f7fa02bd8a4c195  ./app/src/main/java/ru/forum/adbfastboottool/ForumReportManager.kt
 48ad383b609ddced391e3e23d592d0504a84345ee9a8d7f83cb1198f8c99cd94  ./app/src/main/java/ru/forum/adbfastboottool/HashUtils.kt
 ecced73d420817fb1630b9467807c96e867a78615d9c32e7285a6e5a94374528  ./app/src/main/java/ru/forum/adbfastboottool/ImageInspector.kt
-eb5755da96ad2f608d50b9ae2803ed236c553c31b04f6712580b5e066ab30216  ./app/src/main/java/ru/forum/adbfastboottool/MainActivity.kt
+53c2a760534364131ccf4929b6761ef1e2fc7763f5b3b64cc31c3c29bccb598f  ./app/src/main/java/ru/forum/adbfastboottool/MainActivity.kt
 3c44abb55c0a3403c5ba4d4bf725350488af0919cbb16922cfeeccf9de843887  ./app/src/main/java/ru/forum/adbfastboottool/MiAccountClient.kt
 4a14f0098a31c2f418c119979d3a5c4dfa9f414a705efa7441e4ae9ff529e736  ./app/src/main/java/ru/forum/adbfastboottool/MiAccountSecurityPolicy.kt
 973c917e099c39937bb86fa3a83a9d6123440d746499a0245a0437da1a6d056a  ./app/src/main/java/ru/forum/adbfastboottool/MiLoginActivity.kt
@@ -92,7 +92,7 @@ d16195d6ab022a4ec8f9686a1d750a4dd83595140e68f718c992df8a0a60a8f7  ./app/src/main
 63e753b953ea9ea8d1ff6f7a38b0d2f03c81293d202d9745d3c86e3ca41f0d3e  ./app/src/main/res/drawable/bg_welcome_bottom_gradient.xml
 1b7abc4bd35d9d90511b21ce48c5741b2cd4cf28f9150367002099eda73d10da  ./app/src/main/res/drawable/bg_welcome_chip.xml
 bb8393cba10154b48c4771faad92048657dfaeada2b69bd36f0033d74b97b1da  ./app/src/main/res/drawable/bg_welcome_divider.xml
-ebc48c98afaf974b1af20bc72efe41fb409bb2702607619046a1df2417905e49  ./app/src/main/res/drawable/bg_welcome_panel.xml
+2d9d006e1a265abe1dbc46206fa07103af0537ab69b716d7e2b5ea2d15f4bc20  ./app/src/main/res/drawable/bg_welcome_panel.xml
 b77b72c661e27fc604b66e5f87e93cb22ddf7b148682c918e8a31515cb7fd376  ./app/src/main/res/drawable/bg_welcome_primary_button.xml
 73cbcbab95d9cdff1b581658a84ba224d3a174121a256fcf6b1b6887259c4f44  ./app/src/main/res/drawable/bg_welcome_secondary_button.xml
 ea2556fb35aa59383eac767a17c4b0d1765d626d25da8c440af1ec2b18663664  ./app/src/main/res/drawable/bg_welcome_status_row.xml
@@ -113,7 +113,7 @@ b717fa7790618bffa3e6cd562eefbd6a8520cbb08ba895b771e541023624749b  ./app/src/main
 d754ee73dc0e78502bc88d321f124bfc41ef0b7131631b2e57932abbdbdd18d8  ./app/src/main/res/drawable/ic_status_warning_amber.xml
 ef50e2d09641abfb25682fe66d4f509782d0a1fea22d6053f992d7163d4f8b21  ./app/src/main/res/drawable/ic_terminal_keyboard.xml
 0a4ff19a7c3f3c936427a625b76ee9ac8428d916e5d09c3cff0d907b9e721e1d  ./app/src/main/res/layout/activity_main.xml
-fb6df93c985aa6bcbcf40bd1aca7aaa6523398676bd31d0a3615128119c70634  ./app/src/main/res/layout/activity_welcome.xml
+9fffd927c2b9171b23c3f50059239e33a36bfd8d9208e557016c287fbc555cd5  ./app/src/main/res/layout/activity_welcome.xml
 49a2dc6d3b344e651805fd54947575e86203a3c044afc027d025e52aa8d57d45  ./app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
 49a2dc6d3b344e651805fd54947575e86203a3c044afc027d025e52aa8d57d45  ./app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
 2c17078286bc8fa865a69c5acc665130c59f256de4c7d5af3227612493d239c6  ./app/src/main/res/mipmap-hdpi/ic_launcher.png
@@ -144,9 +144,9 @@ b8d8ae593bfddd75be51645a6e94d2855e5de0ea575e937bb84d7b897e191a95  ./app/src/main
 80236fcd00f908a5e93f2e395ccd5c23654b8940379a063515dcd2eb638ac75f  ./app/src/main/res/xml/locales_config.xml
 c5c6f1df1a7a0284eb4f7950e50e47c315502cf92df40167eb7f0d07490fe2ba  ./build.gradle
 d1c2f393979c971394403ee5a2120bac26664ffa806c0efce36745e916c0fc21  ./docs/AI_START_HERE.md
-0beb5002178ef01c6c41370c43e15932b61058b3ebf67effb0d5ef4822a0ec2e  ./docs/ALPHA5_HARDWARE_POLISH_PLAN.md
+c6015ece11c8172d8a785cdb8b6814ba2b43bc3a33c0e2c344a53330c246dbf7  ./docs/ALPHA5_HARDWARE_POLISH_PLAN.md
 ef950cc92e2aa3053fc45c7200c7407ceb6c0b0a8f73b024e460edc8f954eeef  ./docs/ARCHITECTURE.md
-4ef3057db70c30faf44d346b1b5dddb3602b87b8a004c8cb8372cc869c68093d  ./docs/HARDWARE_VALIDATION.md
+3872cc37d32821107d45314ea0e0601326c30f6bf2ef82af9eccbe6ef9f43c1f  ./docs/HARDWARE_VALIDATION.md
 60dc5dd02fcceaa99f0916100ee9ac31adefbb239903d23fe4364fb8a01e45fd  ./docs/LAUNCHER_IDENTITY.md
 cbca066f15a6c4d4a472d558881e4792466e5b34e72c9377c3970057f36f9adc  ./docs/README.md
 08b148b34005d1281743033d9ce335685bf262a71e52d4d9d9e23086caa6c534  ./docs/RECOVERY_FIRST_PLAN.md
@@ -174,7 +174,7 @@ b996c9f306404db994e431ab6402534cf90b8d1c74b35c57f8524909f3f44dc1  ./scripts/buil
 ec2165516b2098db799f9774c309cd54a586aff3a9e31fcab7674655d23e0040  ./scripts/check-documentation.py
 db7f61793ffabfeb58bfb2321925ad50295e80e17124f738a39198d261e4e0c2  ./scripts/check-flash-safety.py
 582f9b3abe5708c2f53f111491f60566bbe8ec0bbc5a38bbb1a103756cfbdb92  ./scripts/check-usb-connectivity.py
-8787787f15c1866802b6e5a45f23d621cd2a9c9d581c85cc6a41a10ac55d1375  ./scripts/check_project.py
+9232201d415ad51a01b5aa153cd57df9d531e548f4808c8fe7138779621739d6  ./scripts/check_project.py
 472f9f90152b96abb0277d39024eb1374f90571912d1011733e3400b45e8667b  ./scripts/checksum_inventory.py
 1ecece5609a84f0a4b0235b2aa7920d65529159173f2b41c6986d781a2ee2a7a  ./scripts/export-chat-context.sh
 803ebcd26a90e2ad44614813048773bca891b086dd41b6b2ce96777b2358f5ac  ./scripts/run-tests.sh

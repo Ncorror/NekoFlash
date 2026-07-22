@@ -3,8 +3,9 @@
     NekoFlash welcome shell.
     CRITICAL: @drawable/bg_welcome is the user's original immutable artwork.
 
-    The artwork remains isolated inside welcomeHeroArea. The compact action panel follows it
-    in normal document flow, so controls never cover the composition. Short screens scroll.
+    The artwork remains isolated inside welcomeHeroArea. The hero expands to consume spare
+    viewport height, keeping the outlined action panel near the bottom without covering the
+    composition. Short screens still scroll.
 -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -23,7 +24,7 @@
         <LinearLayout
             android:id="@+id/welcomeDocument"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="match_parent"
             android:background="@color/bg_base"
             android:orientation="vertical"
             android:paddingBottom="@dimen/welcome_bottom_padding">
@@ -31,7 +32,9 @@
             <FrameLayout
                 android:id="@+id/welcomeHeroArea"
                 android:layout_width="match_parent"
-                android:layout_height="@dimen/welcome_art_height"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:minHeight="@dimen/welcome_art_height"
                 android:background="@color/bg_base">
 
                 <ImageView

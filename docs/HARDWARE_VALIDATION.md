@@ -61,13 +61,29 @@ Build: `6.0.0-alpha5-dev-nekoflash+8d9923ec0878.29870485300`.
 - после restart сохранённая session использовалась успешно;
 - причина локализована: поздний `onPageFinished` повторно обрабатывал уже завершённый `/sts` callback.
 
-Текущий source содержит first-pass race fix. Его device PASS ещё не зафиксирован: нужен fresh login без restart и без banner.
+### Smoke 4 — first-pass login regression
+
+Build: `6.0.0-alpha5-dev-nekoflash+5f119c469430.29913150722`.
+
+Подтверждено:
+
+- fresh Xiaomi login завершился в одном запуске приложения без stale blocked-host banner;
+- unlockApi service session и ожидаемые cookie names получены;
+- ручная смена data-center preference работает;
+- следующий Mi Unlock action безопасно остановлен из-за отсутствия Fastboot-устройства;
+- transport session не создавалась, mutation не выполнялась.
+
+Обнаружено:
+
+- compact log всё ещё показывал raw account ID в сообщении об успешном login. Текущий source удаляет ID из log line; для этой sanitisation нужен regression smoke.
+
+First-pass callback race считается `DONE_DEVICE`. Полный Mi Unlock flow остаётся отдельным hardware gate.
 
 ## Открытые V6 gates
 
 ### Welcome/Sideload smoke
 
-- welcome panel: прозрачность/контур и положение без изменения permission logic;
+- welcome panel: adaptive hero заполняет свободную высоту, outline gate остаётся у нижней границы без изменения permission logic;
 - Sideload: до verify нет зелёного success-status;
 - Import/Verify geometry и тексты остаются читаемыми на целевых размерах экрана.
 
@@ -99,7 +115,7 @@ Build: `6.0.0-alpha5-dev-nekoflash+8d9923ec0878.29870485300`.
 
 ### Mi Unlock
 
-- fresh login без restart и stale banner;
+- regression login после log-sanitisation;
 - разделить standard Fastboot unlock и Xiaomi account/server flow;
 - подтвердить wipe warning и typed/manual confirmation;
 - исключить автоматическую отправку unlock-команды.

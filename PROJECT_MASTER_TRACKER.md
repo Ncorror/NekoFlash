@@ -12,9 +12,9 @@ Version code: **`217`**
 ## Текущее состояние source tree
 
 - Recovery-first Quick Flash slices A–D реализованы; baseline Slice E подтверждён Android CI.
-- Welcome/Sideload/Fastboot DATA hardware-polish внесён, но welcome panel требует ещё одного визуального прохода.
+- Welcome/Sideload/Fastboot DATA hardware-polish внесён. Welcome hero теперь заполняет свободную высоту экрана, а нижний gate использует прозрачный контур; требуется повторный visual smoke test.
 - Mi Account `/sts` exchange исправлен. Дополнительно устранена гонка первого входа: поздний WebView callback не должен заменять успешный результат сообщением о недоверенном адресе.
-- Текущий focused Mi Login first-pass fix прошёл локальные canonical guards и pure/JVM matrix `23/23`, но **ещё не имеет нового Android CI и fresh-device подтверждения**.
+- Mi Login first-pass fix подтверждён на устройстве build `5f119c469430.29913150722`: fresh login завершился в одном проходе без stale blocked-host banner. Для текущего exact head всё ещё нужен новый Android CI.
 
 ## Подтверждённые доказательства
 
@@ -29,10 +29,10 @@ Version code: **`217`**
 
 ### Последнее Android smoke evidence
 
-- Build `8d9923ec0878.29870485300` подтвердил успешный Xiaomi login, получение unlockApi-сессии и ожидаемых service cookies.
-- На первом проходе оставался stale blocked-host banner; после перезапуска сохранённая сессия использовалась успешно.
-- Причина локализована как повторная обработка уже завершённого `/sts` callback. Исправление находится в текущем source tree и требует fresh-login retest без перезапуска.
-- Аккаунтные идентификаторы, токены, serial и raw USB topology в репозитории не сохраняются.
+- Build `8d9923ec0878.29870485300` подтвердил успешный Xiaomi login и получение unlockApi service session, но выявил stale blocked-host banner первого прохода.
+- Build `5f119c469430.29913150722` подтвердил исправление: fresh login завершился в том же запуске без перезапуска и без blocked-host error.
+- Следующий Mi Unlock action корректно остановлен из-за отсутствия Fastboot-устройства.
+- Текущий source также убирает raw account ID из compact log; токены, cookie values, serial и raw USB topology в репозитории не сохраняются.
 
 Подробный sanitised summary: [`docs/HARDWARE_VALIDATION.md`](docs/HARDWARE_VALIDATION.md).
 
@@ -48,10 +48,10 @@ Version code: **`217`**
 | HOMEINFO-001 | Сохранить карточку устройства/рабочей папки | DONE_CODE | Android UI smoke test с устройством |
 | HOMEACTIONS-001 | Сохранить четыре главных перехода Home | DONE_CODE | Android UI smoke test |
 | FLASH-001 | Recovery-first Quick Flash | DONE_CI | Контролируемый hardware retest |
-| POLISH-WELCOME-001 | Облегчить welcome permissions/risk gate | IN_PROGRESS | Прозрачная/контурная панель и повторный visual smoke test |
+| POLISH-WELCOME-001 | Облегчить welcome permissions/risk gate | FIXED_CODE | Повторный visual smoke test на целевых размерах экрана |
 | POLISH-SIDELOAD-001 | Упростить Sideload card и нейтрализовать pre-verify status | FIXED_CODE | Android smoke + transfer/cancel/recovery result |
 | POLISH-DATA-001 | Свернуть Fastboot DATA diagnostics | DONE_CODE | Fastboot hardware retest |
-| UNLOCK-LOGIN-001 | Исправить Mi Account `/sts` и first-pass callback race | FIXED_CODE | Новый Android CI + fresh login без restart/banner |
+| UNLOCK-LOGIN-001 | Исправить Mi Account `/sts` и first-pass callback race | DONE_DEVICE | Новый Android CI для exact head; сохранить no-banner поведение |
 | TERMINAL-001 | Проверить Terminal на устройстве | OPEN | Read-only ADB/Fastboot и sanitised log |
 | SIDELOAD-001 | Подтвердить ADB Sideload V6 | RETEST_REQUIRED | ZIP transfer, cancel, recovery result |
 | UNLOCK-001 | Отдельный аудит Mi Unlock | IN_PROGRESS | Login retest, затем разделение standard/Xiaomi flows |
@@ -71,9 +71,9 @@ Version code: **`217`**
 
 1. Опубликовать текущий audited source ZIP в `feature/recovery-first-quick-flash` через push-only Termux workflow.
 2. Запустить новый Android CI отдельно через `scripts/termux-ci.sh`; подтвердить static/pure/lint/debug/release для точного head SHA.
-3. Выполнить fresh Mi Account login без перезапуска приложения: не должно быть blocked-host banner, а unlockApi-сессия должна завершиться в том же проходе.
+3. Проверить welcome visual smoke: panel должна оставаться у нижней границы, hero — заполнять свободную высоту, outer gate — быть контурным/прозрачным.
 4. Проверить, что Sideload до фактического verify не показывает зелёную success-индикацию.
-5. Завершить visual pass welcome panel: облегчить контур, прозрачность и вертикальное положение без изменения permission logic.
+5. Повторить Mi Account login как regression smoke и убедиться, что compact log не содержит raw account ID.
 6. Затем провести sanitised Terminal/Sideload/Quick Flash hardware validation.
 
 Перед передачей следующему чату выполнить:

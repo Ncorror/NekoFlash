@@ -1479,8 +1479,30 @@ def check_alpha5_hardware_polish() -> None:
     for token in ('@+id/tvStorageChip', '@+id/tvNotificationsChip', '@+id/tvBatteryChip', '@+id/riskRow'):
         if token not in welcome_text:
             fail(f"Welcome compact action token missing: {token}")
+    for token in (
+        'android:layout_height="match_parent"',
+        'android:id="@+id/welcomeHeroArea"',
+        'android:layout_height="0dp"',
+        'android:layout_weight="1"',
+        'android:minHeight="@dimen/welcome_art_height"',
+        'android:background="@drawable/bg_welcome_panel"',
+    ):
+        if token not in welcome_text:
+            fail(f"Welcome adaptive bottom-gate token missing: {token}")
+    welcome_panel = ROOT / "app/src/main/res/drawable/bg_welcome_panel.xml"
+    if not welcome_panel.is_file():
+        fail("Welcome outline panel drawable is missing")
+    else:
+        welcome_panel_text = welcome_panel.read_text(encoding="utf-8")
+        if '<solid android:color="#080B1119"' not in welcome_panel_text:
+            fail("Welcome outer panel must remain effectively transparent")
+        if '<stroke android:width="1dp" android:color="#99324052"' not in welcome_panel_text:
+            fail("Welcome outer panel outline is missing")
     if '@+id/btnBatterySettings' in welcome_text or 'btnBatterySettings' in welcome_activity_text:
         fail("Welcome must not restore a separate battery settings button")
+    if 'Вход выполнен (ID:' in main_text or 'Вход выполнен (ID: $userId)' in main_text:
+        fail("Compact log must not expose the Xiaomi account ID")
+
     for token in (
         'tvStorageChip.setOnClickListener { openStoragePermissionSettings() }',
         'tvNotificationsChip.setOnClickListener { requestNotificationPermissionOrSettings() }',

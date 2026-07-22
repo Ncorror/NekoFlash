@@ -13,7 +13,7 @@
 
 ### Android smoke polish
 
-- Welcome permission chips стали действиями, отдельная battery button удалена, risk row кликабельна. Финальный визуальный проход прозрачности/положения панели остаётся открытым.
+- Welcome permission chips стали действиями, отдельная battery button удалена, risk row кликабельна. Hero теперь адаптивно занимает свободную высоту viewport, нижний gate прижат к нижней области и использует прозрачный outline-first фон.
 - Sideload card упрощена; Import/Verify выровнены, жёлтая памятка удалена, pre-verify note больше не показывает ложную зелёную галочку.
 - Fastboot DATA card сведена к одному основному self-test; специализированные проверки перенесены в дополнительный dialog, no-device taps журналируются.
 - Recovery-first card зафиксирована как защищённый эталон и в smoke-polish не меняется.
@@ -24,7 +24,7 @@
 - Background clientSign exchange допускает только exact `/sts` на фиксированных региональных unlock hosts.
 - Account `passToken` не отправляется на unlock hosts; сохраняются только ожидаемые service-cookie names.
 - Исправлена гонка первого входа: поздний `onPageFinished` больше не может заменить успешную авторизацию stale blocked-host banner.
-- Добавлены pure policy/race regression tests. Fresh Android login без перезапуска и новый Android CI для текущего fix остаются обязательными.
+- Добавлены pure policy/race regression tests. Device smoke build `5f119c469430.29913150722` подтвердил fresh login без перезапуска и stale banner; новый Android CI для текущего exact head остаётся обязательным. Raw account ID больше не пишется в compact log.
 
 ### Workflow и документация
 

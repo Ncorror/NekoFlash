@@ -1671,7 +1671,7 @@ class MainActivity : AppCompatActivity() {
                 viewModel.log("❌ Вход в Mi-аккаунт: не получены данные авторизации")
                 return@registerForActivityResult
             }
-            viewModel.log("🔑 Вход выполнен (ID: $userId). Получение unlockApi-сессии...")
+            viewModel.log("🔑 Вход выполнен. Получение unlockApi-сессии...")
             miAuthExchangeJob?.cancel()
             miAuthExchangeState = MiAuthExchangeState.LOADING
             miAuthExchangeJob = lifecycleScope.launch {
