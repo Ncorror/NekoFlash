@@ -83,7 +83,7 @@ First-pass callback race считается `DONE_DEVICE`. Полный Mi Unloc
 
 ### Welcome/Sideload smoke
 
-- welcome panel: adaptive hero заполняет свободную высоту, outline gate остаётся у нижней границы без изменения permission logic;
+- welcome panel: fullscreen artwork остаётся в одном viewport без vertical scroll/oversized crop, outline gate закреплён у нижней границы без изменения permission logic;
 - Sideload: до verify нет зелёного success-status;
 - Import/Verify geometry и тексты остаются читаемыми на целевых размерах экрана.
 

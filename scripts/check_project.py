@@ -1480,15 +1480,24 @@ def check_alpha5_hardware_polish() -> None:
         if token not in welcome_text:
             fail(f"Welcome compact action token missing: {token}")
     for token in (
-        'android:layout_height="match_parent"',
         'android:id="@+id/welcomeHeroArea"',
-        'android:layout_height="0dp"',
-        'android:layout_weight="1"',
-        'android:minHeight="@dimen/welcome_art_height"',
+        'android:id="@+id/imgWelcomeBg"',
+        'android:layout_height="match_parent"',
+        'android:scaleType="centerCrop"',
+        'android:id="@+id/welcomeBottomArea"',
+        'android:layout_gravity="bottom"',
+        'android:layout_marginBottom="@dimen/welcome_bottom_padding"',
         'android:background="@drawable/bg_welcome_panel"',
     ):
         if token not in welcome_text:
-            fail(f"Welcome adaptive bottom-gate token missing: {token}")
+            fail(f"Welcome full-viewport overlay token missing: {token}")
+    for forbidden in (
+        '<ScrollView',
+        'android:layout_height="0dp"',
+        'android:minHeight="@dimen/welcome_art_height"',
+    ):
+        if forbidden in welcome_text:
+            fail(f"Welcome must not restore the scrolling/oversized hero shell: {forbidden}")
     welcome_panel = ROOT / "app/src/main/res/drawable/bg_welcome_panel.xml"
     if not welcome_panel.is_file():
         fail("Welcome outline panel drawable is missing")

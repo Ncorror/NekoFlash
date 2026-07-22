@@ -13,7 +13,7 @@
 
 ### Android smoke polish
 
-- Welcome permission chips стали действиями, отдельная battery button удалена, risk row кликабельна. Hero теперь адаптивно занимает свободную высоту viewport, нижний gate прижат к нижней области и использует прозрачный outline-first фон.
+- Welcome permission chips стали действиями, отдельная battery button удалена, risk row кликабельна. Неудачный adaptive ScrollView-вариант удалён: artwork теперь заполняет весь viewport без вертикальной прокрутки, а прозрачный outline-first gate закреплён поверх нижней области.
 - Sideload card упрощена; Import/Verify выровнены, жёлтая памятка удалена, pre-verify note больше не показывает ложную зелёную галочку.
 - Fastboot DATA card сведена к одному основному self-test; специализированные проверки перенесены в дополнительный dialog, no-device taps журналируются.
 - Recovery-first card зафиксирована как защищённый эталон и в smoke-polish не меняется.

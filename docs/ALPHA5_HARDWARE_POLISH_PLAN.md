@@ -12,7 +12,7 @@
 
 | ID | Состояние | Что уже сделано | Что ещё требуется |
 |---|---|---|---|
-| POLISH-WELCOME-001 | FIXED_CODE | Adaptive hero заполняет viewport, outer gate прозрачный/контурный и остаётся у нижней границы | Android visual smoke на целевых размерах экрана |
+| POLISH-WELCOME-001 | FIXED_CODE | Fullscreen artwork без ScrollView; outer gate прозрачный/контурный и закреплён снизу | Android visual smoke на целевых размерах экрана |
 | POLISH-SIDELOAD-001 | FIXED_CODE | Жёлтая памятка удалена, Import/Verify выровнены, pre-verify icon нейтрализован | Android smoke, transfer/cancel/recovery-result retest |
 | POLISH-DATA-001 | DONE_CODE | Один основной self-test, advanced dialog, no-device taps в compact log | Fastboot hardware retest |
 | UNLOCK-LOGIN-001 | DONE_DEVICE | Exact `/sts` allowlist, bounded service exchange и first-pass race guard подтверждены device smoke | Новый Android CI и regression после log-sanitisation |
@@ -24,7 +24,7 @@
 - не возвращать отдельную большую кнопку battery settings;
 - сохранить обязательное подтверждение рисков;
 - нижняя панель использует почти прозрачный outer surface и отдельный контур;
-- hero адаптивно занимает свободную высоту, панель остаётся ниже artwork и не перекрывает ключевую композицию;
+- artwork занимает весь content viewport без вертикальной прокрутки и без min-height zoom regression; панель закреплена снизу как прозрачный overlay;
 - логика permissions и допуска к приложению не меняется.
 
 ## POLISH-SIDELOAD-001
@@ -56,7 +56,7 @@
 1. Canonical documentation/static/safety guards.
 2. Pure/JVM matrix `23/23`.
 3. Новый GitHub Actions run для текущего exact head SHA.
-4. Welcome visual smoke после adaptive bottom-gate patch.
+4. Welcome visual smoke после fullscreen overlay-gate patch: один экран, без scroll/oversized crop.
 5. Sideload pre-verify UI smoke.
 6. Mi Account regression после удаления raw account ID из compact log.
 7. Только затем Terminal/Sideload/Quick Flash hardware validation.
