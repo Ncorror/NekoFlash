@@ -12,9 +12,10 @@ Version code: **`217`**
 ## Текущее состояние source tree
 
 - Recovery-first Quick Flash slices A–D реализованы; baseline Slice E подтверждён Android CI.
-- Welcome/Sideload/Fastboot DATA hardware-polish внесён. Adaptive ScrollView welcome-shell оказался неверным на устройстве (избыточный zoom и две позиции прокрутки) и заменён полноэкранным artwork с прозрачным нижним overlay-gate; требуется повторный visual smoke test.
+- Welcome/Sideload/Fastboot DATA hardware-polish внесён. Adaptive ScrollView-вариант был отклонён; полноэкранный artwork с прозрачным нижним overlay-gate подтверждён maintainer на устройстве и принят как защищённый эталон.
 - Mi Account `/sts` exchange исправлен. Дополнительно устранена гонка первого входа: поздний WebView callback не должен заменять успешный результат сообщением о недоверенном адресе.
-- Mi Login first-pass fix подтверждён на устройстве build `5f119c469430.29913150722`: fresh login завершился в одном проходе без stale blocked-host banner. Для текущего exact head всё ещё нужен новый Android CI.
+- Mi Login first-pass fix подтверждён на устройстве build `5f119c469430.29913150722`: fresh login завершился в одном проходе без stale blocked-host banner.
+- Полный форумный diagnostic ZIP удалён как вне-scope. Сохранены compact/trace logs, session tracker, санитизированный log share и self-test TXT/JSON. Для текущего exact head всё ещё нужен новый Android CI.
 
 ## Подтверждённые доказательства
 
@@ -48,9 +49,10 @@ Version code: **`217`**
 | HOMEINFO-001 | Сохранить карточку устройства/рабочей папки | DONE_CODE | Android UI smoke test с устройством |
 | HOMEACTIONS-001 | Сохранить четыре главных перехода Home | DONE_CODE | Android UI smoke test |
 | FLASH-001 | Recovery-first Quick Flash | DONE_CI | Контролируемый hardware retest |
-| POLISH-WELCOME-001 | Облегчить welcome permissions/risk gate | FIXED_CODE | Проверить fullscreen artwork и bottom overlay без scroll/zoom regression |
+| POLISH-WELCOME-001 | Облегчить welcome permissions/risk gate | DONE_DEVICE | Эталонный fullscreen artwork + прозрачный bottom overlay; защищать от регрессии |
 | POLISH-SIDELOAD-001 | Упростить Sideload card и нейтрализовать pre-verify status | FIXED_CODE | Android smoke + transfer/cancel/recovery result |
 | POLISH-DATA-001 | Свернуть Fastboot DATA diagnostics | DONE_CODE | Fastboot hardware retest |
+| REPORT-001 | Удалить вне-scope форумный diagnostic ZIP | DONE_CODE | Exact-head Android CI; сохранить self-test TXT/JSON и sanitised log share |
 | UNLOCK-LOGIN-001 | Исправить Mi Account `/sts` и first-pass callback race | DONE_DEVICE | Новый Android CI для exact head; сохранить no-banner поведение |
 | TERMINAL-001 | Проверить Terminal на устройстве | OPEN | Read-only ADB/Fastboot и sanitised log |
 | SIDELOAD-001 | Подтвердить ADB Sideload V6 | RETEST_REQUIRED | ZIP transfer, cancel, recovery result |
@@ -71,7 +73,7 @@ Version code: **`217`**
 
 1. Опубликовать текущий audited source ZIP в `feature/recovery-first-quick-flash` через push-only Termux workflow.
 2. Запустить новый Android CI отдельно через `scripts/termux-ci.sh`; подтвердить static/pure/lint/debug/release для точного head SHA.
-3. Проверить welcome visual smoke: один экран без вертикальной прокрутки, artwork заполняет viewport с умеренным center-crop, panel закреплена снизу как прозрачный контурный overlay.
+3. На exact-head APK быстро подтвердить, что защищённый Welcome не изменился и меню «Отчёты» содержит только папку, log actions и self-test TXT/JSON.
 4. Проверить, что Sideload до фактического verify не показывает зелёную success-индикацию.
 5. Повторить Mi Account login как regression smoke и убедиться, что compact log не содержит raw account ID.
 6. Затем провести sanitised Terminal/Sideload/Quick Flash hardware validation.

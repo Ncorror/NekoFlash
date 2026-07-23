@@ -38,8 +38,6 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
-import java.util.zip.ZipEntry
-import java.util.zip.ZipOutputStream
 
 class DeviceViewModel(
     application: Application,
@@ -944,7 +942,6 @@ class DeviceViewModel(
             val candidate = connectedUsbTarget
             val manager = connectedUsbManager
             val nativeState = NativeUsbfsBackend.backendState()
-            val probePassed = runCatching { createDiagnosticZipProbe(reports) }.getOrDefault(false)
             val mode = when (_connectionState.value ?: ConnectionState.NONE) {
                 ConnectionState.ADB -> "ADB"
                 ConnectionState.FASTBOOT -> "FASTBOOT"
@@ -967,7 +964,6 @@ class DeviceViewModel(
                     operationActive = operationJob?.isCompleted == false,
                     transportRestartRequired = transportRestartRequired.get(),
                     nativeTransferActive = NativeUsbfsBackend.hasActiveTransfer || nativeState.nativeTransferActive,
-                    diagnosticZipProbePassed = probePassed,
                     freeBytes = workspace?.usableSpace
                 )
             )
@@ -984,32 +980,6 @@ class DeviceViewModel(
             log(if (result.ready) "✅ ${result.summary()}" else "⛔ ${result.summary()}")
             onComplete(result)
         }
-    }
-
-    private fun createDiagnosticZipProbe(reportsDir: File?): Boolean {
-        val dir = reportsDir ?: return false
-        if (!dir.exists() && !dir.mkdirs()) return false
-        val probe = File(dir, ".diagnostic-readiness-probe.zip")
-        val entries = listOf(
-            "manifest.txt" to "probe",
-            "app-info.txt" to BuildConfig.BUILD_ID,
-            "usb-info.txt" to "probe",
-            "adb-info.txt" to "probe",
-            "fastboot-info.txt" to "probe",
-            "diagnostic-summary.json" to "{\"schema\":\"probe\"}",
-            "visible-log.txt" to "probe",
-            "logs/trace-01-probe.txt" to "probe"
-        )
-        ZipOutputStream(probe.outputStream().buffered()).use { zip ->
-            entries.forEach { (name, value) ->
-                zip.putNextEntry(ZipEntry(name))
-                zip.write(value.toByteArray(Charsets.UTF_8))
-                zip.closeEntry()
-            }
-        }
-        val valid = DiagnosticArchiveVerifier.verify(probe, requireTrace = true).valid
-        runCatching { probe.delete() }
-        return valid
     }
 
     fun setDebugLogging(enabled: Boolean) {

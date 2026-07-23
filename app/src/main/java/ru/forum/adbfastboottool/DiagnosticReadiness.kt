@@ -25,7 +25,6 @@ object DiagnosticReadiness {
         val operationActive: Boolean,
         val transportRestartRequired: Boolean,
         val nativeTransferActive: Boolean,
-        val diagnosticZipProbePassed: Boolean,
         val freeBytes: Long?
     )
 
@@ -52,7 +51,6 @@ object DiagnosticReadiness {
         add("WORKSPACE", input.workspaceReady, "Workspace доступен", "Workspace недоступен")
         add("LOG_STORAGE", input.logsReady, "Папка логов доступна", "Папка логов недоступна")
         add("REPORT_STORAGE", input.reportsReady, "Папка отчётов доступна", "Папка отчётов недоступна")
-        add("ZIP_PROBE", input.diagnosticZipProbePassed, "Диагностический ZIP создаётся и читается", "Проверочный ZIP не прошёл валидацию")
         add("USB_CANDIDATE", input.usbCandidatePresent, "Совместимое USB-устройство обнаружено", "Совместимое USB-устройство не обнаружено")
         add("USB_PERMISSION", input.usbPermissionGranted == true, "USB permission выдан", "USB permission не выдан", warningOnly = input.usbPermissionGranted == null)
         add("BULK_ENDPOINTS", input.bulkEndpointsPresent, "Bulk IN/OUT endpoints найдены", "Bulk IN/OUT endpoints не найдены")

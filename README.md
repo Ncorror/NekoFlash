@@ -11,9 +11,9 @@ NekoFlash — Android-инструмент для работы с подключ
 
 ## Текущий статус
 
-Активная версия: `6.0.0-alpha5-dev-nekoflash` (`217`). Recovery-first Quick Flash реализован по slices A–D, а baseline Slice E прошёл Android CI. Текущая ветка содержит последующие UX/Mi Login исправления. First-pass Mi Login уже подтверждён device smoke. Welcome shell переведён на полноэкранный artwork с прозрачным нижним overlay-gate после того, как adaptive ScrollView-вариант дал неверный масштаб и две позиции прокрутки; новый вариант требует visual smoke и Android CI.
+Активная версия: `6.0.0-alpha5-dev-nekoflash` (`217`). Recovery-first Quick Flash реализован по slices A–D, а baseline Slice E прошёл Android CI. Последующие UX/Mi Login исправления находятся в feature-ветке: first-pass Mi Login подтверждён device smoke, а fullscreen Welcome с прозрачным нижним overlay-gate принят maintainer как эталонный экран.
 
-Аппаратные gates Terminal, Sideload и контролируемой Quick Flash остаются открытыми. Android CI не считается доказательством реальной прошивки.
+Полный форумный диагностический ZIP удалён как вне-scope функционал. Сохранены bounded compact/trace logs, session summary, санитизированная отправка лога и локальный self-test TXT/JSON. Аппаратные gates Terminal, Sideload и контролируемой Quick Flash остаются открытыми. Android CI не считается доказательством реальной прошивки.
 
 Точный живой статус и ближайший шаг находятся только в [`PROJECT_MASTER_TRACKER.md`](PROJECT_MASTER_TRACKER.md).
 

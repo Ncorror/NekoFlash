@@ -655,9 +655,8 @@ def check_reports_access() -> None:
 
 def check_private_reports() -> None:
     sanitizer = ROOT / "app/src/main/java/ru/forum/adbfastboottool/ReportSanitizer.kt"
-    forum = ROOT / "app/src/main/java/ru/forum/adbfastboottool/ForumReportManager.kt"
     vm = ROOT / "app/src/main/java/ru/forum/adbfastboottool/DeviceViewModel.kt"
-    for path in (sanitizer, forum, vm):
+    for path in (sanitizer, vm):
         if not path.exists():
             fail(f"Missing private report file: {path.relative_to(ROOT)}")
             continue
@@ -666,16 +665,56 @@ def check_private_reports() -> None:
         for token in ("REDACTED_SERIAL", "sanitizeText", "sanitizeDeviceStoragePaths", "sanitizeLongHexIdentifiers"):
             if token not in text:
                 fail(f"ReportSanitizer missing token: {token}")
-    if forum.exists():
-        text = forum.read_text(encoding="utf-8")
-        for token in ("PrivacyMode.SANITIZED", "forum-report.v6", "ReportSanitizer.sanitizeText", "privacyMode"):
-            if token not in text:
-                fail(f"ForumReportManager privacy hook missing: {token}")
     if vm.exists():
         text = vm.read_text(encoding="utf-8")
         for token in ("selftest.v3", "Privacy mode: sanitized", "ReportSanitizer.sanitizeLines"):
             if token not in text:
                 fail(f"DeviceViewModel self-test privacy hook missing: {token}")
+
+
+def check_forum_report_removed() -> None:
+    """Keep the out-of-scope full forum ZIP exporter from returning."""
+    java_dir = ROOT / "app/src/main/java/ru/forum/adbfastboottool"
+    removed_files = (
+        java_dir / "ForumReportManager.kt",
+        java_dir / "DiagnosticReportFormatter.kt",
+        java_dir / "DiagnosticArchiveVerifier.kt",
+    )
+    for path in removed_files:
+        if path.exists():
+            fail(f"Removed full forum report exporter returned: {path.relative_to(ROOT)}")
+
+    main = (java_dir / "MainActivity.kt").read_text(encoding="utf-8")
+    vm = (java_dir / "DeviceViewModel.kt").read_text(encoding="utf-8")
+    readiness = (java_dir / "DiagnosticReadiness.kt").read_text(encoding="utf-8")
+    strings_en = (ROOT / "app/src/main/res/values/strings.xml").read_text(encoding="utf-8")
+    strings_ru = (ROOT / "app/src/main/res/values-ru/strings.xml").read_text(encoding="utf-8")
+
+    forbidden_main = (
+        "SelfTestForumReport",
+        "createForumReport(",
+        "runSelfTestForumReportFromUi(",
+        "reports_forum_zip",
+        "reports_selftest_forum",
+        "Полный диагностический ZIP создаётся",
+    )
+    for token in forbidden_main:
+        if token in main:
+            fail(f"Removed forum-report UI/command token returned: {token}")
+
+    for token in ("createDiagnosticZipProbe", "diagnosticZipProbePassed"):
+        if token in vm:
+            fail(f"Removed diagnostic ZIP probe returned in DeviceViewModel: {token}")
+    if "ZIP_PROBE" in readiness:
+        fail("Removed ZIP_PROBE readiness check returned")
+
+    for text, label in ((strings_en, "values"), (strings_ru, "values-ru")):
+        for token in ("reports_forum_zip", "reports_selftest_forum", "dialog_report_title", "report_created_message"):
+            if token in text:
+                fail(f"Removed forum-report string returned in {label}: {token}")
+
+    if not ERRORS:
+        print("full forum diagnostic ZIP removal: OK")
 
 
 def check_device_viewmodel_api_refs() -> None:
@@ -1618,6 +1657,7 @@ def main() -> int:
     check_self_test_hooks()
     check_reports_access()
     check_private_reports()
+    check_forum_report_removed()
     check_mi_account_and_share_hardening()
     check_alpha5_hardware_polish()
     check_termux_workflow()

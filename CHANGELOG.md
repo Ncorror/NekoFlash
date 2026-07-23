@@ -2,6 +2,15 @@
 
 ## V6.0.0-alpha5 development baseline — `6.0.0-alpha5-dev-nekoflash` (`217`)
 
+### Удаление форумного диагностического отчёта (вне-scope cleanup)
+
+- Удалён экспорт полного форумного диагностического ZIP: классы `ForumReportManager`, `DiagnosticReportFormatter`, `DiagnosticArchiveVerifier`.
+- Из «Меню отчётов» убраны пункты «Создать форум-отчёт (zip)» и «Self-test форум-комплект»; терминальные команды вида `self-test forum`/`forum`/`zip`/`bundle`/`support` больше не создают ZIP (падают в обычный self-test).
+- Из `DiagnosticReadiness` убраны проверка `ZIP_PROBE` и связанный `createDiagnosticZipProbe`.
+- Сохранены: общий компактный/trace лог, `DiagnosticSessionTracker`, санитизация (`ReportSanitizer`), лёгкий локальный self-test отчёт (`selftest.v3`, txt/json), папка reports и лог-действия. Safety-инварианты Quick Flash и хостовый скоупинг Mi Unlock не затронуты.
+- Обновлены guard'ы `check_project.py` и `check-diagnostic-logging.py`, удалены неиспользуемые строковые ресурсы, обновлены архитектура, help-текст и log-actions dialog.
+- Fullscreen Welcome с прозрачным нижним overlay-gate принят maintainer на устройстве и закреплён как защищённый эталон.
+
 ### Recovery-first Quick Flash
 
 - Реализованы pure plan/candidate models, fail-closed topology builder, Recovery-first UI и одноразовый mutation gate.

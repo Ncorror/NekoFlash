@@ -79,11 +79,15 @@ Build: `6.0.0-alpha5-dev-nekoflash+5f119c469430.29913150722`.
 
 First-pass callback race считается `DONE_DEVICE`. Полный Mi Unlock flow остаётся отдельным hardware gate.
 
+### Smoke 5 — Welcome fullscreen overlay
+
+Maintainer visual verdict: **PASS**. Полноэкранное artwork отображается одним viewport без вертикальной прокрутки; заголовок закреплён сверху, прозрачный контурный permission/risk gate — снизу поверх изображения. Расположение кнопок и читаемость приняты как эталонные. Exact build ID к скриншоту не приложен, поэтому для публикуемого head всё ещё требуется Android CI и короткая regression-проверка без изменения макета.
+
 ## Открытые V6 gates
 
-### Welcome/Sideload smoke
+### Sideload smoke
 
-- welcome panel: fullscreen artwork остаётся в одном viewport без vertical scroll/oversized crop, outline gate закреплён у нижней границы без изменения permission logic;
+- защищённый Welcome не менять; на exact-head APK только подтвердить отсутствие регрессии;
 - Sideload: до verify нет зелёного success-status;
 - Import/Verify geometry и тексты остаются читаемыми на целевых размерах экрана.
 

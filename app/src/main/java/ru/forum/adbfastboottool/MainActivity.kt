@@ -178,7 +178,6 @@ class MainActivity : AppCompatActivity() {
         data object LocalStatus : TerminalAction()
         data object SelfTest : TerminalAction()
         data object SelfTestReport : TerminalAction()
-        data object SelfTestForumReport : TerminalAction()
         data object OpenReportsFolder : TerminalAction()
         data class RawFastboot(val command: String) : TerminalAction()
         data class DestructiveFastboot(val command: String, val risk: String) : TerminalAction()
@@ -845,12 +844,6 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        if (isSelfTestForumReportCommand(rawLower)) {
-            viewModel.log("> $raw")
-            runSelfTestForumReportFromUi()
-            return
-        }
-
         if (isSelfTestReportCommand(rawLower)) {
             viewModel.log("> $raw")
             runSelfTestReportFromUi()
@@ -949,7 +942,6 @@ class MainActivity : AppCompatActivity() {
             TerminalAction.LocalStatus -> viewModel.logConnectionStatus()
             TerminalAction.SelfTest -> viewModel.runSelfTest()
             TerminalAction.SelfTestReport -> runSelfTestReportFromUi()
-            TerminalAction.SelfTestForumReport -> runSelfTestForumReportFromUi()
             TerminalAction.OpenReportsFolder -> openReportsFolder()
             is TerminalAction.RawFastboot -> viewModel.runFastbootCommand(action.command)
             is TerminalAction.DestructiveFastboot -> confirmDestructiveFastbootCommand(action.command, action.risk)
@@ -974,7 +966,6 @@ class MainActivity : AppCompatActivity() {
             TerminalAction.LocalStatus -> viewModel.logConnectionStatus()
             TerminalAction.SelfTest -> viewModel.runSelfTest()
             TerminalAction.SelfTestReport -> runSelfTestReportFromUi()
-            TerminalAction.SelfTestForumReport -> runSelfTestForumReportFromUi()
             TerminalAction.OpenReportsFolder -> openReportsFolder()
             is TerminalAction.AdbService -> viewModel.runAdbService(action.service)
             is TerminalAction.AdbShell -> viewModel.runAdbShell(action.command)
@@ -2324,10 +2315,8 @@ class MainActivity : AppCompatActivity() {
             readOnlyLabel to { toggleDiagnosticReadOnlyFromUi() },
             "СКОПИРОВАТЬ КРАТКИЙ ИТОГ" to { copyDiagnosticSummary() },
             getString(R.string.reports_open_folder) to { openReportsFolder() },
-            getString(R.string.reports_forum_zip) to { createForumReport() },
             getString(R.string.reports_log_actions) to { showLogActions() },
-            getString(R.string.reports_selftest) to { runSelfTestReportFromUi() },
-            getString(R.string.reports_selftest_forum) to { runSelfTestForumReportFromUi() }
+            getString(R.string.reports_selftest) to { runSelfTestReportFromUi() }
         )
         val container = android.widget.LinearLayout(this).apply {
             orientation = android.widget.LinearLayout.VERTICAL
@@ -3326,7 +3315,6 @@ class MainActivity : AppCompatActivity() {
         val sub = tokens.getOrNull(1)?.lowercase(Locale.US)
         return when (sub) {
             "report", "export", "log", "txt", "json" -> TerminalAction.SelfTestReport
-            "forum", "zip", "bundle", "full", "support" -> TerminalAction.SelfTestForumReport
             else -> TerminalAction.SelfTest
         }
     }
@@ -3354,31 +3342,6 @@ class MainActivity : AppCompatActivity() {
             rawLower == "doctor json" ||
             rawLower == "adb self-test report" ||
             rawLower == "fastboot self-test report"
-    }
-
-    private fun isSelfTestForumReportCommand(rawLower: String): Boolean {
-        return rawLower == "self-test forum" ||
-            rawLower == "self-test zip" ||
-            rawLower == "self-test bundle" ||
-            rawLower == "self-test full" ||
-            rawLower == "self-test support" ||
-            rawLower == "selftest forum" ||
-            rawLower == "selftest zip" ||
-            rawLower == "selftest bundle" ||
-            rawLower == "selftest full" ||
-            rawLower == "selftest support" ||
-            rawLower == "smoke-test forum" ||
-            rawLower == "smoke-test zip" ||
-            rawLower == "smoke-test bundle" ||
-            rawLower == "smoke-test full" ||
-            rawLower == "smoke-test support" ||
-            rawLower == "doctor forum" ||
-            rawLower == "doctor zip" ||
-            rawLower == "doctor bundle" ||
-            rawLower == "doctor full" ||
-            rawLower == "doctor support" ||
-            rawLower == "adb self-test forum" ||
-            rawLower == "fastboot self-test forum"
     }
 
     private fun runDiagnosticReadinessFromUi() {
@@ -3458,101 +3421,6 @@ class MainActivity : AppCompatActivity() {
             .setTitle("Self-test отчёт создан")
             .setMessage("Файлы сохранены:\n${artifacts.textFile.absolutePath}\n${artifacts.jsonFile.absolutePath}\n\nОтчёты санитизированы: серийники, приватные пути и host-идентификаторы замаскированы. TXT удобно читать человеку, JSON удобно прикладывать к баг-репорту.")
             .setPositiveButton(getString(R.string.share_upper)) { _, _ -> shareGenericFile(artifacts.textFile, "text/plain", "ADB Fastboot Tool self-test report") }
-            .setNeutralButton("ОТКРЫТЬ REPORTS") { _, _ -> openReportsFolder() }
-            .setNegativeButton(getString(R.string.close_upper), null)
-            .show()
-    }
-
-    private fun runSelfTestForumReportFromUi() {
-        if (!ensureWorkspaceReady()) return
-        viewModel.runSelfTestReportArtifacts { artifacts ->
-            lifecycleScope.launch(Dispatchers.IO) {
-                try {
-                    val report = ForumReportManager.createReport(
-                        context = this@MainActivity,
-                        usbManager = usbManager,
-                        workspace = workspacePath,
-                        currentLogFile = viewModel.currentLogFile(),
-                        compactLogFiles = viewModel.currentLogFiles(),
-                        traceLogFiles = viewModel.currentTraceLogFiles(),
-                        sessionSummary = viewModel.currentDiagnosticSessionSummary(),
-                        partitionInventory = viewModel.currentFastbootPartitionInventory(),
-                        usbSessionSnapshot = viewModel.currentUsbSessionSnapshot(),
-                        buildId = viewModel.currentBuildId(),
-                        diagnosticMode = viewModel.currentDiagnosticMode(),
-                        readOnlyMutationLock = viewModel.isReadOnlyMutationLockEnabled(),
-                        transportSessionId = viewModel.currentTransportSessionId(),
-                        visibleLogLines = viewModel.logSnapshot(),
-                        connectionInfo = viewModel.currentConnectionInfo(),
-                        fastbootDiagnostics = viewModel.currentFastbootDiagnostics(),
-                        adbDiagnostics = viewModel.currentAdbDiagnostics(),
-                        debugLogging = viewModel.isDebugLoggingEnabled(),
-                        extraFiles = listOf(
-                            artifacts.textFile to "self-test/selftest.txt",
-                            artifacts.jsonFile to "self-test/selftest.json"
-                        )
-                    )
-                    val verification = DiagnosticArchiveVerifier.verify(
-                        report,
-                        requireTrace = viewModel.currentDiagnosticMode() != DiagnosticModePolicy.Mode.NORMAL || viewModel.isDebugLoggingEnabled()
-                    )
-                    viewModel.log("✅ Self-test ZIP для форума создан: ${report.absolutePath} (privacy: sanitized)")
-                    viewModel.log("✅ ${verification.message}")
-                    runOnUiThread { showForumReportDialog(report, verification) }
-                } catch (e: Exception) {
-                    viewModel.log("ОШИБКА: не удалось создать ZIP с self-test: ${e.message ?: e.javaClass.simpleName}")
-                }
-            }
-        }
-    }
-
-
-    private fun createForumReport() {
-        if (!ensureWorkspaceReady()) return
-        lifecycleScope.launch(Dispatchers.IO) {
-            try {
-                val report = ForumReportManager.createReport(
-                    context = this@MainActivity,
-                    usbManager = usbManager,
-                    workspace = workspacePath,
-                    currentLogFile = viewModel.currentLogFile(),
-                    compactLogFiles = viewModel.currentLogFiles(),
-                    traceLogFiles = viewModel.currentTraceLogFiles(),
-                    sessionSummary = viewModel.currentDiagnosticSessionSummary(),
-                    partitionInventory = viewModel.currentFastbootPartitionInventory(),
-                    usbSessionSnapshot = viewModel.currentUsbSessionSnapshot(),
-                    buildId = viewModel.currentBuildId(),
-                    diagnosticMode = viewModel.currentDiagnosticMode(),
-                    readOnlyMutationLock = viewModel.isReadOnlyMutationLockEnabled(),
-                    transportSessionId = viewModel.currentTransportSessionId(),
-                    visibleLogLines = viewModel.logSnapshot(),
-                    connectionInfo = viewModel.currentConnectionInfo(),
-                    fastbootDiagnostics = viewModel.currentFastbootDiagnostics(),
-                    adbDiagnostics = viewModel.currentAdbDiagnostics(),
-                    debugLogging = viewModel.isDebugLoggingEnabled()
-                )
-                val verification = DiagnosticArchiveVerifier.verify(
-                    report,
-                    requireTrace = viewModel.currentDiagnosticMode() != DiagnosticModePolicy.Mode.NORMAL || viewModel.isDebugLoggingEnabled()
-                )
-                viewModel.log("✅ Отчёт для форума создан: ${report.absolutePath} (privacy: sanitized)")
-                viewModel.log("✅ ${verification.message}")
-                runOnUiThread { showForumReportDialog(report, verification) }
-            } catch (e: Exception) {
-                viewModel.log("ОШИБКА: не удалось создать отчёт для форума: ${e.message ?: e.javaClass.simpleName}")
-            }
-        }
-    }
-
-    private fun showForumReportDialog(
-        report: File,
-        verification: DiagnosticArchiveVerifier.Result = DiagnosticArchiveVerifier.verify(report, requireTrace = false)
-    ) {
-        val verificationText = if (verification.valid) verification.message else "ВНИМАНИЕ: ${verification.message}"
-        MaterialAlertDialogBuilder(this)
-            .setTitle(getString(R.string.dialog_report_title))
-            .setMessage(getString(R.string.report_created_message, report.absolutePath) + "\n\n" + verificationText)
-            .setPositiveButton(getString(R.string.share_upper)) { _, _ -> shareGenericFile(report, "application/zip", "ADB Fastboot Tool forum report") }
             .setNeutralButton("ОТКРЫТЬ REPORTS") { _, _ -> openReportsFolder() }
             .setNegativeButton(getString(R.string.close_upper), null)
             .show()
@@ -3651,7 +3519,7 @@ class MainActivity : AppCompatActivity() {
                 getString(R.string.log_dialog_message, file.absolutePath) +
                     "\n\nКомпактных сегментов: ${viewModel.currentLogFiles().size}" +
                     "\nTrace-сегментов: ${viewModel.currentTraceLogFiles().size}" +
-                    "\nПолный диагностический ZIP создаётся через меню «Отчёты»."
+                    "\n" + getString(R.string.log_dialog_reports_note)
             )
             .setPositiveButton(getString(R.string.copy_path_upper)) { _, _ ->
                 copyTextToClipboard("ADB Fastboot log", file.absolutePath, getString(R.string.log_path_copied))

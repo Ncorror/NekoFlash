@@ -32,7 +32,7 @@
 
 ## Logs
 
-Compact/trace storage ограничен по размеру. `ReportSanitizer` удаляет serial, пути и длинные идентификаторы. `ForumReportManager` создаёт schema `forum-report.v6` без профилей и inventory history.
+Compact/trace storage ограничен по размеру. `ReportSanitizer` удаляет serial, пути и длинные идентификаторы. Локальный self-test отчёт (`selftest.v3`, txt/json) остаётся санитизированным. Экспорт полного форумного диагностического ZIP (`ForumReportManager`, `DiagnosticReportFormatter`, `DiagnosticArchiveVerifier`) удалён из V6 как вне-scope функционал; общий компактный лог и session tracker сохранены.
 
 ## Запрещённые зависимости
 

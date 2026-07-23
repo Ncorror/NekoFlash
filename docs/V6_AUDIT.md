@@ -22,7 +22,8 @@ Compilation hotfix: `V6.0.0-alpha4`
 
 ## Исправлено
 
-- diagnostic report schema повышена до `forum-report.v6`;
+- на alpha3 diagnostic report schema была повышена до `forum-report.v6`;
+- в alpha5 полный форумный ZIP-exporter удалён как вне-scope; сохранены compact/trace logs, session summary и санитизированный self-test TXT/JSON;
 - documentation/checksum guards больше не требуют удалённые raw logs;
 - project guard запрещает возврат Service page, profiles/history и Mi Flash;
 - текущий roadmap, safety model, release process и hardware summary переписаны под V6.
@@ -35,7 +36,7 @@ Compilation hotfix: `V6.0.0-alpha4`
 - Quick Flash inventory/slot/preflight/draft;
 - Sideload и recovery verifier;
 - Mi Unlock и необходимые account/session classes;
-- bounded/sanitised logs и reports menu;
+- bounded/sanitised compact/trace logs, session tracker и reports menu с локальным self-test TXT/JSON;
 - 19 тестовых модулей, каждый связан с активной функцией или её минимальной safety boundary.
 
 ## Подтверждение Android compile hotfix

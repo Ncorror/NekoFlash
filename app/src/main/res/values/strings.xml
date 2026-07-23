@@ -47,7 +47,6 @@ Safety gate: type exactly `%2$s` to continue.</string>
     <string name="typed_confirm_error">Type exactly: %1$s</string>
     <string name="typed_confirm_failed_log">Typed confirmation failed: %1$s</string>
     <string name="dialog_sideload_confirm_title">Confirm ADB Sideload</string>
-    <string name="dialog_report_title">Forum report</string>
     <string name="dialog_log_title">Operation log</string>
     <string name="dialog_help_title">How to use</string>
     <string name="dialog_battery_title">Battery optimization</string>
@@ -71,10 +70,11 @@ Fastboot:
 • fastboot flash &lt;partition&gt; &lt;file.img&gt; uses /sdcard/Download/NekoFlash for relative paths;
 • file-based operations still check getvar, max-download-size, and sidecar .sha256/.md5.
 
-Forum diagnostics:
+Diagnostics and reports:
 • “Auto” checks USB every 3 seconds and reports new devices;
-• “Debug” adds detailed USB/Fastboot lines to the log;
-• “Report” creates a ZIP with log.txt, usb-info.txt, fastboot-info.txt, and app-info.txt.
+• “Debug” adds detailed USB/Fastboot lines to the trace log;
+• the “Reports” menu opens the reports folder and creates a sanitized self-test in TXT/JSON;
+• sharing a log creates a separate sanitized copy without private identifiers.
 
 Files and logs:
 • “Import” copies .img/.zip/.bin/.sha256/.md5 into /sdcard/Download/NekoFlash;
@@ -95,12 +95,9 @@ Device profiles:
     <string name="analysis_file_title">Inspection: %1$s</string>
     <string name="analysis_header">=== FIRMWARE FILE INSPECTION ===</string>
     <string name="sha256_copied">SHA-256 copied</string>
-    <string name="report_created_message">File created:
-%1$s
-
-Includes logs, USB/ADB/Fastboot details, app information, and explicitly selected diagnostic files. Attach it to a bug report when needed.</string>
     <string name="share_file_chooser">Send file</string>
     <string name="share_file_text">File: %1$s</string>
+    <string name="log_dialog_reports_note">A sanitized self-test TXT/JSON can be created from the “Reports” menu.</string>
     <string name="log_file_not_created">ERROR: log file has not been created yet</string>
     <string name="log_dialog_message">File:
 %1$s
@@ -360,10 +357,8 @@ Plan fingerprint: %10$s
     <string name="layout_reports_menu">📋 Reports</string>
     <string name="reports_sheet_title">📋 Reports &amp; Logs</string>
     <string name="reports_open_folder">📂  Open reports folder</string>
-    <string name="reports_forum_zip">📦  Create forum report (zip)</string>
     <string name="reports_log_actions">📄  Log: export / clear</string>
     <string name="reports_selftest">🧪  Self-test report</string>
-    <string name="reports_selftest_forum">🧪  Self-test forum bundle</string>
     <string name="settings_section_profile">Safety profile</string>
     <string name="settings_open_language">🌐  Language</string>
     <string name="settings_open_permissions">🔐  Permissions</string>
