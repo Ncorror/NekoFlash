@@ -65,4 +65,4 @@
 
 - Полный Mi Flash удалён из активной ветки.
 - ADB/Fastboot transports, Terminal, Quick Flash, Sideload, Mi Unlock и sanitised logs сохранены.
-- Предыдущее состояние архивировано в `archive/full-miflash-v5.9.17` и `v5.9.17-full-miflash`.
+- Предыдущее состояние полного Mi Flash оставлено только во внешнем архиве владельца (Google Drive); в Git V6 оно не зеркалируется.

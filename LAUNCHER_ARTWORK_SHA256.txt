@@ -1,1 +1,1 @@
-cf7e7875b10cb393d5b05340c3072e90f52c846f3c013c67d239d030b232074e  docs/artwork/nekoflash_launcher_v5.9.13.png
+f075a649bd20e14d63591af7cc5608048661b839a95a282c834ce65b2921e769  docs/artwork/nekoflash_launcher_circle_cat_v6.0.0.png

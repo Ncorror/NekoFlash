@@ -534,7 +534,7 @@ def check_launcher_identity() -> None:
     manifest = ROOT / "app/src/main/AndroidManifest.xml"
     base_strings = ROOT / "app/src/main/res/values/strings.xml"
     ru_strings = ROOT / "app/src/main/res/values-ru/strings.xml"
-    source = ROOT / "docs/artwork/nekoflash_launcher_v5.9.13.png"
+    source = ROOT / "docs/artwork/nekoflash_launcher_circle_cat_v6.0.0.png"
     lock = ROOT / "LAUNCHER_ARTWORK_SHA256.txt"
 
     manifest_text = manifest.read_text(encoding="utf-8")
@@ -912,7 +912,7 @@ def check_master_tracker_presence() -> None:
         "docs/SAFETY_MODEL.md",
         "scripts/check-documentation.py",
         "scripts/termux-ci.sh",
-        "archive/full-miflash-v5.9.17",
+        "внешняя резервная копия владельца вне Git",
         "TOPBAR-001",
     ):
         if token not in text:

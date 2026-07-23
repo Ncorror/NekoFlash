@@ -41,7 +41,7 @@ Version code: **`217`**
 
 | ID | Задача | Статус | Следующее доказательство |
 |---|---|---|---|
-| SCOPE-001 | Не возвращать полный Mi Flash в активную ветку | DONE_CODE | `check_project.py` и архив V5.9.17 |
+| SCOPE-001 | Не возвращать полный Mi Flash в активную ветку | DONE_CODE | `check_project.py` + внешняя резервная копия владельца вне Git |
 | AUDIT-001 | Очистить V6 source/doc tree | DONE_CI | Alpha4 compile hotfix и documentation guards |
 | CONTEXT-001 | Самодостаточный handoff | DONE_CODE | `docs/AI_START_HERE.md` + export script |
 | TERMUX-001 | Разделить push, CI evidence и APK | DONE_CI | Push-only publisher; APK только по `--with-apk` |
@@ -64,7 +64,7 @@ Version code: **`217`**
 
 - `cardQuickFlashRecoveryFirst` принят как эталонный UI и не меняется в hardware-polish без отдельного решения.
 - `TOPBAR-001`, `HOMEINFO-001`, `HOMEACTIONS-001` сохраняются функционально.
-- Полный Mi Flash не возвращается; архивная база — `archive/full-miflash-v5.9.17`.
+- Полный Mi Flash не возвращается; внешняя резервная копия владельца хранится вне Git (Google Drive) и не дублируется в активной ветке.
 - Не допускаются force push, скрытый выбор partition, автоматический mutation retry или утверждение PASS без evidence.
 
 Основные safety-инварианты: [`docs/SAFETY_MODEL.md`](docs/SAFETY_MODEL.md). Архитектура Quick Flash: [`docs/RECOVERY_FIRST_PLAN.md`](docs/RECOVERY_FIRST_PLAN.md).

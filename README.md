@@ -7,7 +7,7 @@ NekoFlash — Android-инструмент для работы с подключ
 - ADB Sideload;
 - Mi Unlock.
 
-Полный Mi Flash/Fastboot ROM workflow не входит в V6. Его последнее состояние сохранено в Git-ветке `archive/full-miflash-v5.9.17` и теге `v5.9.17-full-miflash`.
+Полный Mi Flash/Fastboot ROM workflow не входит в V6. Внешняя резервная копия старого полного Mi Flash хранится владельцем вне Git (Google Drive) и намеренно не дублируется в активном репозитории.
 
 ## Текущий статус
 
