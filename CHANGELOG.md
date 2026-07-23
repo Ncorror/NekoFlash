@@ -1,34 +1,68 @@
 # История изменений NekoFlash
 
+## V6.0.0-alpha5 development baseline — `6.0.0-alpha5-dev-nekoflash` (`217`)
+
+### Удаление форумного диагностического отчёта (вне-scope cleanup)
+
+- Удалён экспорт полного форумного диагностического ZIP: классы `ForumReportManager`, `DiagnosticReportFormatter`, `DiagnosticArchiveVerifier`.
+- Из «Меню отчётов» убраны пункты «Создать форум-отчёт (zip)» и «Self-test форум-комплект»; терминальные команды вида `self-test forum`/`forum`/`zip`/`bundle`/`support` больше не создают ZIP (падают в обычный self-test).
+- Из `DiagnosticReadiness` убраны проверка `ZIP_PROBE` и связанный `createDiagnosticZipProbe`.
+- Сохранены: общий компактный/trace лог, `DiagnosticSessionTracker`, санитизация (`ReportSanitizer`), лёгкий локальный self-test отчёт (`selftest.v3`, txt/json), папка reports и лог-действия. Safety-инварианты Quick Flash и хостовый скоупинг Mi Unlock не затронуты.
+- Обновлены guard'ы `check_project.py` и `check-diagnostic-logging.py`, удалены неиспользуемые строковые ресурсы, обновлены архитектура, help-текст и log-actions dialog.
+- Fullscreen Welcome с прозрачным нижним overlay-gate принят maintainer на устройстве и закреплён как защищённый эталон.
+
+### Recovery-first Quick Flash
+
+- Реализованы pure plan/candidate models, fail-closed topology builder, Recovery-first UI и одноразовый mutation gate.
+- Filename используется только как hint; target разрешается по concrete inventory/slot evidence.
+- Primary и Expert targets разделены, Expert Mode выключен по умолчанию, legacy multi-flash queue скрыт.
+- Один confirmation соответствует одному concrete partition и одному вызову `flashPartitionDetailed`; mutation retry отсутствует.
+- Session, URI, размер, SHA-256 и topology evidence повторно проверяются перед execution.
+- Baseline Slice E подтверждён GitHub Actions run `29855091700`: static/safety, pure/policy, `lintDebug`, `assembleDebug`, `assembleRelease` — success.
+
+### Android smoke polish
+
+- Welcome permission chips стали действиями, отдельная battery button удалена, risk row кликабельна. Неудачный adaptive ScrollView-вариант удалён: artwork теперь заполняет весь viewport без вертикальной прокрутки, а прозрачный outline-first gate закреплён поверх нижней области.
+- Sideload card упрощена; Import/Verify выровнены, жёлтая памятка удалена, pre-verify note больше не показывает ложную зелёную галочку.
+- Fastboot DATA card сведена к одному основному self-test; специализированные проверки перенесены в дополнительный dialog, no-device taps журналируются.
+- Recovery-first card зафиксирована как защищённый эталон и в smoke-polish не меняется.
+
+### Mi Account / Mi Unlock
+
+- Интерактивный login принимает только точный официальный completion callback `https://unlock.update.miui.com/sts`.
+- Background clientSign exchange допускает только exact `/sts` на фиксированных региональных unlock hosts.
+- Account `passToken` не отправляется на unlock hosts; сохраняются только ожидаемые service-cookie names.
+- Исправлена гонка первого входа: поздний `onPageFinished` больше не может заменить успешную авторизацию stale blocked-host banner.
+- Добавлены pure policy/race regression tests. Device smoke build `5f119c469430.29913150722` подтвердил fresh login без перезапуска и stale banner; новый Android CI для текущего exact head остаётся обязательным. Raw account ID больше не пишется в compact log.
+
+### Workflow и документация
+
+- `termux-publish.sh` выполняет только безопасный import/commit/push feature-ветки без локальной сборки и CI.
+- `termux-ci.sh` по умолчанию создаёт лёгкий evidence archive без APK; APK скачиваются отдельно по `--with-apk`.
+- Python cache исключён из source tree и checksum inventory.
+- Каноническая документация пересобрана: tracker сокращён до живого статуса, hardware evidence отделён от планов, stale/противоречивые утверждения удалены.
+
 ## V6.0.0-alpha4 — `6.0.0-alpha4-nekoflash` (`216`)
 
-- Исправлена Android compilation regression после scope cleanup: восстановлены transient-модели `PendingUnlockVerification` и `PendingSideloadVerification`.
-- Устранены каскадные `Unresolved reference` в проверке результата Mi Unlock и ADB Sideload.
-- Static compile guard теперь требует обе модели и полный набор их полей, чтобы дефект не вернулся.
-- Product scope, верхняя панель, Home device info, Terminal, Quick Flash, Sideload и Mi Unlock функционально не изменены.
+- Восстановлены private transient-модели `PendingUnlockVerification` и `PendingSideloadVerification` после scope cleanup.
+- Исправлены Android compilation errors; static guard защищает обе модели и их поля.
+- Maintainer-confirmed green GitHub Actions run: `29832274659`, commit `90871fb`.
 
 ## V6.0.0-alpha3 — `6.0.0-alpha3-nekoflash` (`215`)
 
 - Проведён полный V6 source audit после удаления Mi Flash.
-- Удалена скрытая недоступная страница «Сервис» и её осиротевшие ресурсы.
-- Удалены `DeviceProfileManager`, `PartitionInventoryHistory` и связанные вложения отчётов.
-- Raw hardware logs, auto-journal и исторические V5 документы удалены из активного source tree; аппаратные факты сведены в проверяемый sanitised summary.
-- Диагностический ZIP обновлён до schema `forum-report.v6`.
-- Документация переписана под четыре функции V6, планы и release gates синхронизированы.
-- `TOPBAR-001`, `HOMEINFO-001` и `HOMEACTIONS-001` сохранены.
-- Сокращённая test matrix остаётся ориентированной на Terminal, Quick Flash, Sideload, Mi Unlock и безопасные логи.
+- Удалены скрытая Service page, `DeviceProfileManager`, `PartitionInventoryHistory`, raw hardware logs и исторические V5 документы из активного дерева.
+- Diagnostic report обновлён до schema `forum-report.v6`.
+- `TOPBAR-001`, `HOMEINFO-001`, `HOMEACTIONS-001` сохранены.
 
 ## V6.0.0-alpha2 — `6.0.0-alpha2-nekoflash` (`214`)
 
-- Закреплена карточка информации об устройстве и рабочей папке.
+- Закреплена карточка устройства и рабочей папки.
 - Добавлены действия «Открыть папку» и «Копировать путь».
-- На Home добавлены четыре прямых перехода: Terminal, Quick Flash, ADB Sideload и Mi Unlock.
-- Верхняя панель сохранена функционально без изменения transport/state binding.
+- На Home добавлены Terminal, Quick Flash, ADB Sideload и Mi Unlock.
 
 ## V6.0.0-alpha1 — `6.0.0-alpha1-nekoflash` (`213`)
 
-- Полный Mi Flash и относящиеся к нему state machines, tests и CI job удалены из активной ветки.
-- Рабочие ADB/Fastboot transports, Terminal, Quick Flash, Sideload, Mi Unlock и логи сохранены.
-- Полное предыдущее состояние сохранено в `archive/full-miflash-v5.9.17` и `v5.9.17-full-miflash`.
-
-История до V6 доступна в архивной Git-ветке и теге; она намеренно не дублируется в активной документации.
+- Полный Mi Flash удалён из активной ветки.
+- ADB/Fastboot transports, Terminal, Quick Flash, Sideload, Mi Unlock и sanitised logs сохранены.
+- Предыдущее состояние полного Mi Flash оставлено только во внешнем архиве владельца (Google Drive); в Git V6 оно не зеркалируется.

@@ -40,6 +40,11 @@ probe_planner = read("app/src/main/java/ru/forum/adbfastboottool/FastbootPartiti
 viewmodel = read("app/src/main/java/ru/forum/adbfastboottool/DeviceViewModel.kt")
 main_activity = read("app/src/main/java/ru/forum/adbfastboottool/MainActivity.kt")
 manifest = read("tools/tests.manifest")
+quick_flash_plan = read("app/src/main/java/ru/forum/adbfastboottool/QuickFlashPlan.kt")
+quick_flash_topology = read("app/src/main/java/ru/forum/adbfastboottool/QuickFlashTopologyCandidateBuilder.kt")
+quick_flash_ui = read("app/src/main/java/ru/forum/adbfastboottool/QuickFlashUiPolicy.kt")
+quick_flash_mutation = read("app/src/main/java/ru/forum/adbfastboottool/QuickFlashMutationGate.kt")
+main_layout = read("app/src/main/res/layout/activity_main.xml")
 
 # --- Fix A: single-URB is diagnostic-only for real DATA ---
 require("isSingleUrbDiagnostic" in protocol, "Fix A: isSingleUrbDiagnostic present")
@@ -76,6 +81,133 @@ require(
 )
 # resolver is compiled by the fastboot-core test module
 require("PartitionNameResolver.kt" in manifest, "Hint: resolver added to fastboot-core test sources")
+
+# --- Recovery-first Quick Flash Slice A ---
+require("enum class QuickFlashTarget" in quick_flash_plan, "Quick Flash: explicit target catalog present")
+require(
+    "Visibility.PRIMARY" in quick_flash_plan and "Visibility.EXPERT" in quick_flash_plan,
+    "Quick Flash: primary and expert targets are separated",
+)
+require(
+    "TARGET_AMBIGUOUS" in quick_flash_plan and "CANDIDATE_NOT_CONFIRMED" in quick_flash_plan,
+    "Quick Flash: missing/ambiguous evidence fails closed",
+)
+require(
+    "MANUAL_CONFIRMATION_REQUIRED" in quick_flash_plan and "MANUAL_TARGET_FORBIDDEN" in quick_flash_plan,
+    "Quick Flash: manual target requires repeat entry and blocks excluded scope",
+)
+require(
+    'listOf("flash", partitionName)' in quick_flash_plan and "QuickFlashSlot" in quick_flash_plan,
+    "Quick Flash: one plan resolves to one concrete flash command",
+)
+require("quick-flash-plan" in manifest, "Quick Flash: Slice A pure regression module registered")
+
+# --- Recovery-first Quick Flash Slice B ---
+require(
+    "object QuickFlashTopologyCandidateBuilder" in quick_flash_topology,
+    "Quick Flash: read-only topology candidate builder present",
+)
+require(
+    "FastbootPartitionInventory.from" in quick_flash_topology and
+    "FastbootSlotResolver.resolve" in quick_flash_topology and
+    "FastbootPartitionProbePlanner.plan" in quick_flash_topology,
+    "Quick Flash: Slice B combines inventory, slot resolution and bounded probes",
+)
+require(
+    "PartitionNameResolver.resolve" in quick_flash_topology and
+    "suggestedTargets" in quick_flash_topology,
+    "Quick Flash: filename classification remains a hint",
+)
+require(
+    "SLOT_TOPOLOGY_UNKNOWN" in quick_flash_topology and
+    "SESSION_BROKEN" in quick_flash_topology and
+    "IMAGE_ARCHIVE_REQUIRES_SIDELOAD" in quick_flash_topology,
+    "Quick Flash: unknown topology, broken session and archives fail closed",
+)
+require(
+    "inventory.partition" in quick_flash_topology and
+    "resolution.targets != listOf(entry.name)" in quick_flash_topology,
+    "Quick Flash: candidates require exact concrete inventory and slot match",
+)
+require("quick-flash-topology" in manifest, "Quick Flash: Slice B pure regression module registered")
+
+# --- Recovery-first Quick Flash Slice C ---
+require(
+    "QuickFlashTarget.RECOVERY" in quick_flash_ui and
+    quick_flash_ui.index("QuickFlashTarget.RECOVERY") < quick_flash_ui.index("QuickFlashTarget.BOOT"),
+    "Quick Flash: Recovery is the first primary UI target",
+)
+require(
+    "legacyQueueVisible: Boolean = false" in quick_flash_ui and
+    'android:id="@+id/legacyFlashQueueCard"' in main_layout and
+    'android:visibility="gone"' in main_layout.split('android:id="@+id/legacyFlashQueueCard"', 1)[1][:300],
+    "Quick Flash: legacy multi-flash queue is hidden",
+)
+require(
+    'android:id="@+id/containerQuickFlashExpertTargets"' in main_layout and
+    'android:visibility="gone"' in main_layout.split('android:id="@+id/containerQuickFlashExpertTargets"', 1)[1][:500],
+    "Quick Flash: expert targets are hidden by default",
+)
+require(
+    "QuickFlashTopologyCandidateBuilder.buildFromInventory" in main_activity and
+    "selectedPartitionName = candidate.partitionName" in main_activity,
+    "Quick Flash: UI uses concrete Slice B candidates",
+)
+quick_flash_ui_body = main_activity.split("private fun startQuickFlashTargetFlow", 1)[-1].split("private fun showFlashConfirmation", 1)[0]
+require(
+    "FastbootSlotResolver.RequestedSlot.BOTH" not in quick_flash_ui_body and
+    "viewModel.runConfirmedQuickFlash(" in quick_flash_ui_body,
+    "Quick Flash: new UI confirms one concrete partition through Slice D, never BOTH",
+)
+require(
+    "currentTransportSessionId() != inventorySessionId" in quick_flash_ui_body and
+    "expectedSessionId = inventorySessionId" in quick_flash_ui_body and
+    "currentTransportSessionId() != expectedSessionId" in quick_flash_ui_body,
+    "Quick Flash: inventory candidates remain bound to one transport session",
+)
+require("quick-flash-ui" in manifest, "Quick Flash: Slice C pure regression module registered")
+
+# --- Recovery-first Quick Flash Slice D ---
+require(
+    "object QuickFlashMutationGate" in quick_flash_mutation and
+    "data class ConfirmationTicket" in quick_flash_mutation,
+    "Quick Flash: one-shot pure mutation gate present",
+)
+require(
+    "CONFIRMATION_ALREADY_CONSUMED" in quick_flash_mutation and
+    "SESSION_CHANGED" in quick_flash_mutation and
+    "IMAGE_SHA256_CHANGED" in quick_flash_mutation and
+    "TARGET_AMBIGUOUS" in quick_flash_mutation,
+    "Quick Flash: replay, session, file and topology changes fail closed",
+)
+require(
+    "commandCount = 1" in quick_flash_mutation and
+    "retryAllowed = false" in quick_flash_mutation,
+    "Quick Flash: authorization encodes one flash command and no retry",
+)
+mutation_body = viewmodel.split("fun runConfirmedQuickFlash(", 1)[-1].split("fun runFlashTarget(", 1)[0]
+require(
+    "QuickFlashMutationGate.evaluate" in mutation_body and
+    "computeFastbootArtifactId(canonicalFile)" in mutation_body and
+    "QuickFlashTopologyCandidateBuilder.buildFromInventory" in mutation_body,
+    "Quick Flash: runtime gate rechecks plan, file identity and topology",
+)
+require(
+    mutation_body.count("flashPartitionDetailed(") == 1 and
+    mutation_body.count("proto.flashPartitionDetailed(") == 1,
+    "Quick Flash: Slice D has exactly one mutation call and no duplicate call",
+)
+require(
+    "prepareGuidedFastbootDataArtifact(" in mutation_body and
+    "releaseFastbootStagedArtifact" in mutation_body,
+    "Quick Flash: Slice D uses existing verified staging lifecycle",
+)
+require(
+    "viewModel.runConfirmedQuickFlash(" in quick_flash_ui_body and
+    "viewModel.runFlash(plan.partitionName, file)" not in quick_flash_ui_body,
+    "Quick Flash: Recovery-first UI cannot bypass the mutation gate",
+)
+require("quick-flash-mutation-gate" in manifest, "Quick Flash: Slice D pure regression module registered")
 
 # --- Read-only partition inventory ---
 require("object FastbootPartitionInventory" in inventory, "Inventory: model present")

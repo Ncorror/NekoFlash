@@ -59,6 +59,49 @@ fun main() {
         "unexpected HTTPS port must be blocked"
     )
 
+    assertTrue(
+        MiAccountSecurityPolicy.isOfficialUnlockCallbackUrl("https://unlock.update.miui.com/sts?d=token"),
+        "exact official Mi Unlock completion callback must be recognized"
+    )
+    assertFalse(
+        MiAccountSecurityPolicy.isOfficialUnlockCallbackUrl("http://unlock.update.miui.com/sts"),
+        "cleartext completion callback must be blocked"
+    )
+    assertFalse(
+        MiAccountSecurityPolicy.isOfficialUnlockCallbackUrl("https://unlock.update.miui.com/other"),
+        "unexpected callback path must be blocked"
+    )
+    assertFalse(
+        MiAccountSecurityPolicy.isOfficialUnlockCallbackUrl("https://evil.unlock.update.miui.com/sts"),
+        "callback subdomain confusion must be blocked"
+    )
+
+    val officialServiceUrls = listOf(
+        "https://unlock.update.miui.com/sts?d=cn",
+        "https://unlock.update.intl.miui.com/sts?d=sg",
+        "https://in-unlock.update.intl.miui.com/sts?d=in",
+        "https://ru-unlock.update.intl.miui.com/sts?d=ru",
+        "https://eu-unlock.update.intl.miui.com/sts?d=eu"
+    )
+    officialServiceUrls.forEach { serviceUrl ->
+        assertTrue(
+            MiAccountSecurityPolicy.isAllowedUnlockServiceUrl(serviceUrl),
+            "official regional unlockApi /sts URL must be allowed: $serviceUrl"
+        )
+    }
+    assertFalse(
+        MiAccountSecurityPolicy.isAllowedUnlockServiceUrl("https://unlock.update.miui.com/other"),
+        "unexpected unlock service path must be blocked"
+    )
+    assertFalse(
+        MiAccountSecurityPolicy.isAllowedUnlockServiceUrl("https://evil.unlock.update.miui.com/sts"),
+        "unlock service subdomain confusion must be blocked"
+    )
+    assertFalse(
+        MiAccountSecurityPolicy.isAllowedUnlockServiceUrl("https://eu-unlock.update.intl.miui.com:444/sts"),
+        "unexpected unlock service port must be blocked"
+    )
+
     val base = url("https://account.xiaomi.com/pass/serviceLogin")
     assertEquals(
         "https://account.xiaomi.com/pass/next",
@@ -70,6 +113,22 @@ fun main() {
     }
     assertThrows("redirect downgrade to HTTP must fail") {
         MiAccountSecurityPolicy.resolveAllowedRedirect(base, "http://account.xiaomi.com/pass")
+    }
+
+    val authRedirect = MiAccountSecurityPolicy.resolveAllowedAuthRedirect(
+        base,
+        "https://unlock.update.miui.com/sts?d=token"
+    )
+    assertEquals(
+        "https://unlock.update.miui.com/sts?d=token",
+        authRedirect.toString(),
+        "bounded account-to-unlockApi redirect must be allowed"
+    )
+    assertThrows("unexpected unlockApi redirect path must fail") {
+        MiAccountSecurityPolicy.resolveAllowedAuthRedirect(
+            base,
+            "https://unlock.update.miui.com/not-sts"
+        )
     }
 
     val signed = MiAccountSecurityPolicy.appendQueryParameter(
@@ -86,6 +145,23 @@ fun main() {
         )
     }
 
+    val signedUnlockService = MiAccountSecurityPolicy.appendQueryParameter(
+        "https://eu-unlock.update.intl.miui.com/sts?d=token",
+        "clientSign",
+        "a+b/c="
+    )
+    assertTrue(
+        signedUnlockService.contains("&clientSign=a%2Bb%2Fc%3D"),
+        "official unlockApi service location must accept encoded clientSign"
+    )
+    assertThrows("unexpected unlockApi service path must fail") {
+        MiAccountSecurityPolicy.appendQueryParameter(
+            "https://unlock.update.miui.com/other?d=token",
+            "clientSign",
+            "secret"
+        )
+    }
+
     val jar = MiAccountCookieJar(
         url("https://account.xiaomi.com/pass/serviceLogin"),
         linkedMapOf("passToken" to "initial-token", "userId" to "42")
@@ -96,6 +172,38 @@ fun main() {
         jar.headerFor(url("https://api.account.xiaomi.com/pass/configuration")).contains("passToken="),
         "host-only initial cookie must not leak to another subdomain"
     )
+
+    val unlockUrl = url("https://unlock.update.miui.com/sts?d=token")
+    assertFalse(
+        jar.headerFor(unlockUrl).contains("passToken="),
+        "account passToken must never be sent to unlock.update.miui.com"
+    )
+    jar.capture(
+        unlockUrl,
+        mapOf(
+            "Set-Cookie" to listOf(
+                "serviceToken=unlock-secret; Domain=.miui.com; Path=/; Secure; HttpOnly",
+                "unlockApi_slh=slh-value; Domain=.miui.com; Path=/; Secure",
+                "unlockApi_ph=ph-value; Path=/; Secure",
+                "userId=42; Domain=.miui.com; Path=/; Secure",
+                "unexpected=broad; Domain=.miui.com; Path=/; Secure",
+                "evil=bad; Domain=.example.com; Path=/; Secure"
+            )
+        )
+    )
+    val unlockHeader = jar.headerFor(unlockUrl)
+    assertTrue(unlockHeader.contains("serviceToken=unlock-secret"), "serviceToken must follow official /sts scope")
+    assertTrue(unlockHeader.contains("unlockApi_slh=slh-value"), "unlockApi_slh must follow official /sts scope")
+    assertTrue(unlockHeader.contains("unlockApi_ph=ph-value"), "host-only unlockApi_ph must be retained")
+    assertFalse(unlockHeader.contains("unexpected="), "unknown broad .miui.com cookie must be rejected")
+    assertFalse(unlockHeader.contains("evil="), "unrelated unlock cookie domain must be rejected")
+
+    val serviceEntries = jar.serviceEntries().toMap()
+    assertEquals("unlock-secret", serviceEntries["serviceToken"], "serviceToken must be exported")
+    assertEquals("slh-value", serviceEntries["unlockApi_slh"], "unlockApi_slh must be exported")
+    assertEquals("ph-value", serviceEntries["unlockApi_ph"], "unlockApi_ph must be exported")
+    assertEquals("42", serviceEntries["userId"], "userId must be exported")
+    assertFalse(serviceEntries.containsKey("passToken"), "passToken must not be exported as a service cookie")
 
     jar.capture(
         url("https://account.xiaomi.com/pass/serviceLogin"),

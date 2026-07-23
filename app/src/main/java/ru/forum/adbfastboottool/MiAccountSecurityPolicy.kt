@@ -10,12 +10,24 @@ import java.util.Locale
 /**
  * Pure security policy for Xiaomi Account authentication.
  *
- * The network client is intentionally limited to HTTPS endpoints under
- * account.xiaomi.com. Cookies are stored with host/domain/path/secure scope so
- * a redirect cannot copy the whole authentication cookie set to a new host.
+ * Interactive login remains confined to HTTPS endpoints under account.xiaomi.com.
+ * The non-interactive clientSign exchange may additionally call only the exact
+ * official Mi Unlock `/sts` endpoints used by Xiaomi's regional unlock service.
+ * Cookies keep RFC6265 host/domain/path/secure scope, so account credentials are
+ * never copied to an unlock-service host.
  */
 object MiAccountSecurityPolicy {
     private const val ACCOUNT_ROOT = "account.xiaomi.com"
+    private const val UNLOCK_CALLBACK_HOST = "unlock.update.miui.com"
+    private const val UNLOCK_CALLBACK_PATH = "/sts"
+
+    private val unlockServiceHosts = setOf(
+        "unlock.update.miui.com",
+        "unlock.update.intl.miui.com",
+        "in-unlock.update.intl.miui.com",
+        "ru-unlock.update.intl.miui.com",
+        "eu-unlock.update.intl.miui.com"
+    )
     private val cookieNamePattern = Regex("^[!#$%&'*+.^_`|~0-9A-Za-z-]+$")
 
     fun normalizeHost(raw: String?): String? {
@@ -31,24 +43,52 @@ object MiAccountSecurityPolicy {
         return host == ACCOUNT_ROOT || host.endsWith(".$ACCOUNT_ROOT")
     }
 
+    fun isAllowedUnlockServiceHost(rawHost: String?): Boolean {
+        val host = normalizeHost(rawHost) ?: return false
+        return host in unlockServiceHosts
+    }
+
     fun isAllowedAccountUrl(raw: String): Boolean =
         runCatching { isAllowedAccountUrl(URI(raw).toURL()) }.getOrDefault(false)
 
     fun isAllowedAccountUrl(url: URL): Boolean {
-        if (!url.protocol.equals("https", ignoreCase = true)) return false
-        if (!url.userInfo.isNullOrEmpty()) return false
-        if (url.port != -1 && url.port != 443) return false
-        if (!isAllowedAccountHost(url.host)) return false
-        return true
+        if (!hasSafeHttpsOrigin(url)) return false
+        return isAllowedAccountHost(url.host)
+    }
+
+    fun isAllowedUnlockServiceUrl(raw: String): Boolean =
+        runCatching { isAllowedUnlockServiceUrl(URI(raw).toURL()) }.getOrDefault(false)
+
+    fun isAllowedUnlockServiceUrl(url: URL): Boolean {
+        if (!hasSafeHttpsOrigin(url)) return false
+        if (!isAllowedUnlockServiceHost(url.host)) return false
+        return url.path == UNLOCK_CALLBACK_PATH
+    }
+
+    fun isAllowedAuthFlowUrl(raw: String): Boolean =
+        runCatching { isAllowedAuthFlowUrl(URI(raw).toURL()) }.getOrDefault(false)
+
+    fun isAllowedAuthFlowUrl(url: URL): Boolean =
+        isAllowedAccountUrl(url) || isAllowedUnlockServiceUrl(url)
+
+    fun isOfficialUnlockCallbackUrl(raw: String): Boolean =
+        runCatching { isOfficialUnlockCallbackUrl(URI(raw).toURL()) }.getOrDefault(false)
+
+    /**
+     * Browser completion is intentionally narrower than the HTTP exchange:
+     * WebView may finish only at the exact China unlockApi callback returned by
+     * Xiaomi Account. Regional `/sts` hosts are used only by the background
+     * clientSign exchange and are never opened as top-level login pages.
+     */
+    fun isOfficialUnlockCallbackUrl(url: URL): Boolean {
+        if (!hasSafeHttpsOrigin(url)) return false
+        if (normalizeHost(url.host) != UNLOCK_CALLBACK_HOST) return false
+        return url.path == UNLOCK_CALLBACK_PATH
     }
 
     @Throws(IOException::class)
     fun requireAllowedAccountUrl(raw: String, context: String): URL {
-        val url = try {
-            URI(raw).toURL()
-        } catch (e: Exception) {
-            throw IOException("Invalid Xiaomi $context URL", e)
-        }
+        val url = parseUrl(raw, context)
         if (!isAllowedAccountUrl(url)) {
             throw IOException("Blocked Xiaomi $context URL: ${safeDescription(url)}")
         }
@@ -56,24 +96,43 @@ object MiAccountSecurityPolicy {
     }
 
     @Throws(IOException::class)
+    fun requireAllowedAuthFlowUrl(raw: String, context: String): URL {
+        val url = parseUrl(raw, context)
+        if (!isAllowedAuthFlowUrl(url)) {
+            throw IOException("Blocked Xiaomi $context URL: ${safeDescription(url)}")
+        }
+        return url
+    }
+
+    /** Account-only redirect resolver used by interactive/login-only checks. */
+    @Throws(IOException::class)
     fun resolveAllowedRedirect(current: URL, location: String): URL {
         if (!isAllowedAccountUrl(current)) {
             throw IOException("Redirect source is outside Xiaomi account allowlist")
         }
-        val resolved = try {
-            current.toURI().resolve(location).toURL()
-        } catch (e: Exception) {
-            throw IOException("Invalid Xiaomi redirect Location", e)
-        }
+        val resolved = resolve(current, location)
         if (!isAllowedAccountUrl(resolved)) {
             throw IOException("Blocked Xiaomi redirect: ${safeDescription(resolved)}")
         }
         return resolved
     }
 
+    /** Redirect resolver for the bounded account -> official `/sts` exchange. */
+    @Throws(IOException::class)
+    fun resolveAllowedAuthRedirect(current: URL, location: String): URL {
+        if (!isAllowedAuthFlowUrl(current)) {
+            throw IOException("Redirect source is outside Xiaomi authentication allowlist")
+        }
+        val resolved = resolve(current, location)
+        if (!isAllowedAuthFlowUrl(resolved)) {
+            throw IOException("Blocked Xiaomi authentication redirect: ${safeDescription(resolved)}")
+        }
+        return resolved
+    }
+
     @Throws(IOException::class)
     fun appendQueryParameter(raw: String, name: String, value: String): String {
-        val url = requireAllowedAccountUrl(raw, "service location")
+        val url = requireAllowedAuthFlowUrl(raw, "service location")
         if (!url.ref.isNullOrEmpty()) {
             throw IOException("Xiaomi service location must not contain a fragment")
         }
@@ -81,8 +140,27 @@ object MiAccountSecurityPolicy {
         val encodedName = URLEncoder.encode(name, "UTF-8")
         val encodedValue = URLEncoder.encode(value, "UTF-8")
         val result = raw + separator + encodedName + "=" + encodedValue
-        requireAllowedAccountUrl(result, "signed service location")
+        requireAllowedAuthFlowUrl(result, "signed service location")
         return result
+    }
+
+    private fun parseUrl(raw: String, context: String): URL = try {
+        URI(raw).toURL()
+    } catch (e: Exception) {
+        throw IOException("Invalid Xiaomi $context URL", e)
+    }
+
+    private fun resolve(current: URL, location: String): URL = try {
+        current.toURI().resolve(location).toURL()
+    } catch (e: Exception) {
+        throw IOException("Invalid Xiaomi redirect Location", e)
+    }
+
+    private fun hasSafeHttpsOrigin(url: URL): Boolean {
+        if (!url.protocol.equals("https", ignoreCase = true)) return false
+        if (!url.userInfo.isNullOrEmpty()) return false
+        if (url.port != -1 && url.port != 443) return false
+        return true
     }
 
     private fun safeDescription(url: URL): String {
@@ -95,6 +173,32 @@ object MiAccountSecurityPolicy {
 
     internal fun isValidCookieValue(value: String): Boolean =
         value.none { it == ';' || it == '\r' || it == '\n' || it.code < 0x20 || it.code == 0x7f }
+
+    internal fun isAllowedUnlockServiceCookieName(name: String): Boolean =
+        name == "serviceToken" ||
+            name == "userId" ||
+            name == "cUserId" ||
+            name.startsWith("unlockApi_")
+
+    internal fun isAllowedCookieDomain(requestUrl: URL, candidate: String, cookieName: String): Boolean {
+        val requestHost = normalizeHost(requestUrl.host) ?: return false
+        if (!domainMatches(requestHost, candidate)) return false
+
+        if (isAllowedAccountUrl(requestUrl)) {
+            return candidate == "xiaomi.com" || isAllowedAccountHost(candidate)
+        }
+
+        if (isAllowedUnlockServiceUrl(requestUrl)) {
+            // A regional official /sts response may scope serviceToken to
+            // .miui.com, .intl.miui.com, or an intermediate parent such as
+            // .update.intl.miui.com. domainMatches() limits the candidate to
+            // a real parent of the exact allowlisted request host.
+            val officialParent = candidate == "miui.com" || candidate.endsWith(".miui.com")
+            return officialParent && isAllowedUnlockServiceCookieName(cookieName)
+        }
+
+        return false
+    }
 
     internal fun domainMatches(host: String, domain: String): Boolean =
         host == domain || host.endsWith(".$domain")
@@ -113,7 +217,7 @@ object MiAccountSecurityPolicy {
     }
 }
 
-/** RFC6265-style cookie storage limited to Xiaomi Account requests. */
+/** RFC6265-style cookie storage limited to the bounded Xiaomi auth flow. */
 internal class MiAccountCookieJar(initialUrl: URL, initial: Map<String, String>) {
     private data class Key(val name: String, val domain: String, val path: String)
     private data class StoredCookie(
@@ -145,7 +249,7 @@ internal class MiAccountCookieJar(initialUrl: URL, initial: Map<String, String>)
     }
 
     fun headerFor(url: URL): String {
-        require(MiAccountSecurityPolicy.isAllowedAccountUrl(url)) {
+        require(MiAccountSecurityPolicy.isAllowedAuthFlowUrl(url)) {
             "Cookie header requested for non-allowlisted URL"
         }
         return matching(url)
@@ -153,12 +257,23 @@ internal class MiAccountCookieJar(initialUrl: URL, initial: Map<String, String>)
             .joinToString("; ") { "${it.name}=${it.value}" }
     }
 
-    fun entriesFor(url: URL): List<Pair<String, String>> = matching(url).map { it.name to it.value }
+    fun entriesFor(url: URL): List<Pair<String, String>> {
+        require(MiAccountSecurityPolicy.isAllowedAuthFlowUrl(url)) {
+            "Cookie entries requested for non-allowlisted URL"
+        }
+        return matching(url).map { it.name to it.value }
+    }
+
+    /** Known unlockApi cookies across the bounded redirect chain. */
+    fun serviceEntries(): List<Pair<String, String>> = cookies.values
+        .filter { MiAccountSecurityPolicy.isAllowedUnlockServiceCookieName(it.name) }
+        .associate { it.name to it.value }
+        .toList()
 
     fun names(): Set<String> = cookies.values.mapTo(sortedSetOf()) { it.name }
 
     fun capture(requestUrl: URL, headers: Map<String?, List<String>>) {
-        require(MiAccountSecurityPolicy.isAllowedAccountUrl(requestUrl)) {
+        require(MiAccountSecurityPolicy.isAllowedAuthFlowUrl(requestUrl)) {
             "Cookies captured from non-allowlisted URL"
         }
         headers.forEach { (headerName, values) ->
@@ -193,10 +308,7 @@ internal class MiAccountCookieJar(initialUrl: URL, initial: Map<String, String>)
             when (attrName) {
                 "domain" -> {
                     val candidate = MiAccountSecurityPolicy.normalizeHost(attrValue.trimStart('.')) ?: return
-                    if (!MiAccountSecurityPolicy.domainMatches(requestHost, candidate)) return
-                    // The HTTP client never leaves account.xiaomi.com, but rejecting unrelated
-                    // parent domains here provides a second containment layer.
-                    if (candidate != "xiaomi.com" && !MiAccountSecurityPolicy.isAllowedAccountHost(candidate)) return
+                    if (!MiAccountSecurityPolicy.isAllowedCookieDomain(requestUrl, candidate, name)) return
                     domain = candidate
                     hostOnly = false
                 }

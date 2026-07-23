@@ -15,7 +15,9 @@ Safety V6 должен быть небольшим и непосредствен
 - показ пользователю файла и итогового раздела;
 - явное финальное подтверждение.
 
-При detach, смене режима или устройства draft инвалидируется. Mutation-команда не повторяется автоматически после ошибки.
+Recovery-first UI показывает только concrete candidates из read-only inventory/topology builder. Expert targets скрыты до явного включения, а multi-flash queue и выбор обоих слотов не доступны в активном UI.
+
+При detach, смене режима или устройства draft инвалидируется. Recovery-first UI фиксирует transport session до хеширования и не разрешает использовать inventory/candidate evidence после смены сессии. Mutation-команда не повторяется автоматически после ошибки.
 
 ## Recovery topology
 
@@ -32,6 +34,10 @@ Safety V6 должен быть небольшим и непосредствен
 ## Unlock
 
 Разблокировка требует отдельного предупреждения о сбросе данных и ручного подтверждения. Стандартный Fastboot unlock и Xiaomi account/server flow должны быть явно разделены.
+
+Mi Account WebView допускает top-level login только под `account.xiaomi.com`. Завершение интерактивного unlockApi login распознаётся только по точному HTTPS callback `unlock.update.miui.com/sts`; произвольные `miui.com`/`xiaomi.com` hosts и другие paths не разрешаются.
+
+После WebView login background clientSign exchange может обратиться только к exact `/sts` на фиксированном наборе официальных unlock hosts для China, Singapore, India, Russia и Europe. `passToken`/`deviceId`/account cookies остаются host-scoped для `account.xiaomi.com` и не отправляются на unlock host. Из `/sts` сохраняются только ожидаемые `serviceToken`, `userId`, `cUserId` и `unlockApi_*` cookies. Ошибка входа должна возвращать конкретную sanitised причину, а не маскироваться как пользовательская отмена.
 
 ## Логи
 

@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <solid android:color="#FF0B1119" />
+    <!-- The outer gate is intentionally outline-first. Individual controls keep their own surfaces. -->
+    <solid android:color="#080B1119" />
     <corners android:radius="22dp" />
-    <stroke android:width="1dp" android:color="#66324052" />
+    <stroke android:width="1dp" android:color="#99324052" />
 </shape>

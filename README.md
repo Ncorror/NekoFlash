@@ -1,25 +1,37 @@
 # NekoFlash
 
-NekoFlash — Android-инструмент для работы с подключённым устройством через ADB и Fastboot. Активный V6 scope состоит из четырёх сценариев:
+NekoFlash — Android-инструмент для работы с подключённым устройством через USB Host, ADB и Fastboot. Активный V6 scope состоит из четырёх сценариев:
 
-- терминал ADB/Fastboot;
-- быстрая прошивка отдельных популярных разделов;
+- Terminal ADB/Fastboot;
+- Recovery-first Quick Flash отдельных boot-chain образов;
 - ADB Sideload;
 - Mi Unlock.
 
-Главный экран сохраняет рабочую верхнюю панель подключения и карточку сведений об устройстве. Их поведение защищено правилами `TOPBAR-001` и `HOMEINFO-001`; разрешены только косметические изменения.
-
-Полный Mi Flash workflow не входит в V6. Его последнее состояние сохранено в Git-ветке `archive/full-miflash-v5.9.17` и теге `v5.9.17-full-miflash`.
-
-## Основные документы
-
-- [Статус и ближайший план](PROJECT_MASTER_TRACKER.md)
-- [История V6](CHANGELOG.md)
-- [Сборка](BUILDING.md)
-- [Карта документации](docs/README.md)
-- [Границы продукта](docs/SCOPE.md)
-- [Аудит очистки V6](docs/V6_AUDIT.md)
+Полный Mi Flash/Fastboot ROM workflow не входит в V6. Внешняя резервная копия старого полного Mi Flash хранится владельцем вне Git (Google Drive) и намеренно не дублируется в активном репозитории.
 
 ## Текущий статус
 
-Активная версия: `6.0.0-alpha4-nekoflash` (`216`). Локальные static/pure-проверки являются обязательными, а Android lint/assemble и аппаратные сценарии подтверждаются отдельно через CI и устройство.
+Активная версия: `6.0.0-alpha5-dev-nekoflash` (`217`). Recovery-first Quick Flash реализован по slices A–D, а baseline Slice E прошёл Android CI. Последующие UX/Mi Login исправления находятся в feature-ветке: first-pass Mi Login подтверждён device smoke, а fullscreen Welcome с прозрачным нижним overlay-gate принят maintainer как эталонный экран.
+
+Полный форумный диагностический ZIP удалён как вне-scope функционал. Сохранены bounded compact/trace logs, session summary, санитизированная отправка лога и локальный self-test TXT/JSON. Аппаратные gates Terminal, Sideload и контролируемой Quick Flash остаются открытыми. Android CI не считается доказательством реальной прошивки.
+
+Точный живой статус и ближайший шаг находятся только в [`PROJECT_MASTER_TRACKER.md`](PROJECT_MASTER_TRACKER.md).
+
+## Начать или продолжить работу
+
+1. Открыть [`docs/AI_START_HERE.md`](docs/AI_START_HERE.md).
+2. Прочитать [`PROJECT_MASTER_TRACKER.md`](PROJECT_MASTER_TRACKER.md).
+3. Следовать активному плану, указанному в tracker.
+4. Перед передачей новому чату выполнить `bash scripts/export-chat-context.sh`.
+
+## Основные документы
+
+- [Единый трекер](PROJECT_MASTER_TRACKER.md)
+- [Карта документации](docs/README.md)
+- [Recovery-first план](docs/RECOVERY_FIRST_PLAN.md)
+- [Alpha5 hardware polish](docs/ALPHA5_HARDWARE_POLISH_PLAN.md)
+- [Аппаратные доказательства](docs/HARDWARE_VALIDATION.md)
+- [Safety model](docs/SAFETY_MODEL.md)
+- [Termux workflow](docs/TERMUX_WORKFLOW.md)
+- [Сборка](BUILDING.md)
+- [История V6](CHANGELOG.md)

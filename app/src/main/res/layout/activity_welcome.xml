@@ -3,10 +3,10 @@
     NekoFlash welcome shell.
     CRITICAL: @drawable/bg_welcome is the user's original immutable artwork.
 
-    Structural rule: the artwork exists only inside welcomeHeroArea. The action card is a
-    separate opaque block after that hero in normal vertical document flow. Because the image
-    is no longer a full-screen background behind the controls, the card cannot cover any part
-    of the artwork on any screen size. Short screens scroll the complete document.
+    The artwork fills the complete content viewport. The title is anchored at the top and the
+    compact outline-first action gate is anchored at the bottom as a translucent overlay.
+    This avoids both the large dark tail and the two-position ScrollView crop seen on some
+    portrait displays while keeping every permission/risk control in the same order.
 -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -14,259 +14,220 @@
     android:background="@color/bg_base"
     android:fitsSystemWindows="true">
 
-    <ScrollView
-        android:id="@+id/welcomeScroll"
+    <FrameLayout
+        android:id="@+id/welcomeHeroArea"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:clipToPadding="false"
-        android:fillViewport="true"
-        android:overScrollMode="never">
+        android:background="@color/bg_base">
+
+        <ImageView
+            android:id="@+id/imgWelcomeBg"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:contentDescription="@string/onboarding_bg_desc"
+            android:importantForAccessibility="no"
+            android:scaleType="centerCrop"
+            android:src="@drawable/bg_welcome" />
 
         <LinearLayout
-            android:id="@+id/welcomeDocument"
+            android:id="@+id/welcomeTitleBlock"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@color/bg_base"
-            android:orientation="vertical"
-            android:paddingBottom="@dimen/welcome_bottom_padding">
-
-            <FrameLayout
-                android:id="@+id/welcomeHeroArea"
-                android:layout_width="match_parent"
-                android:layout_height="@dimen/welcome_art_height"
-                android:background="@color/bg_base">
-
-                <ImageView
-                    android:id="@+id/imgWelcomeBg"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:contentDescription="@string/onboarding_bg_desc"
-                    android:importantForAccessibility="no"
-                    android:scaleType="centerCrop"
-                    android:src="@drawable/bg_welcome" />
-
-                <LinearLayout
-                    android:id="@+id/welcomeTitleBlock"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="top"
-                    android:layout_marginStart="@dimen/welcome_horizontal_padding"
-                    android:layout_marginTop="@dimen/welcome_top_padding"
-                    android:layout_marginEnd="@dimen/welcome_horizontal_padding"
-                    android:orientation="vertical">
-
-                    <LinearLayout
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:gravity="bottom"
-                        android:orientation="horizontal">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:fontFamily="sans-serif-black"
-                            android:shadowColor="#E0000000"
-                            android:shadowDx="0"
-                            android:shadowDy="2"
-                            android:shadowRadius="8"
-                            android:text="@string/app_name_neko"
-                            android:textColor="@color/accent"
-                            android:textSize="34sp" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:fontFamily="sans-serif-black"
-                            android:shadowColor="#E0000000"
-                            android:shadowDx="0"
-                            android:shadowDy="2"
-                            android:shadowRadius="8"
-                            android:text="@string/app_name_flash"
-                            android:textColor="@color/text_primary"
-                            android:textSize="34sp" />
-                    </LinearLayout>
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:fontFamily="sans-serif-medium"
-                        android:shadowColor="#E0000000"
-                        android:shadowDx="0"
-                        android:shadowDy="1"
-                        android:shadowRadius="7"
-                        android:text="@string/onboarding_subtitle"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="14sp" />
-                </LinearLayout>
-            </FrameLayout>
+            android:layout_gravity="top"
+            android:layout_marginStart="@dimen/welcome_horizontal_padding"
+            android:layout_marginTop="@dimen/welcome_top_padding"
+            android:layout_marginEnd="@dimen/welcome_horizontal_padding"
+            android:orientation="vertical">
 
             <LinearLayout
-                android:id="@+id/welcomeBottomArea"
-                android:layout_width="match_parent"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="@dimen/welcome_horizontal_padding"
-                android:layout_marginTop="@dimen/welcome_panel_gap"
-                android:layout_marginEnd="@dimen/welcome_horizontal_padding"
-                android:background="@drawable/bg_welcome_panel"
-                android:orientation="vertical"
-                android:paddingStart="@dimen/welcome_panel_padding_horizontal"
-                android:paddingTop="@dimen/welcome_panel_padding_vertical"
-                android:paddingEnd="@dimen/welcome_panel_padding_horizontal"
-                android:paddingBottom="@dimen/welcome_panel_padding_vertical">
-
-                <LinearLayout
-                    android:id="@+id/permissionChipsRow"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:baselineAligned="false"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:id="@+id/tvStorageChip"
-                        android:layout_width="0dp"
-                        android:layout_height="@dimen/welcome_chip_height"
-                        android:layout_marginEnd="5dp"
-                        android:layout_weight="1"
-                        android:background="@drawable/bg_welcome_chip"
-                        android:drawableStart="@drawable/ic_status_optional_gray"
-                        android:drawablePadding="5dp"
-                        android:fontFamily="sans-serif-medium"
-                        android:gravity="center_vertical"
-                        android:maxLines="2"
-                        android:paddingStart="8dp"
-                        android:paddingEnd="6dp"
-                        android:text="@string/perm_storage"
-                        android:textColor="@color/text_primary"
-                        android:textSize="9.5sp" />
-
-                    <TextView
-                        android:id="@+id/tvNotificationsChip"
-                        android:layout_width="0dp"
-                        android:layout_height="@dimen/welcome_chip_height"
-                        android:layout_marginEnd="5dp"
-                        android:layout_weight="1"
-                        android:background="@drawable/bg_welcome_chip"
-                        android:drawableStart="@drawable/ic_status_optional_gray"
-                        android:drawablePadding="5dp"
-                        android:fontFamily="sans-serif-medium"
-                        android:gravity="center_vertical"
-                        android:maxLines="2"
-                        android:paddingStart="8dp"
-                        android:paddingEnd="6dp"
-                        android:text="@string/perm_notifications"
-                        android:textColor="@color/text_primary"
-                        android:textSize="9.5sp" />
-
-                    <TextView
-                        android:id="@+id/tvBatteryChip"
-                        android:layout_width="0dp"
-                        android:layout_height="@dimen/welcome_chip_height"
-                        android:layout_weight="1.18"
-                        android:background="@drawable/bg_welcome_chip"
-                        android:drawableStart="@drawable/ic_status_optional_gray"
-                        android:drawablePadding="5dp"
-                        android:fontFamily="sans-serif-medium"
-                        android:gravity="center_vertical"
-                        android:maxLines="2"
-                        android:paddingStart="8dp"
-                        android:paddingEnd="6dp"
-                        android:text="@string/perm_battery_opt"
-                        android:textColor="@color/text_primary"
-                        android:textSize="9sp" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:id="@+id/riskRow"
-                    android:layout_width="match_parent"
-                    android:layout_height="@dimen/welcome_risk_row_height"
-                    android:layout_marginTop="7dp"
-                    android:background="@drawable/bg_welcome_status_row"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingEnd="9dp">
-
-                    <CheckBox
-                        android:id="@+id/checkboxAgree"
-                        android:layout_width="42dp"
-                        android:layout_height="42dp"
-                        android:buttonTint="@color/accent"
-                        android:enabled="false"
-                        android:gravity="center" />
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:fontFamily="sans-serif-medium"
-                        android:maxLines="2"
-                        android:text="@string/onboarding_agree_text_short"
-                        android:textColor="@color/text_primary"
-                        android:textSize="12sp" />
-                </LinearLayout>
+                android:gravity="bottom"
+                android:orientation="horizontal">
 
                 <TextView
-                    android:id="@+id/tvWelcomeStatus"
-                    android:layout_width="match_parent"
-                    android:layout_height="@dimen/welcome_status_height"
-                    android:layout_marginTop="7dp"
-                    android:drawableStart="@drawable/ic_status_optional_gray"
-                    android:drawablePadding="7dp"
-                    android:fontFamily="sans-serif-medium"
-                    android:gravity="center_vertical"
-                    android:maxLines="2"
-                    android:text="@string/onboarding_need_storage_short"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="11.5sp" />
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-black"
+                    android:shadowColor="#E0000000"
+                    android:shadowDx="0"
+                    android:shadowDy="2"
+                    android:shadowRadius="8"
+                    android:text="@string/app_name_neko"
+                    android:textColor="@color/accent"
+                    android:textSize="34sp" />
 
-                <Button
-                    android:id="@+id/btnPrimaryAction"
-                    android:layout_width="match_parent"
-                    android:layout_height="@dimen/welcome_primary_button_height"
-                    android:layout_marginTop="6dp"
-                    android:background="@drawable/bg_welcome_primary_button"
-                    android:backgroundTint="@null"
-                    android:drawableEnd="@drawable/ic_arrow_right"
-                    android:drawablePadding="10dp"
-                    android:fontFamily="sans-serif-medium"
-                    android:insetTop="0dp"
-                    android:insetBottom="0dp"
-                    android:stateListAnimator="@null"
-                    android:text="@string/onboarding_enter_button"
-                    android:textAllCaps="false"
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-black"
+                    android:shadowColor="#E0000000"
+                    android:shadowDx="0"
+                    android:shadowDy="2"
+                    android:shadowRadius="8"
+                    android:text="@string/app_name_flash"
                     android:textColor="@color/text_primary"
-                    android:textSize="14sp" />
-
-                <Button
-                    android:id="@+id/btnBatterySettings"
-                    android:layout_width="match_parent"
-                    android:layout_height="@dimen/welcome_secondary_button_height"
-                    android:layout_marginTop="7dp"
-                    android:background="@drawable/bg_welcome_secondary_button"
-                    android:backgroundTint="@null"
-                    android:drawableStart="@drawable/ic_settings_outline"
-                    android:drawablePadding="9dp"
-                    android:fontFamily="sans-serif-medium"
-                    android:insetTop="0dp"
-                    android:insetBottom="0dp"
-                    android:stateListAnimator="@null"
-                    android:text="@string/onboarding_battery_settings_button"
-                    android:textAllCaps="false"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="12.5sp" />
-
-                <TextView
-                    android:id="@+id/tvMiuiHint"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="7dp"
-                    android:fontFamily="sans-serif"
-                    android:gravity="center"
-                    android:maxLines="2"
-                    android:text="@string/onboarding_miui_hint_short"
-                    android:textColor="@color/text_muted"
-                    android:textSize="9.5sp" />
+                    android:textSize="34sp" />
             </LinearLayout>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:fontFamily="sans-serif-medium"
+                android:shadowColor="#E0000000"
+                android:shadowDx="0"
+                android:shadowDy="1"
+                android:shadowRadius="7"
+                android:text="@string/onboarding_subtitle"
+                android:textColor="@color/text_secondary"
+                android:textSize="14sp" />
         </LinearLayout>
-    </ScrollView>
+    </FrameLayout>
+
+    <LinearLayout
+        android:id="@+id/welcomeBottomArea"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:layout_marginStart="@dimen/welcome_horizontal_padding"
+        android:layout_marginEnd="@dimen/welcome_horizontal_padding"
+        android:layout_marginBottom="@dimen/welcome_bottom_padding"
+        android:background="@drawable/bg_welcome_panel"
+        android:orientation="vertical"
+        android:paddingStart="@dimen/welcome_panel_padding_horizontal"
+        android:paddingTop="@dimen/welcome_panel_padding_vertical"
+        android:paddingEnd="@dimen/welcome_panel_padding_horizontal"
+        android:paddingBottom="@dimen/welcome_panel_padding_vertical">
+
+        <LinearLayout
+            android:id="@+id/permissionChipsRow"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:baselineAligned="false"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/tvStorageChip"
+                android:layout_width="0dp"
+                android:layout_height="@dimen/welcome_chip_height"
+                android:layout_marginEnd="5dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_welcome_chip"
+                android:clickable="true"
+                android:drawableStart="@drawable/ic_status_optional_gray"
+                android:drawablePadding="5dp"
+                android:focusable="true"
+                android:fontFamily="sans-serif-medium"
+                android:gravity="center_vertical"
+                android:maxLines="2"
+                android:paddingStart="8dp"
+                android:paddingEnd="6dp"
+                android:text="@string/perm_storage"
+                android:textColor="@color/text_primary"
+                android:textSize="9.5sp" />
+
+            <TextView
+                android:id="@+id/tvNotificationsChip"
+                android:layout_width="0dp"
+                android:layout_height="@dimen/welcome_chip_height"
+                android:layout_marginEnd="5dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_welcome_chip"
+                android:clickable="true"
+                android:drawableStart="@drawable/ic_status_optional_gray"
+                android:drawablePadding="5dp"
+                android:focusable="true"
+                android:fontFamily="sans-serif-medium"
+                android:gravity="center_vertical"
+                android:maxLines="2"
+                android:paddingStart="8dp"
+                android:paddingEnd="6dp"
+                android:text="@string/perm_notifications"
+                android:textColor="@color/text_primary"
+                android:textSize="9.5sp" />
+
+            <TextView
+                android:id="@+id/tvBatteryChip"
+                android:layout_width="0dp"
+                android:layout_height="@dimen/welcome_chip_height"
+                android:layout_weight="1.18"
+                android:background="@drawable/bg_welcome_chip"
+                android:clickable="true"
+                android:drawableStart="@drawable/ic_status_optional_gray"
+                android:drawablePadding="5dp"
+                android:focusable="true"
+                android:fontFamily="sans-serif-medium"
+                android:gravity="center_vertical"
+                android:maxLines="2"
+                android:paddingStart="8dp"
+                android:paddingEnd="6dp"
+                android:text="@string/perm_battery_opt"
+                android:textColor="@color/text_primary"
+                android:textSize="9sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/riskRow"
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/welcome_risk_row_height"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/bg_welcome_status_row"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingEnd="9dp">
+
+            <CheckBox
+                android:id="@+id/checkboxAgree"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:buttonTint="@color/accent"
+                android:enabled="false"
+                android:gravity="center" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:fontFamily="sans-serif-medium"
+                android:maxLines="1"
+                android:text="@string/onboarding_agree_text_short"
+                android:textColor="@color/text_primary"
+                android:textSize="11.5sp" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tvWelcomeStatus"
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/welcome_status_height"
+            android:layout_marginTop="4dp"
+            android:drawableStart="@drawable/ic_status_optional_gray"
+            android:drawablePadding="7dp"
+            android:fontFamily="sans-serif-medium"
+            android:gravity="center_vertical"
+            android:maxLines="1"
+            android:text="@string/onboarding_need_storage_short"
+            android:textColor="@color/text_secondary"
+            android:textSize="10.5sp" />
+
+        <Button
+            android:id="@+id/btnPrimaryAction"
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/welcome_primary_button_height"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/bg_welcome_primary_button"
+            android:backgroundTint="@null"
+            android:drawableEnd="@drawable/ic_arrow_right"
+            android:drawablePadding="10dp"
+            android:fontFamily="sans-serif-medium"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:stateListAnimator="@null"
+            android:text="@string/onboarding_enter_button"
+            android:textAllCaps="false"
+            android:textColor="@color/text_primary"
+            android:textSize="13.5sp" />
+    </LinearLayout>
 </FrameLayout>

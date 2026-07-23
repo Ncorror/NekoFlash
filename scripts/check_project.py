@@ -285,8 +285,8 @@ def check_versions() -> None:
     if int(code.group(1)) < 31:
         fail("versionCode must be >= 31 for NekoFlash rebrand")
     version_name = name.group(1)
-    if not re.fullmatch(r"\d+\.\d+\.\d+(?:-alpha\d+)?-nekoflash", version_name):
-        fail("versionName must match x.y.z[-alphaN]-nekoflash")
+    if not re.fullmatch(r"\d+\.\d+\.\d+(?:-alpha\d+(?:-dev)?)?-nekoflash", version_name):
+        fail("versionName must match x.y.z[-alphaN[-dev]]-nekoflash")
     build_id = re.search(r'buildConfigField\s+"String",\s+"BUILD_ID",\s+"\\"([^+]+)\+', build)
     if not build_id or build_id.group(1) != version_name:
         fail("BuildConfig BUILD_ID prefix must match versionName")
@@ -534,7 +534,7 @@ def check_launcher_identity() -> None:
     manifest = ROOT / "app/src/main/AndroidManifest.xml"
     base_strings = ROOT / "app/src/main/res/values/strings.xml"
     ru_strings = ROOT / "app/src/main/res/values-ru/strings.xml"
-    source = ROOT / "docs/artwork/nekoflash_launcher_v5.9.13.png"
+    source = ROOT / "docs/artwork/nekoflash_launcher_circle_cat_v6.0.0.png"
     lock = ROOT / "LAUNCHER_ARTWORK_SHA256.txt"
 
     manifest_text = manifest.read_text(encoding="utf-8")
@@ -655,9 +655,8 @@ def check_reports_access() -> None:
 
 def check_private_reports() -> None:
     sanitizer = ROOT / "app/src/main/java/ru/forum/adbfastboottool/ReportSanitizer.kt"
-    forum = ROOT / "app/src/main/java/ru/forum/adbfastboottool/ForumReportManager.kt"
     vm = ROOT / "app/src/main/java/ru/forum/adbfastboottool/DeviceViewModel.kt"
-    for path in (sanitizer, forum, vm):
+    for path in (sanitizer, vm):
         if not path.exists():
             fail(f"Missing private report file: {path.relative_to(ROOT)}")
             continue
@@ -666,16 +665,56 @@ def check_private_reports() -> None:
         for token in ("REDACTED_SERIAL", "sanitizeText", "sanitizeDeviceStoragePaths", "sanitizeLongHexIdentifiers"):
             if token not in text:
                 fail(f"ReportSanitizer missing token: {token}")
-    if forum.exists():
-        text = forum.read_text(encoding="utf-8")
-        for token in ("PrivacyMode.SANITIZED", "forum-report.v6", "ReportSanitizer.sanitizeText", "privacyMode"):
-            if token not in text:
-                fail(f"ForumReportManager privacy hook missing: {token}")
     if vm.exists():
         text = vm.read_text(encoding="utf-8")
         for token in ("selftest.v3", "Privacy mode: sanitized", "ReportSanitizer.sanitizeLines"):
             if token not in text:
                 fail(f"DeviceViewModel self-test privacy hook missing: {token}")
+
+
+def check_forum_report_removed() -> None:
+    """Keep the out-of-scope full forum ZIP exporter from returning."""
+    java_dir = ROOT / "app/src/main/java/ru/forum/adbfastboottool"
+    removed_files = (
+        java_dir / "ForumReportManager.kt",
+        java_dir / "DiagnosticReportFormatter.kt",
+        java_dir / "DiagnosticArchiveVerifier.kt",
+    )
+    for path in removed_files:
+        if path.exists():
+            fail(f"Removed full forum report exporter returned: {path.relative_to(ROOT)}")
+
+    main = (java_dir / "MainActivity.kt").read_text(encoding="utf-8")
+    vm = (java_dir / "DeviceViewModel.kt").read_text(encoding="utf-8")
+    readiness = (java_dir / "DiagnosticReadiness.kt").read_text(encoding="utf-8")
+    strings_en = (ROOT / "app/src/main/res/values/strings.xml").read_text(encoding="utf-8")
+    strings_ru = (ROOT / "app/src/main/res/values-ru/strings.xml").read_text(encoding="utf-8")
+
+    forbidden_main = (
+        "SelfTestForumReport",
+        "createForumReport(",
+        "runSelfTestForumReportFromUi(",
+        "reports_forum_zip",
+        "reports_selftest_forum",
+        "Полный диагностический ZIP создаётся",
+    )
+    for token in forbidden_main:
+        if token in main:
+            fail(f"Removed forum-report UI/command token returned: {token}")
+
+    for token in ("createDiagnosticZipProbe", "diagnosticZipProbePassed"):
+        if token in vm:
+            fail(f"Removed diagnostic ZIP probe returned in DeviceViewModel: {token}")
+    if "ZIP_PROBE" in readiness:
+        fail("Removed ZIP_PROBE readiness check returned")
+
+    for text, label in ((strings_en, "values"), (strings_ru, "values-ru")):
+        for token in ("reports_forum_zip", "reports_selftest_forum", "dialog_report_title", "report_created_message"):
+            if token in text:
+                fail(f"Removed forum-report string returned in {label}: {token}")
+
+    if not ERRORS:
+        print("full forum diagnostic ZIP removal: OK")
 
 
 def check_device_viewmodel_api_refs() -> None:
@@ -868,9 +907,12 @@ def check_master_tracker_presence() -> None:
     text = path.read_text(encoding="utf-8")
     for token in (
         "## Текущий следующий шаг",
+        "docs/AI_START_HERE.md",
+        "docs/RECOVERY_FIRST_PLAN.md",
         "docs/SAFETY_MODEL.md",
         "scripts/check-documentation.py",
-        "archive/full-miflash-v5.9.17",
+        "scripts/termux-ci.sh",
+        "внешняя резервная копия владельца вне Git",
         "TOPBAR-001",
     ):
         if token not in text:
@@ -902,10 +944,11 @@ def check_mi_account_and_share_hardening() -> None:
             "pathMatches",
         ),
         client: (
-            "MiAccountSecurityPolicy.requireAllowedAccountUrl",
-            "MiAccountSecurityPolicy.resolveAllowedRedirect",
+            "MiAccountSecurityPolicy.requireAllowedAuthFlowUrl",
+            "MiAccountSecurityPolicy.resolveAllowedAuthRedirect",
             "jar.headerFor(currentUrl)",
             "jar.capture(currentUrl",
+            "jar.serviceEntries()",
         ),
         login: (
             "setAcceptThirdPartyCookies(webView, false)",
@@ -942,18 +985,340 @@ def check_mi_account_and_share_hardening() -> None:
         if not re.search(rf"^{re.escape(module)}\t", tests_manifest, re.M):
             fail(f"Mi Account/share/console test module missing from manifest: {module}")
 
-    publisher = ROOT / "scripts/termux-publish-both-branches.sh"
-    if not publisher.is_file():
-        fail("Missing Termux dual-branch publisher")
-    else:
-        text = publisher.read_text(encoding="utf-8")
-        for token in ("git push --atomic", 'MAIN_BRANCH="main"', 'REFACTOR_BRANCH="claude-ai-refactor"', "git commit-tree"):
-            if token not in text:
-                fail(f"Termux publisher missing token: {token}")
-
     if not ERRORS:
         print("Mi Account/share/console hardening: OK")
 
+
+
+def check_termux_workflow() -> None:
+    required = {
+        "scripts/termux-bootstrap.sh": (
+            "pkg install -y",
+            "termux-setup-storage",
+            "gh auth login",
+        ),
+        "scripts/termux-publish.sh": (
+            'TARGET_BRANCH="${NEKOFLASH_BRANCH:-$CURRENT_BRANCH}"',
+            "--source-zip",
+            'git pull --ff-only origin "$TARGET_BRANCH"',
+            "rsync -a --delete",
+            "main branch is protected from direct publishing",
+            'git push -u origin "$TARGET_BRANCH"',
+            "REMOTE_SHA",
+            "No local build or CI was started",
+        ),
+        "scripts/termux-ci.sh": (
+            "--run-id",
+            "--with-apk",
+            "status,conclusion,url,headSha,headBranch,event",
+            'if [ "$RUN_STATUS" != "completed" ]',
+            "REPORT_ARTIFACTS",
+            "APK_ARTIFACTS",
+            '--name "$artifact_name"',
+            "compiler-errors.log",
+            'RESULT_NAME="NekoFlash-CI-$RUN_ID"',
+            'APK_RESULT_NAME="NekoFlash-APK-$RUN_ID"',
+            "evidence only (no APK)",
+        ),
+        "scripts/export-chat-context.sh": (
+            "PROJECT_MASTER_TRACKER.md",
+            "RECOVERY_FIRST_PLAN.md",
+            "NekoFlash-chat-context.txt",
+        ),
+        "docs/AI_START_HERE.md": (
+            "PROJECT_MASTER_TRACKER.md",
+            "RECOVERY_FIRST_PLAN.md",
+            "TERMUX_WORKFLOW.md",
+        ),
+        "docs/TERMUX_WORKFLOW.md": (
+            "scripts/termux-bootstrap.sh",
+            "scripts/termux-publish.sh",
+            "scripts/termux-ci.sh",
+            "scripts/export-chat-context.sh",
+            "status=completed",
+        ),
+        "docs/RECOVERY_FIRST_PLAN.md": (
+            "QuickFlashTarget",
+            "QuickFlashPlan",
+            "fail-closed",
+            "TOPBAR-001",
+        ),
+    }
+    publish_script = (ROOT / "scripts/termux-publish.sh").read_text(encoding="utf-8")
+    for forbidden in ("scripts/run-tests.sh", "./gradlew", "assembleDebug", "gh workflow run"):
+        if forbidden in publish_script:
+            fail(f"Push-only Termux publisher contains forbidden build/CI command: {forbidden}")
+
+    ci_script = (ROOT / "scripts/termux-ci.sh").read_text(encoding="utf-8")
+    if re.search(r"gh run download \"?\$RUN_ID\"?\s*\\?\s*--repo[^\n]+\s*\\?\s*-D \"?\$LOCAL_RESULT_DIR/artifacts", ci_script):
+        fail("Termux CI collector must not download every artifact into the evidence archive")
+    if 'endswith("-reports")' not in ci_script or 'endswith("-apk")' not in ci_script:
+        fail("Termux CI collector must select report and APK artifacts explicitly")
+
+    for rel, tokens in required.items():
+        path = ROOT / rel
+        if not path.is_file():
+            fail(f"Missing repository continuity file: {rel}")
+            continue
+        text = path.read_text(encoding="utf-8")
+        for token in tokens:
+            if token not in text:
+                fail(f"Repository continuity token missing in {rel}: {token}")
+
+    obsolete = ROOT / "scripts/termux-publish-both-branches.sh"
+    if obsolete.exists():
+        fail("Obsolete dual-branch Termux publisher must not return")
+
+    if not ERRORS:
+        print("Termux workflow and new-chat continuity: OK")
+
+def check_quick_flash_plan_slice() -> None:
+    model = ROOT / "app/src/main/java/ru/forum/adbfastboottool/QuickFlashPlan.kt"
+    test = ROOT / "tools/quick-flash-plan-test/ru/forum/adbfastboottool/QuickFlashPlanTest.kt"
+    manifest = ROOT / "tools/tests.manifest"
+    for path in (model, test, manifest):
+        if not path.is_file():
+            fail(f"Missing FLASH-001 Slice A file: {path.relative_to(ROOT)}")
+            return
+
+    model_text = model.read_text(encoding="utf-8")
+    required = (
+        "enum class QuickFlashTarget",
+        "data class QuickFlashCandidate",
+        "data class QuickFlashPlan",
+        "object QuickFlashPlanValidator",
+        "object QuickFlashPlanCodec",
+        "TARGET_AMBIGUOUS",
+        "CANDIDATE_NOT_CONFIRMED",
+        "MANUAL_CONFIRMATION_REQUIRED",
+        'listOf("flash", partitionName)',
+    )
+    for token in required:
+        if token not in model_text:
+            fail(f"FLASH-001 Slice A token missing: {token}")
+
+    forbidden_imports = ("android.", "androidx.")
+    if any(token in model_text for token in forbidden_imports):
+        fail("FLASH-001 Slice A model must remain independent from Android UI/framework")
+
+    manifest_text = manifest.read_text(encoding="utf-8")
+    if not re.search(r"^quick-flash-plan\t", manifest_text, re.M):
+        fail("Quick Flash plan pure test module missing from manifest")
+
+    if not ERRORS:
+        print("Quick Flash Slice A plan model: OK")
+
+
+
+def check_quick_flash_topology_slice() -> None:
+    builder = ROOT / "app/src/main/java/ru/forum/adbfastboottool/QuickFlashTopologyCandidateBuilder.kt"
+    test = ROOT / "tools/quick-flash-topology-test/ru/forum/adbfastboottool/QuickFlashTopologyCandidateBuilderTest.kt"
+    planner = ROOT / "app/src/main/java/ru/forum/adbfastboottool/FastbootPartitionProbePlanner.kt"
+    manifest = ROOT / "tools/tests.manifest"
+    gitignore = ROOT / ".gitignore"
+    for path in (builder, test, planner, manifest, gitignore):
+        if not path.is_file():
+            fail(f"Missing FLASH-001 Slice B file: {path.relative_to(ROOT)}")
+            return
+
+    builder_text = builder.read_text(encoding="utf-8")
+    required = (
+        "object QuickFlashTopologyCandidateBuilder",
+        "FastbootPartitionInventory.from",
+        "FastbootPartitionProbePlanner.plan",
+        "FastbootSlotResolver.resolve",
+        "PartitionNameResolver.resolve",
+        "SLOT_TOPOLOGY_UNKNOWN",
+        "SESSION_BROKEN",
+        "IMAGE_ARCHIVE_REQUIRES_SIDELOAD",
+        "MANUAL_PARTITION_REQUIRES_EXPERT_MODE",
+        "inventory.topology != FastbootPartitionInventory.SlotTopology.UNKNOWN",
+        "data class InventoryRequest",
+        "fun buildFromInventory",
+    )
+    for token in required:
+        if token not in builder_text:
+            fail(f"FLASH-001 Slice B token missing: {token}")
+
+    if any(token in builder_text for token in ("android.", "androidx.")):
+        fail("FLASH-001 Slice B builder must remain independent from Android UI/framework")
+
+    planner_text = planner.read_text(encoding="utf-8")
+    if "discoveryPartitions: List<String> = emptyList()" not in planner_text:
+        fail("Slice B bounded discovery partitions are missing from probe planner")
+    if "val limited = sorted.take(maxQueries)" not in planner_text:
+        fail("Slice B probe planner must remain bounded by maxQueries")
+
+    manifest_text = manifest.read_text(encoding="utf-8")
+    if not re.search(r"^quick-flash-topology\t", manifest_text, re.M):
+        fail("Quick Flash topology pure test module missing from manifest")
+
+    gitignore_text = gitignore.read_text(encoding="utf-8")
+    if "__pycache__/" not in gitignore_text or "*.py[cod]" not in gitignore_text:
+        fail("Generated Python cache must stay excluded from source control")
+    checksum_policy = (ROOT / "scripts/checksum_inventory.py").read_text(encoding="utf-8")
+    if '"__pycache__"' not in checksum_policy:
+        fail("Generated Python cache must stay excluded from checksum inventory")
+
+    if not ERRORS:
+        print("Quick Flash Slice B topology builder: OK")
+
+def check_quick_flash_ui_slice() -> None:
+    policy = ROOT / "app/src/main/java/ru/forum/adbfastboottool/QuickFlashUiPolicy.kt"
+    test = ROOT / "tools/quick-flash-ui-test/ru/forum/adbfastboottool/QuickFlashUiPolicyTest.kt"
+    layout = ROOT / "app/src/main/res/layout/activity_main.xml"
+    main = ROOT / "app/src/main/java/ru/forum/adbfastboottool/MainActivity.kt"
+    manifest = ROOT / "tools/tests.manifest"
+    for path in (policy, test, layout, main, manifest):
+        if not path.is_file():
+            fail(f"Missing FLASH-001 Slice C file: {path.relative_to(ROOT)}")
+            return
+
+    policy_text = policy.read_text(encoding="utf-8")
+    required_policy = (
+        "object QuickFlashUiPolicy",
+        "QuickFlashTarget.RECOVERY",
+        "QuickFlashTarget.BOOT",
+        "QuickFlashTarget.INIT_BOOT",
+        "QuickFlashTarget.VENDOR_BOOT",
+        "QuickFlashTarget.DTBO",
+        "QuickFlashTarget.VBMETA",
+        "QuickFlashTarget.VENDOR_KERNEL_BOOT",
+        "QuickFlashTarget.MANUAL",
+        "legacyQueueVisible: Boolean = false",
+    )
+    for token in required_policy:
+        if token not in policy_text:
+            fail(f"FLASH-001 Slice C policy token missing: {token}")
+    if any(token in policy_text for token in ("android.", "androidx.")):
+        fail("FLASH-001 Slice C UI policy must remain pure")
+
+    layout_text = layout.read_text(encoding="utf-8")
+    layout_tokens = (
+        '@+id/cardQuickFlashRecoveryFirst',
+        '@+id/btnFlashRecovery',
+        '@+id/btnFlashBoot',
+        '@+id/btnFlashInitBoot',
+        '@+id/btnFlashVendorBoot',
+        '@+id/switchQuickFlashExpert',
+        '@+id/containerQuickFlashExpertTargets',
+        '@+id/btnFlashDtbo',
+        '@+id/btnFlashVbmeta',
+        '@+id/btnFlashVendorKernelBoot',
+        '@+id/btnFlashManual',
+        '@+id/legacyFlashQueueCard',
+    )
+    for token in layout_tokens:
+        if token not in layout_text:
+            fail(f"FLASH-001 Slice C layout token missing: {token}")
+    if layout_text.index('@+id/btnFlashRecovery') > layout_text.index('@+id/btnFlashBoot'):
+        fail("Recovery must remain the first primary Quick Flash target")
+    expert_match = re.search(
+        r'android:id="@\+id/containerQuickFlashExpertTargets"[\s\S]{0,500}?android:visibility="gone"',
+        layout_text,
+    )
+    if not expert_match:
+        fail("Expert Quick Flash targets must be hidden by default")
+    queue_match = re.search(
+        r'android:id="@\+id/legacyFlashQueueCard"[\s\S]{0,300}?android:visibility="gone"',
+        layout_text,
+    )
+    if not queue_match:
+        fail("Legacy multi-flash queue must remain hidden in Recovery-first UI")
+    if layout_text.index('@+id/cardQuickFlashRecoveryFirst') > layout_text.index('@+id/btnFastbootDataSelfTest'):
+        fail("Recovery-first card must appear before diagnostic-only Fastboot DATA tools")
+
+    main_text = main.read_text(encoding="utf-8")
+    main_tokens = (
+        "QuickFlashUiPolicy.isVisible",
+        "QuickFlashTopologyCandidateBuilder.buildFromInventory",
+        "QuickFlashPlanValidator.validate",
+        "selectedPartitionName = candidate.partitionName",
+        "viewModel.runConfirmedQuickFlash(",
+        "currentTransportSessionId() != inventorySessionId",
+        "expectedSessionId = inventorySessionId",
+        "currentTransportSessionId() != expectedSessionId",
+        "currentTransportSessionId() != plan.deviceSessionId",
+        "showManualQuickFlashTargetDialog",
+    )
+    for token in main_tokens:
+        if token not in main_text:
+            fail(f"FLASH-001 Slice C MainActivity token missing: {token}")
+    if "fun flashPartBtn(" in main_text:
+        fail("Legacy target-first Quick Flash button flow must not return")
+    if 'FastbootSlotResolver.RequestedSlot.BOTH' in main_text[main_text.find("private fun startQuickFlashTargetFlow"):main_text.find("private fun showFlashConfirmation")]:
+        fail("Recovery-first UI must not expose a hidden both-slots mutation")
+
+    manifest_text = manifest.read_text(encoding="utf-8")
+    if not re.search(r"^quick-flash-ui\t", manifest_text, re.M):
+        fail("Quick Flash UI pure test module missing from manifest")
+
+    if not ERRORS:
+        print("Quick Flash Slice C Recovery-first UI: OK")
+
+
+
+def check_quick_flash_mutation_gate_slice() -> None:
+    gate = ROOT / "app/src/main/java/ru/forum/adbfastboottool/QuickFlashMutationGate.kt"
+    test = ROOT / "tools/quick-flash-mutation-gate-test/ru/forum/adbfastboottool/QuickFlashMutationGateTest.kt"
+    viewmodel = ROOT / "app/src/main/java/ru/forum/adbfastboottool/DeviceViewModel.kt"
+    main = ROOT / "app/src/main/java/ru/forum/adbfastboottool/MainActivity.kt"
+    manifest = ROOT / "tools/tests.manifest"
+    for path in (gate, test, viewmodel, main, manifest):
+        if not path.is_file():
+            fail(f"Missing FLASH-001 Slice D file: {path.relative_to(ROOT)}")
+            return
+
+    gate_text = gate.read_text(encoding="utf-8")
+    required_gate = (
+        "object QuickFlashMutationGate",
+        "data class ConfirmationTicket",
+        "confirmationAvailable",
+        "CONFIRMATION_ALREADY_CONSUMED",
+        "SESSION_CHANGED",
+        "IMAGE_SHA256_CHANGED",
+        "TARGET_AMBIGUOUS",
+        "commandCount = 1",
+        "retryAllowed = false",
+        "class QuickFlashConfirmationRegistry",
+    )
+    for token in required_gate:
+        if token not in gate_text:
+            fail(f"FLASH-001 Slice D gate token missing: {token}")
+    if any(token in gate_text for token in ("android.", "androidx.")):
+        fail("FLASH-001 Slice D mutation gate must remain pure")
+
+    vm_text = viewmodel.read_text(encoding="utf-8")
+    vm_tokens = (
+        "fun runConfirmedQuickFlash(",
+        "quickFlashConfirmationRegistry.consume",
+        "QuickFlashMutationGate.evaluate",
+        "computeFastbootArtifactId(canonicalFile)",
+        "QuickFlashTopologyCandidateBuilder.buildFromInventory",
+        "proto.flashPartitionDetailed(authorization.partitionName, activePrepared.stagedFile)",
+        "confirmed quick flash finished",
+    )
+    for token in vm_tokens:
+        if token not in vm_text:
+            fail(f"FLASH-001 Slice D DeviceViewModel token missing: {token}")
+    body = vm_text.split("fun runConfirmedQuickFlash(", 1)[-1].split("fun runFlashTarget(", 1)[0]
+    if body.count("flashPartitionDetailed(") != 1:
+        fail("Slice D must contain exactly one flashPartitionDetailed call")
+    if body.count("proto.flashPartitionDetailed(") != 1:
+        fail("Slice D mutation body must not retry or duplicate the flash command")
+
+    main_text = main.read_text(encoding="utf-8")
+    if "QuickFlashMutationGate.issueConfirmation" not in main_text or "viewModel.runConfirmedQuickFlash(" not in main_text:
+        fail("Slice D confirmation ticket is not wired from MainActivity to DeviceViewModel")
+    if "viewModel.runFlash(plan.partitionName, file)" in main_text:
+        fail("Recovery-first UI must not bypass Slice D through the legacy runFlash path")
+
+    manifest_text = manifest.read_text(encoding="utf-8")
+    if not re.search(r"^quick-flash-mutation-gate\t", manifest_text, re.M):
+        fail("Quick Flash mutation gate pure test module missing from manifest")
+
+    if not ERRORS:
+        print("Quick Flash Slice D one-shot mutation gate: OK")
 
 def check_flash_operation_draft_state() -> None:
     draft = ROOT / "app/src/main/java/ru/forum/adbfastboottool/FlashOperationDraft.kt"
@@ -1040,6 +1405,7 @@ def check_v6_scope_reset() -> None:
         "validation/journal.jsonl",
         "scripts/build-journal.py",
         "scripts/test_build_journal.py",
+        "scripts/termux-publish-both-branches.sh",
     )
     for rel in removed_legacy_paths:
         if (ROOT / rel).exists():
@@ -1127,6 +1493,148 @@ def check_v6_scope_reset() -> None:
     if not ERRORS:
         print("V6 scope/audit cleanup, TOPBAR-001, HOMEINFO-001 and HOMEACTIONS-001: OK")
 
+
+def check_alpha5_hardware_polish() -> None:
+    welcome = ROOT / "app/src/main/res/layout/activity_welcome.xml"
+    welcome_activity = ROOT / "app/src/main/java/ru/forum/adbfastboottool/WelcomeActivity.kt"
+    layout = ROOT / "app/src/main/res/layout/activity_main.xml"
+    main = ROOT / "app/src/main/java/ru/forum/adbfastboottool/MainActivity.kt"
+    policy = ROOT / "app/src/main/java/ru/forum/adbfastboottool/MiAccountSecurityPolicy.kt"
+    login = ROOT / "app/src/main/java/ru/forum/adbfastboottool/MiLoginActivity.kt"
+
+    required = (welcome, welcome_activity, layout, main, policy, login)
+    for path in required:
+        if not path.is_file():
+            fail(f"Missing alpha5 hardware polish file: {path.relative_to(ROOT)}")
+            return
+
+    welcome_text = welcome.read_text(encoding="utf-8")
+    welcome_activity_text = welcome_activity.read_text(encoding="utf-8")
+    layout_text = layout.read_text(encoding="utf-8")
+    main_text = main.read_text(encoding="utf-8")
+    policy_text = policy.read_text(encoding="utf-8")
+    login_text = login.read_text(encoding="utf-8")
+
+    for token in ('@+id/tvStorageChip', '@+id/tvNotificationsChip', '@+id/tvBatteryChip', '@+id/riskRow'):
+        if token not in welcome_text:
+            fail(f"Welcome compact action token missing: {token}")
+    for token in (
+        'android:id="@+id/welcomeHeroArea"',
+        'android:id="@+id/imgWelcomeBg"',
+        'android:layout_height="match_parent"',
+        'android:scaleType="centerCrop"',
+        'android:id="@+id/welcomeBottomArea"',
+        'android:layout_gravity="bottom"',
+        'android:layout_marginBottom="@dimen/welcome_bottom_padding"',
+        'android:background="@drawable/bg_welcome_panel"',
+    ):
+        if token not in welcome_text:
+            fail(f"Welcome full-viewport overlay token missing: {token}")
+    for forbidden in (
+        '<ScrollView',
+        'android:layout_height="0dp"',
+        'android:minHeight="@dimen/welcome_art_height"',
+    ):
+        if forbidden in welcome_text:
+            fail(f"Welcome must not restore the scrolling/oversized hero shell: {forbidden}")
+    welcome_panel = ROOT / "app/src/main/res/drawable/bg_welcome_panel.xml"
+    if not welcome_panel.is_file():
+        fail("Welcome outline panel drawable is missing")
+    else:
+        welcome_panel_text = welcome_panel.read_text(encoding="utf-8")
+        if '<solid android:color="#080B1119"' not in welcome_panel_text:
+            fail("Welcome outer panel must remain effectively transparent")
+        if '<stroke android:width="1dp" android:color="#99324052"' not in welcome_panel_text:
+            fail("Welcome outer panel outline is missing")
+    if '@+id/btnBatterySettings' in welcome_text or 'btnBatterySettings' in welcome_activity_text:
+        fail("Welcome must not restore a separate battery settings button")
+    if 'Вход выполнен (ID:' in main_text or 'Вход выполнен (ID: $userId)' in main_text:
+        fail("Compact log must not expose the Xiaomi account ID")
+
+    for token in (
+        'tvStorageChip.setOnClickListener { openStoragePermissionSettings() }',
+        'tvNotificationsChip.setOnClickListener { requestNotificationPermissionOrSettings() }',
+        'tvBatteryChip.setOnClickListener { openBatteryOptimizationSettings() }',
+        'R.id.riskRow).setOnClickListener',
+    ):
+        if token not in welcome_activity_text:
+            fail(f"Welcome clickable status binding missing: {token}")
+
+    if 'sideload_memo_icon' in layout_text or 'sideload_memo_text' in layout_text:
+        fail("Sideload yellow memo card must remain removed")
+    for token in ('@+id/btnSideloadImport', '@+id/btnSideloadCheckArchive', '@drawable/ic_nf_verify'):
+        if token not in layout_text:
+            fail(f"Sideload compact action token missing: {token}")
+    sideload_note = re.search(
+        r'<TextView\s+[^>]*android:text="@string/layout_sideload_hash_note"[^>]*/>',
+        layout_text,
+        re.S,
+    )
+    if not sideload_note:
+        fail("Sideload neutral checksum note is missing")
+    elif 'ic_status_check_green' in sideload_note.group(0):
+        fail("Sideload pre-verification note must not show a green success icon")
+
+    for token in ('@+id/btnFastbootDataSelfTest', '@+id/btnFastbootDataAdvanced'):
+        if token not in layout_text:
+            fail(f"Fastboot DATA compact UI token missing: {token}")
+    for obsolete in (
+        '@+id/btnFastbootDataSharedStorageProbe',
+        '@+id/btnFastbootDataQualifyImage',
+        '@+id/btnFastbootDataAutoMatrix',
+        '@+id/btnFastbootDataContentProbe',
+    ):
+        if obsolete in layout_text:
+            fail(f"Advanced Fastboot DATA action returned to the main card: {obsolete}")
+    for token in ('openFastbootDiagnosticAction', 'showFastbootAdvancedDiagnosticsDialog', 'Fastboot DATA: нажато'):
+        if token not in main_text:
+            fail(f"Fastboot DATA logging/collapse token missing: {token}")
+
+    for token in (
+        'UNLOCK_CALLBACK_HOST = "unlock.update.miui.com"',
+        'UNLOCK_CALLBACK_PATH = "/sts"',
+        'isOfficialUnlockCallbackUrl',
+        'unlockServiceHosts = setOf(',
+        'isAllowedUnlockServiceUrl',
+        'requireAllowedAuthFlowUrl',
+        'resolveAllowedAuthRedirect',
+        'isAllowedUnlockServiceCookieName',
+    ):
+        if token not in policy_text:
+            fail(f"Mi Unlock callback/service policy token missing: {token}")
+    for token in (
+        'handleOfficialCompletion',
+        'EXTRA_LOGIN_ERROR',
+        'mi_login_missing_cookies',
+        'mi_login_retry',
+        'if (monitoringEnded || isFinishing || isDestroyed) return',
+        'if (MiAccountSecurityPolicy.isOfficialUnlockCallbackUrl(url))',
+        'late WebView callbacks are stale',
+    ):
+        if token not in login_text:
+            fail(f"Mi Login observable callback/race token missing: {token}")
+    finished_block = re.search(
+        r'override fun onPageFinished\(view: WebView, url: String\) \{(?P<body>.*?)\n            \}',
+        login_text,
+        re.S,
+    )
+    if not finished_block:
+        fail('Mi Login onPageFinished guard is missing')
+    else:
+        body = finished_block.group('body')
+        terminal_guard = body.find('if (monitoringEnded || isFinishing || isDestroyed) return')
+        callback_guard = body.find('isOfficialUnlockCallbackUrl(url)')
+        account_guard = body.find('!MiAccountSecurityPolicy.isAllowedAccountUrl(url)')
+        if min(terminal_guard, callback_guard, account_guard) < 0 or not (
+            terminal_guard < callback_guard < account_guard
+        ):
+            fail('Mi Login onPageFinished must ignore terminal state, then consume /sts, then reject unrelated hosts')
+    if 'getStringExtra(MiLoginActivity.EXTRA_LOGIN_ERROR)' not in main_text:
+        fail("MainActivity must preserve the concrete Mi Login cancellation reason")
+
+    if not ERRORS:
+        print("alpha5 hardware polish and Mi Login callback guard: OK")
+
 def main() -> int:
     check_master_tracker_presence()
     check_xml_files()
@@ -1149,7 +1657,14 @@ def main() -> int:
     check_self_test_hooks()
     check_reports_access()
     check_private_reports()
+    check_forum_report_removed()
     check_mi_account_and_share_hardening()
+    check_alpha5_hardware_polish()
+    check_termux_workflow()
+    check_quick_flash_plan_slice()
+    check_quick_flash_topology_slice()
+    check_quick_flash_ui_slice()
+    check_quick_flash_mutation_gate_slice()
     check_flash_operation_draft_state()
     check_v6_scope_reset()
     check_device_viewmodel_api_refs()

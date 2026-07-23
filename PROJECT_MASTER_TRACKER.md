@@ -1,57 +1,92 @@
 # NekoFlash — единый трекер проекта
 
-Последнее обновление: **2026-07-21**  
-Текущий milestone: **V6.0.0 — alpha4 Android compile hotfix**  
-Версия: **`6.0.0-alpha4-nekoflash`**  
-Version code: **`216`**
+Последнее обновление: **2026-07-22**  
+Текущий milestone: **V6.0.0 — alpha5 Recovery-first Quick Flash**  
+Версия: **`6.0.0-alpha5-dev-nekoflash`**  
+Version code: **`217`**
 
-## Цель продукта
+## Новый чат
 
-NekoFlash остаётся компактным Android-инструментом с четырьмя основными сценариями: Terminal, Recovery-first Quick Flash, ADB Sideload и Mi Unlock. Верхняя панель подключения и карточка устройства сохраняются функционально; меняется только косметика.
+Начать с [`docs/AI_START_HERE.md`](docs/AI_START_HERE.md), затем читать этот файл как единственный источник живого статуса. Исторические детали находятся в changelog и feature-планах; их нельзя переносить обратно в текущий статус.
+
+## Текущее состояние source tree
+
+- Recovery-first Quick Flash slices A–D реализованы; baseline Slice E подтверждён Android CI.
+- Welcome/Sideload/Fastboot DATA hardware-polish внесён. Adaptive ScrollView-вариант был отклонён; полноэкранный artwork с прозрачным нижним overlay-gate подтверждён maintainer на устройстве и принят как защищённый эталон.
+- Mi Account `/sts` exchange исправлен. Дополнительно устранена гонка первого входа: поздний WebView callback не должен заменять успешный результат сообщением о недоверенном адресе.
+- Mi Login first-pass fix подтверждён на устройстве build `5f119c469430.29913150722`: fresh login завершился в одном проходе без stale blocked-host banner.
+- Полный форумный diagnostic ZIP удалён как вне-scope. Сохранены compact/trace logs, session tracker, санитизированный log share и self-test TXT/JSON. Для текущего exact head всё ещё нужен новый Android CI.
+
+## Подтверждённые доказательства
+
+### Последний подтверждённый Android CI
+
+- GitHub Actions run: `29855091700` (`Build Android APK #14`).
+- Event/head branch: `pull_request` / `feature/recovery-first-quick-flash`.
+- PR head SHA: `8a6dab5f81dd0ff117b3b6e27e6d528a45900e24`.
+- Checkout/build SHA: `3057477010f2ac8f1e39c1390a3c74732baab20c` — synthetic PR merge commit.
+- Результат: static/safety, pure/policy matrix, `lintDebug`, `assembleDebug`, `assembleRelease` — `success`.
+- Этот run относится к baseline до последующих hardware-polish/Mi Login исправлений.
+
+### Последнее Android smoke evidence
+
+- Build `8d9923ec0878.29870485300` подтвердил успешный Xiaomi login и получение unlockApi service session, но выявил stale blocked-host banner первого прохода.
+- Build `5f119c469430.29913150722` подтвердил исправление: fresh login завершился в том же запуске без перезапуска и без blocked-host error.
+- Следующий Mi Unlock action корректно остановлен из-за отсутствия Fastboot-устройства.
+- Текущий source также убирает raw account ID из compact log; токены, cookie values, serial и raw USB topology в репозитории не сохраняются.
+
+Подробный sanitised summary: [`docs/HARDWARE_VALIDATION.md`](docs/HARDWARE_VALIDATION.md).
 
 ## Статус задач
 
 | ID | Задача | Статус | Следующее доказательство |
 |---|---|---|---|
-| SCOPE-001 | Удалить полный Mi Flash из активной ветки | DONE_CODE | Архив V5.9.17 подтверждён, guard не допускает возврата файлов |
-| AUDIT-001 | Удалить хвосты, исторический груз и осиротевший код | DONE_CODE | Android CI для alpha4 |
-| TOPBAR-001 | Сохранить функциональное поведение верхней панели | DONE_CODE | Android UI smoke test |
-| HOMEINFO-001 | Сохранить карточку устройства и рабочей папки | DONE_CODE | Android UI smoke test |
-| HOMEACTIONS-001 | Четыре главных перехода на Home | DONE_CODE | Android UI smoke test |
-| TERMINAL-001 | Проверить ADB/Fastboot terminal на устройстве | OPEN | Команды read-only и экспорт лога |
-| FLASH-001 | Recovery-first Quick Flash | NEXT | Новый упрощённый экран и preflight для популярных разделов |
-| SIDELOAD-001 | Подтвердить ADB Sideload в V6 | RETEST_REQUIRED | ZIP transfer, cancel, recovery result |
-| UNLOCK-001 | Провести отдельный аудит Mi Unlock | OPEN | Разделить стандартный Fastboot unlock и Xiaomi flow |
-| TEST-001 | Сокращённая релевантная test matrix | DONE_LOCAL | 19/19 local; alpha4 Android CI required |
-| RELEASE-001 | Signing и аппаратный release gate | OPEN | После стабилизации alpha/beta |
+| SCOPE-001 | Не возвращать полный Mi Flash в активную ветку | DONE_CODE | `check_project.py` + внешняя резервная копия владельца вне Git |
+| AUDIT-001 | Очистить V6 source/doc tree | DONE_CI | Alpha4 compile hotfix и documentation guards |
+| CONTEXT-001 | Самодостаточный handoff | DONE_CODE | `docs/AI_START_HERE.md` + export script |
+| TERMUX-001 | Разделить push, CI evidence и APK | DONE_CI | Push-only publisher; APK только по `--with-apk` |
+| TOPBAR-001 | Сохранить функциональное поведение верхней панели | DONE_CODE | Android UI smoke test с устройством |
+| HOMEINFO-001 | Сохранить карточку устройства/рабочей папки | DONE_CODE | Android UI smoke test с устройством |
+| HOMEACTIONS-001 | Сохранить четыре главных перехода Home | DONE_CODE | Android UI smoke test |
+| FLASH-001 | Recovery-first Quick Flash | DONE_CI | Контролируемый hardware retest |
+| POLISH-WELCOME-001 | Облегчить welcome permissions/risk gate | DONE_DEVICE | Эталонный fullscreen artwork + прозрачный bottom overlay; защищать от регрессии |
+| POLISH-SIDELOAD-001 | Упростить Sideload card и нейтрализовать pre-verify status | FIXED_CODE | Android smoke + transfer/cancel/recovery result |
+| POLISH-DATA-001 | Свернуть Fastboot DATA diagnostics | DONE_CODE | Fastboot hardware retest |
+| REPORT-001 | Удалить вне-scope форумный diagnostic ZIP | DONE_CODE | Exact-head Android CI; сохранить self-test TXT/JSON и sanitised log share |
+| UNLOCK-LOGIN-001 | Исправить Mi Account `/sts` и first-pass callback race | DONE_DEVICE | Новый Android CI для exact head; сохранить no-banner поведение |
+| TERMINAL-001 | Проверить Terminal на устройстве | OPEN | Read-only ADB/Fastboot и sanitised log |
+| SIDELOAD-001 | Подтвердить ADB Sideload V6 | RETEST_REQUIRED | ZIP transfer, cancel, recovery result |
+| UNLOCK-001 | Отдельный аудит Mi Unlock | IN_PROGRESS | Login retest, затем разделение standard/Xiaomi flows |
+| TEST-001 | Релевантная test matrix | DONE_CI | Текущий source: local 23/23; новый Android CI pending |
+| RELEASE-001 | Signing и hardware release gate | OPEN | После стабилизации alpha/beta |
 
-## Что удалено аудитом alpha3
+## Защищённые границы
 
-- скрытая недоступная страница «Сервис»;
-- `DeviceProfileManager` и `PartitionInventoryHistory`;
-- профильные/history-вложения диагностического ZIP;
-- raw hardware logs и автоматический build journal из source tree;
-- исторические V5 документы из активной ветки;
-- осиротевшие ресурсы и устаревшие проверки документации.
+- `cardQuickFlashRecoveryFirst` принят как эталонный UI и не меняется в hardware-polish без отдельного решения.
+- `TOPBAR-001`, `HOMEINFO-001`, `HOMEACTIONS-001` сохраняются функционально.
+- Полный Mi Flash не возвращается; внешняя резервная копия владельца хранится вне Git (Google Drive) и не дублируется в активной ветке.
+- Не допускаются force push, скрытый выбор partition, автоматический mutation retry или утверждение PASS без evidence.
 
-## Что намеренно сохранено
-
-- USB/ADB/Fastboot transport;
-- terminal и read-only self-test;
-- Quick Flash draft, partition inventory, slot resolver и минимальный preflight;
-- Sideload и recovery result verifier;
-- Mi Account компоненты, которые используются Xiaomi unlock flow;
-- sanitization и экспорт диагностических отчётов;
-- верхняя панель и карточка устройства.
+Основные safety-инварианты: [`docs/SAFETY_MODEL.md`](docs/SAFETY_MODEL.md). Архитектура Quick Flash: [`docs/RECOVERY_FIRST_PLAN.md`](docs/RECOVERY_FIRST_PLAN.md).
 
 ## Текущий следующий шаг
 
-Проверки scope/safety определены в `docs/SAFETY_MODEL.md`, а canonical documentation guard запускается через `scripts/check-documentation.py`. Архивная база остаётся в `archive/full-miflash-v5.9.17`.
+1. Опубликовать текущий audited source ZIP в `feature/recovery-first-quick-flash` через push-only Termux workflow.
+2. Запустить новый Android CI отдельно через `scripts/termux-ci.sh`; подтвердить static/pure/lint/debug/release для точного head SHA.
+3. На exact-head APK быстро подтвердить, что защищённый Welcome не изменился и меню «Отчёты» содержит только папку, log actions и self-test TXT/JSON.
+4. Проверить, что Sideload до фактического verify не показывает зелёную success-индикацию.
+5. Повторить Mi Account login как regression smoke и убедиться, что compact log не содержит raw account ID.
+6. Затем провести sanitised Terminal/Sideload/Quick Flash hardware validation.
 
-1. Опубликовать alpha4 и подтвердить Android lint/debug/release в GitHub Actions.
-2. Сделать `V6.0.0-alpha5`: Recovery-first Quick Flash для `recovery`, `boot`, `init_boot`, `vendor_boot`; дополнительные `dtbo`, `vbmeta`, `vendor_kernel_boot` скрыть в Expert Mode.
-3. Провести аппаратный ретест Terminal и Sideload.
-4. Отдельно проверить Mi Unlock и удалить всё, что не участвует в подтверждённом сценарии.
-5. После стабилизации UI и функций перейти к beta и signing.
+Перед передачей следующему чату выполнить:
 
-Реальная прошивка всегда требует подключённого Fastboot-устройства, существующего раздела, корректного slot, проверенного файла и явного подтверждения. Автоматического повторения mutation-команд нет.
+```bash
+python3 scripts/update-checksums.py
+python3 scripts/check-documentation.py
+python3 scripts/check_project.py
+python3 scripts/test-checksum-inventory.py
+bash scripts/run-tests.sh
+bash scripts/export-chat-context.sh
+```
+
+Реальная прошивка требует Fastboot-устройства, существующего concrete partition, корректного slot, проверенного файла и явного confirmation. Автоматического повторения mutation-команд нет.

@@ -12,8 +12,13 @@
 
 ## Quick Flash
 
-- `FastbootPartitionInventory` и probe planner определяют доступные разделы.
-- `FastbootSlotResolver` разрешает A/B target.
+- `QuickFlashTarget`, `QuickFlashCandidate` и `QuickFlashPlan` образуют pure confirmation-ready model; `QuickFlashPlanValidator` принимает только один concrete partition с read-only evidence.
+- `QuickFlashTopologyCandidateBuilder` объединяет `FastbootPartitionInventory`, bounded probe planner, `FastbootSlotResolver` и filename hint в read-only candidate result; он не выбирает target и не выполняет mutation.
+- `QuickFlashUiPolicy` фиксирует Recovery-first порядок и hidden-by-default Expert Mode. `MainActivity` использует `buildFromInventory`, показывает только concrete candidates, создаёт confirmation-ready `QuickFlashPlan` и одноразовый `QuickFlashMutationGate.ConfirmationTicket`.
+- `QuickFlashMutationGate` остаётся pure boundary перед mutation: повторно связывает confirmation с plan fingerprint, transport session, image identity и concrete candidate. `DeviceViewModel.runConfirmedQuickFlash` поглощает ticket один раз, использует существующий private staging и делает ровно один вызов `FastbootProtocol.flashPartitionDetailed`.
+- Legacy multi-flash queue не входит в активный Recovery-first UI и скрыт; один UI plan соответствует одному concrete partition.
+- `FastbootPartitionInventory` принимает только concrete bootloader evidence, а probe planner формирует ограниченные read-only запросы для недостающих данных.
+- `FastbootSlotResolver` проверяет точное соответствие concrete partition и A/B policy; unknown topology не выдаёт candidate.
 - `FastbootFlashPreparationPolicy` и `PreflightValidator` выполняют минимальный preflight.
 - `FlashOperationDraft` хранит только восстановимый UI draft; выполнение требует свежей проверки и подтверждения.
 
@@ -23,11 +28,11 @@
 
 ## Unlock
 
-`MiUnlockClient` и связанные Mi Account компоненты изолированы от Quick Flash. До аппаратного аудита они не считаются полностью подтверждённым flow.
+`MiLoginActivity`, `MiAccountSecurityPolicy` и `MiAccountClient` разделяют interactive account login и bounded unlockApi service exchange. Exact `/sts` completion является terminal state; account tokens не передаются на unlock hosts. `MiUnlockClient` изолирован от Quick Flash. Успешный login не считается подтверждением полного unlock flow: standard Fastboot unlock и Xiaomi account/server flow требуют отдельного аппаратного аудита.
 
 ## Logs
 
-Compact/trace storage ограничен по размеру. `ReportSanitizer` удаляет serial, пути и длинные идентификаторы. `ForumReportManager` создаёт schema `forum-report.v6` без профилей и inventory history.
+Compact/trace storage ограничен по размеру. `ReportSanitizer` удаляет serial, пути и длинные идентификаторы. Локальный self-test отчёт (`selftest.v3`, txt/json) остаётся санитизированным. Экспорт полного форумного диагностического ZIP (`ForumReportManager`, `DiagnosticReportFormatter`, `DiagnosticArchiveVerifier`) удалён из V6 как вне-scope функционал; общий компактный лог и session tracker сохранены.
 
 ## Запрещённые зависимости
 

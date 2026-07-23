@@ -1,53 +1,129 @@
 # Аппаратная проверка NekoFlash V6
 
-Этот файл содержит только sanitised summary. Raw журналы с serial, USB topology и пользовательскими путями в Git не коммитятся. Исторический факт не является автоматическим PASS для текущей V6 сборки.
+Этот документ содержит только reviewed sanitised summary. Raw logs с serial, USB topology, пользовательскими путями, account ID, cookie values и tokens в Git не коммитятся. Исторический факт не является PASS для текущей сборки.
 
-## Сохранённые исторические факты
+## Историческая база до V6
 
-| Устройство | Подтверждённый факт до V6 | Статус для V6 |
+| Устройство/flow | Подтверждённый факт | Статус V6 |
 |---|---|---|
-| Xiaomi/POCO `onyx` | Распознавались ADB Recovery и `ADB SIDELOAD`; владелец ранее подтверждал рабочую sideload-сессию | Полный V6 retest required |
-| Xiaomi/POCO `vayu` | Выполнялись read-only Fastboot transport/DATA diagnostics | Quick Flash mutation не подтверждена |
-| Xiaomi/POCO `marble` | Выполнялись read-only Fastboot transport/DATA diagnostics | Quick Flash mutation не подтверждена |
-| Mi Unlock | Владелец сообщал об успешной работе старой реализации | Нужен отдельный V6 audit и новый sanitised report |
+| Xiaomi/POCO `onyx` | Ранее распознавались ADB Recovery и ADB Sideload | Полный V6 retest required |
+| Xiaomi/POCO `vayu` | Ранее выполнялись read-only Fastboot DATA diagnostics | Quick Flash mutation не подтверждена |
+| Xiaomi/POCO `marble` | Ранее выполнялись read-only Fastboot DATA diagnostics | Quick Flash mutation не подтверждена |
+| Mi Unlock | Владелец сообщал об успешной работе старого flow | Требуется отдельный V6 audit |
 
-## Обязательные V6 проверки
+## Android smoke evidence alpha5
+
+### Smoke 1 — baseline UI без USB
+
+Build: `6.0.0-alpha5-dev-nekoflash+6ef9da644a82.29860864789`.
+
+Подтверждено:
+
+- приложение запускается и создаёт compact log/trace/session summary;
+- transport session отсутствует, operation не стартует;
+- Recovery-first Quick Flash визуально принят maintainer и зафиксирован как защищённый экран.
+
+Обнаружено:
+
+- перегруженные welcome/Sideload/Fastboot DATA panels;
+- диагностические taps без устройства не различались в compact log;
+- Mi Account completion возвращал общий cancellation result.
+
+### Smoke 2 — hardware-polish без USB
+
+Build: `6.0.0-alpha5-dev-nekoflash+0747c4ec72e3.29866798716`.
+
+Подтверждено:
+
+- Fastboot DATA main/advanced taps оставляют точный no-device отказ;
+- импорт и анализ ZIP работают без transport session;
+- интерактивный Xiaomi login доходит до получения account identity.
+
+Обнаружено:
+
+- background token exchange блокировал официальный `https://unlock.update.miui.com/sts`;
+- Sideload pre-verify note показывал misleading green success icon.
+
+### Smoke 3 — `/sts` exchange
+
+Build: `6.0.0-alpha5-dev-nekoflash+8d9923ec0878.29870485300`.
+
+Подтверждено:
+
+- Xiaomi login завершён;
+- unlockApi service session и ожидаемые service cookies получены;
+- следующий Mi Unlock action корректно остановлен из-за отсутствия Fastboot-устройства;
+- смена data-center preference журналируется без account secrets.
+
+Остаточный дефект:
+
+- на первом проходе UI иногда показывал stale blocked-host banner;
+- после restart сохранённая session использовалась успешно;
+- причина локализована: поздний `onPageFinished` повторно обрабатывал уже завершённый `/sts` callback.
+
+### Smoke 4 — first-pass login regression
+
+Build: `6.0.0-alpha5-dev-nekoflash+5f119c469430.29913150722`.
+
+Подтверждено:
+
+- fresh Xiaomi login завершился в одном запуске приложения без stale blocked-host banner;
+- unlockApi service session и ожидаемые cookie names получены;
+- ручная смена data-center preference работает;
+- следующий Mi Unlock action безопасно остановлен из-за отсутствия Fastboot-устройства;
+- transport session не создавалась, mutation не выполнялась.
+
+Обнаружено:
+
+- compact log всё ещё показывал raw account ID в сообщении об успешном login. Текущий source удаляет ID из log line; для этой sanitisation нужен regression smoke.
+
+First-pass callback race считается `DONE_DEVICE`. Полный Mi Unlock flow остаётся отдельным hardware gate.
+
+### Smoke 5 — Welcome fullscreen overlay
+
+Maintainer visual verdict: **PASS**. Полноэкранное artwork отображается одним viewport без вертикальной прокрутки; заголовок закреплён сверху, прозрачный контурный permission/risk gate — снизу поверх изображения. Расположение кнопок и читаемость приняты как эталонные. Exact build ID к скриншоту не приложен, поэтому для публикуемого head всё ещё требуется Android CI и короткая regression-проверка без изменения макета.
+
+## Открытые V6 gates
+
+### Sideload smoke
+
+- защищённый Welcome не менять; на exact-head APK только подтвердить отсутствие регрессии;
+- Sideload: до verify нет зелёного success-status;
+- Import/Verify geometry и тексты остаются читаемыми на целевых размерах экрана.
 
 ### Terminal
 
-- ADB `devices`/read-only shell;
+- ADB read-only shell;
 - Fastboot `getvar product`, `current-slot`, `unlocked`;
 - cancel/detach;
 - sanitised log export.
 
-### Quick Flash
+### ADB Sideload
+
+- recovery sideload mode;
+- выбор ZIP и integrity;
+- progress и cancel;
+- recovery result;
+- reconnect после завершения.
+
+### Recovery-first Quick Flash
 
 На восстанавливаемом устройстве:
 
 - inventory и slot resolution;
-- Recovery-first target selection;
-- файл/размер/SHA-256;
-- явное confirmation;
-- одна контролируемая операция;
+- один concrete target;
+- файл, размер и SHA-256 до confirmation;
+- одна контролируемая flash operation;
 - отсутствие auto retry;
-- post-operation reboot только вручную.
-
-### ADB Sideload
-
-- переход recovery в sideload;
-- выбор ZIP и integrity;
-- progress;
-- cancel;
-- recovery result;
-- reconnect после завершения.
+- reboot только отдельным ручным действием.
 
 ### Mi Unlock
 
-- определить фактический поддерживаемый flow;
-- проверить account/session handling;
-- подтвердить предупреждение о wipe;
+- regression login после log-sanitisation;
+- разделить standard Fastboot unlock и Xiaomi account/server flow;
+- подтвердить wipe warning и typed/manual confirmation;
 - исключить автоматическую отправку unlock-команды.
 
-## Формат доказательства
+## Формат нового доказательства
 
-Для каждого теста сохраняется sanitised ZIP вне исходного дерева и краткая запись: версия, модель/codename без serial, режим, шаги, результат и SHA-256 проверяемого файла.
+Для каждого теста сохраняется sanitised ZIP вне source tree и краткая запись: version/build ID, модель/codename без serial, режим, шаги, результат и SHA-256 проверяемого файла. Cookie values, tokens, account ID и raw USB identifiers не включаются.

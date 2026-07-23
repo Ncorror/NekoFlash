@@ -224,11 +224,16 @@ def check_integration() -> None:
         "scripts/build-apk.bat": "scripts\\check-documentation.py",
         ".github/workflows/build.yml": "scripts/check-documentation.py",
         "scripts/check_project.py": "check-documentation.py",
+        "README.md": "docs/AI_START_HERE.md",
+        "BUILDING.md": "scripts/termux-ci.sh",
+        "PROJECT_MASTER_TRACKER.md": "docs/RECOVERY_FIRST_PLAN.md",
+        "docs/AI_START_HERE.md": "scripts/export-chat-context.sh",
+        "docs/TERMUX_WORKFLOW.md": "scripts/termux-ci.sh",
     }
     for path, token in required.items():
         text = (ROOT / path).read_text(encoding="utf-8")
         if token not in text:
-            fail(f"{path} does not invoke/reference documentation guard")
+            fail(f"{path} does not invoke/reference required integration token: {token}")
 
 
 def main() -> None:

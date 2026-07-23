@@ -30,7 +30,6 @@ class WelcomeActivity : AppCompatActivity() {
 
     private lateinit var checkbox: CheckBox
     private lateinit var btnPrimaryAction: Button
-    private lateinit var btnBatterySettings: Button
     private lateinit var tvStorageChip: TextView
     private lateinit var tvNotificationsChip: TextView
     private lateinit var tvBatteryChip: TextView
@@ -56,7 +55,6 @@ class WelcomeActivity : AppCompatActivity() {
 
         checkbox = findViewById(R.id.checkboxAgree)
         btnPrimaryAction = findViewById(R.id.btnPrimaryAction)
-        btnBatterySettings = findViewById(R.id.btnBatterySettings)
         tvStorageChip = findViewById(R.id.tvStorageChip)
         tvNotificationsChip = findViewById(R.id.tvNotificationsChip)
         tvBatteryChip = findViewById(R.id.tvBatteryChip)
@@ -65,8 +63,12 @@ class WelcomeActivity : AppCompatActivity() {
         checkbox.isChecked = OnboardingGate.isCompleted(this)
         checkbox.setOnCheckedChangeListener { _, _ -> refreshGateState() }
         btnPrimaryAction.setOnClickListener { handlePrimaryAction() }
-        btnBatterySettings.setOnClickListener { openBatteryOptimizationSettings() }
+        tvStorageChip.setOnClickListener { openStoragePermissionSettings() }
         tvNotificationsChip.setOnClickListener { requestNotificationPermissionOrSettings() }
+        tvBatteryChip.setOnClickListener { openBatteryOptimizationSettings() }
+        findViewById<android.view.View>(R.id.riskRow).setOnClickListener {
+            if (checkbox.isEnabled) checkbox.isChecked = !checkbox.isChecked
+        }
 
         refreshGateState()
     }
@@ -119,11 +121,10 @@ class WelcomeActivity : AppCompatActivity() {
 
         checkbox.isEnabled = requiredReady
 
-        val welcomeReady = status.storage
+        val welcomeReady = status.storage && checkbox.isChecked
         tvWelcomeStatus.text = when {
             !status.storage -> getString(R.string.onboarding_need_storage_short)
-            !status.notifications -> getString(R.string.onboarding_ready_notifications_optional)
-            !status.batteryOptIgnored -> getString(R.string.onboarding_ready_battery_recommended)
+            !checkbox.isChecked -> getString(R.string.onboarding_confirm_risk_short)
             else -> getString(R.string.onboarding_ready_short)
         }
         tvWelcomeStatus.setCompoundDrawablesRelativeWithIntrinsicBounds(
@@ -141,7 +142,7 @@ class WelcomeActivity : AppCompatActivity() {
         } else {
             getString(R.string.onboarding_grant_button)
         }
-        btnPrimaryAction.alpha = if (requiredReady && !checkbox.isChecked) 0.72f else 1.0f
+        btnPrimaryAction.alpha = if (welcomeReady || !requiredReady) 1.0f else 0.78f
     }
 
     private fun chip(view: TextView, label: String, granted: Boolean, required: Boolean) {
@@ -174,12 +175,8 @@ class WelcomeActivity : AppCompatActivity() {
     }
 
     private fun requestNotificationPermissionOrSettings() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-            Toast.makeText(this, getString(R.string.permission_status_not_required), Toast.LENGTH_SHORT).show()
-            return
-        }
-        if (PermissionGate.hasNotifications(this)) {
-            Toast.makeText(this, getString(R.string.permission_status_granted), Toast.LENGTH_SHORT).show()
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || PermissionGate.hasNotifications(this)) {
+            openNotificationSettings()
             return
         }
 
@@ -188,12 +185,29 @@ class WelcomeActivity : AppCompatActivity() {
         val permanentlyDenied = requestCount >= 2 &&
             !shouldShowRequestPermissionRationale(android.Manifest.permission.POST_NOTIFICATIONS)
         if (permanentlyDenied) {
-            openApplicationDetails(getString(R.string.onboarding_notifications_open_settings))
+            openNotificationSettings()
+            Toast.makeText(this, getString(R.string.onboarding_notifications_open_settings), Toast.LENGTH_LONG).show()
             return
         }
 
         prefs.edit().putInt(PREF_NOTIFICATION_REQUEST_COUNT, requestCount + 1).apply()
         requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), REQ_NOTIFICATIONS)
+    }
+
+
+    private fun openNotificationSettings() {
+        val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+            }
+        } else {
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.parse("package:$packageName")
+            }
+        }
+        if (runCatching { settingsLauncher.launch(intent) }.isFailure) {
+            openApplicationDetails(getString(R.string.perm_open_settings_manually))
+        }
     }
 
     private fun openStoragePermissionSettings() {
@@ -211,6 +225,8 @@ class WelcomeActivity : AppCompatActivity() {
                     openApplicationDetails(getString(R.string.perm_open_settings_manually))
                 }
             }
+        } else if (PermissionGate.hasStorage(this)) {
+            openApplicationDetails(getString(R.string.permission_status_granted))
         } else {
             requestPermissions(
                 arrayOf(
@@ -298,7 +314,8 @@ class WelcomeActivity : AppCompatActivity() {
             if (requestCount >= 2 &&
                 !shouldShowRequestPermissionRationale(android.Manifest.permission.POST_NOTIFICATIONS)
             ) {
-                openApplicationDetails(getString(R.string.onboarding_notifications_open_settings))
+                openNotificationSettings()
+                Toast.makeText(this, getString(R.string.onboarding_notifications_open_settings), Toast.LENGTH_LONG).show()
             }
         }
     }

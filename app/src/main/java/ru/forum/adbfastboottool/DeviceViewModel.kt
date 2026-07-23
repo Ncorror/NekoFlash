@@ -38,8 +38,6 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
-import java.util.zip.ZipEntry
-import java.util.zip.ZipOutputStream
 
 class DeviceViewModel(
     application: Application,
@@ -157,6 +155,7 @@ class DeviceViewModel(
     private val flashDraftLock = Any()
     private val flashDraftPreparationSequence = AtomicLong(0L)
     private val flashDraftPreparationTokens = ConcurrentHashMap<String, Long>()
+    private val quickFlashConfirmationRegistry = QuickFlashConfirmationRegistry()
     private var flashDraftSnapshot: FlashOperationDraft = FlashOperationDraftPolicy.markNeedsRevalidation(
         FlashOperationDraftCodec.decode(savedStateHandle.get<ArrayList<String>>(SAVED_FLASH_QUEUE_DRAFT))
     )
@@ -420,6 +419,7 @@ class DeviceViewModel(
 
     private fun captureUsbSession(candidate: UsbDeviceInspector.Candidate, usbManager: UsbManager) {
         connectedUsbManager = usbManager
+        quickFlashConfirmationRegistry.clear()
         val sessionId = createTransportSessionId(candidate)
         activeTransportSessionId = sessionId
         _transportSessionId.postValue(sessionId)
@@ -748,6 +748,7 @@ class DeviceViewModel(
             flushDiagnostics("DISCONNECT:$reason", terminal = false)
         }
         clearFastbootStaging(reason)
+        quickFlashConfirmationRegistry.clear()
         pendingUsbTargetKey = null
         connectedUsbTarget = null
         connectedUsbManager = null
@@ -941,7 +942,6 @@ class DeviceViewModel(
             val candidate = connectedUsbTarget
             val manager = connectedUsbManager
             val nativeState = NativeUsbfsBackend.backendState()
-            val probePassed = runCatching { createDiagnosticZipProbe(reports) }.getOrDefault(false)
             val mode = when (_connectionState.value ?: ConnectionState.NONE) {
                 ConnectionState.ADB -> "ADB"
                 ConnectionState.FASTBOOT -> "FASTBOOT"
@@ -964,7 +964,6 @@ class DeviceViewModel(
                     operationActive = operationJob?.isCompleted == false,
                     transportRestartRequired = transportRestartRequired.get(),
                     nativeTransferActive = NativeUsbfsBackend.hasActiveTransfer || nativeState.nativeTransferActive,
-                    diagnosticZipProbePassed = probePassed,
                     freeBytes = workspace?.usableSpace
                 )
             )
@@ -981,32 +980,6 @@ class DeviceViewModel(
             log(if (result.ready) "✅ ${result.summary()}" else "⛔ ${result.summary()}")
             onComplete(result)
         }
-    }
-
-    private fun createDiagnosticZipProbe(reportsDir: File?): Boolean {
-        val dir = reportsDir ?: return false
-        if (!dir.exists() && !dir.mkdirs()) return false
-        val probe = File(dir, ".diagnostic-readiness-probe.zip")
-        val entries = listOf(
-            "manifest.txt" to "probe",
-            "app-info.txt" to BuildConfig.BUILD_ID,
-            "usb-info.txt" to "probe",
-            "adb-info.txt" to "probe",
-            "fastboot-info.txt" to "probe",
-            "diagnostic-summary.json" to "{\"schema\":\"probe\"}",
-            "visible-log.txt" to "probe",
-            "logs/trace-01-probe.txt" to "probe"
-        )
-        ZipOutputStream(probe.outputStream().buffered()).use { zip ->
-            entries.forEach { (name, value) ->
-                zip.putNextEntry(ZipEntry(name))
-                zip.write(value.toByteArray(Charsets.UTF_8))
-                zip.closeEntry()
-            }
-        }
-        val valid = DiagnosticArchiveVerifier.verify(probe, requireTrace = true).valid
-        runCatching { probe.delete() }
-        return valid
     }
 
     fun setDebugLogging(enabled: Boolean) {
@@ -1712,6 +1685,118 @@ class DeviceViewModel(
                 if (!result.success) failOperation(formatFlashFailure(partition, result))
             } finally {
                 releaseFastbootStagedArtifact(prepared, "single flash finished")
+            }
+        }
+    }
+
+    /**
+     * Slice D execution path for the Recovery-first UI.
+     *
+     * A confirmation ticket is consumed exactly once. The plan, USB session,
+     * image identity and concrete topology candidate are revalidated inside the
+     * operation immediately before one call to flashPartitionDetailed().
+     */
+    fun runConfirmedQuickFlash(
+        plan: QuickFlashPlan,
+        sourceFile: File,
+        ticket: QuickFlashMutationGate.ConfirmationTicket,
+        expertModeEnabled: Boolean
+    ) {
+        startOperation(
+            text(R.string.notif_flash_img),
+            text(R.string.notif_flashing_partition, sourceFile.name, plan.partitionName)
+        ) {
+            val confirmationAvailable = quickFlashConfirmationRegistry.consume(ticket.confirmationId)
+            val proto = fastbootProtocol ?: failOperation("Нет Fastboot-соединения")
+            val canonicalFile = runCatching { sourceFile.canonicalFile }
+                .getOrElse { failOperation("Quick Flash file path invalid: ${it.message ?: it.javaClass.simpleName}") }
+
+            val artifactId = runCatching { computeFastbootArtifactId(canonicalFile) }
+                .getOrElse { failOperation("Quick Flash image identity failed: ${it.message ?: it.javaClass.simpleName}") }
+            val actualSha256 = artifactId.substringAfter("sha256:").substringBefore(":bytes=")
+            val inventory = currentFastbootPartitionInventory()
+                ?: failOperation("Quick Flash inventory отсутствует; выполните Refresh и подтвердите план заново")
+
+            val topology = QuickFlashTopologyCandidateBuilder.buildFromInventory(
+                QuickFlashTopologyCandidateBuilder.InventoryRequest(
+                    inventory = inventory,
+                    imageDisplayName = canonicalFile.name,
+                    expertModeEnabled = expertModeEnabled,
+                    manualPartitionName = plan.partitionName.takeIf { plan.target == QuickFlashTarget.MANUAL },
+                    maxPointQueries = 0,
+                    sessionBroken = proto.isSessionBroken
+                )
+            )
+            val currentCandidates = topology.candidates.filter { it.target == plan.target }
+            val unlocked = FastbootMutationSafety.parseFastbootBoolean(proto.currentDiagnostics()?.unlocked)
+            val gate = QuickFlashMutationGate.evaluate(
+                QuickFlashMutationGate.Request(
+                    plan = plan,
+                    ticket = ticket,
+                    runtime = QuickFlashMutationGate.RuntimeEvidence(
+                        currentSessionId = currentTransportSessionId(),
+                        fastbootConnected = proto.isConnected,
+                        sessionBroken = proto.isSessionBroken,
+                        readOnlyMutationLock = readOnlyMutationLockEnabled,
+                        expertModeEnabled = expertModeEnabled,
+                        bootloaderUnlocked = unlocked,
+                        currentImageUri = canonicalFile.toURI().toString(),
+                        currentImageDisplayName = canonicalFile.name,
+                        currentImageSizeBytes = canonicalFile.length(),
+                        currentImageSha256 = actualSha256,
+                        currentCandidates = currentCandidates,
+                        confirmationAvailable = confirmationAvailable
+                    )
+                )
+            )
+            gate.warnings.forEach { log("⚠️ Quick Flash gate: $it") }
+            if (!gate.allowed) {
+                failOperation("Quick Flash mutation blocked: ${gate.errors.joinToString()}")
+            }
+            val authorization = gate.authorization
+                ?: failOperation("Quick Flash mutation authorization отсутствует")
+
+            log("=== QUICK FLASH MUTATION GATE ===")
+            log("Confirmation: ${authorization.confirmationId}")
+            log("Plan fingerprint: ${authorization.planFingerprint.take(16)}…")
+            log("Execution fingerprint: ${authorization.executionFingerprint.take(16)}…")
+            log("Authorized command count: ${authorization.commandCount}; retry=${authorization.retryAllowed}")
+            log("Authorized command: fastboot ${authorization.fastbootArguments.joinToString(" ")}")
+
+            val targetSize = proto.partitionSizeBytes(authorization.partitionName)
+            if (proto.isSessionBroken) {
+                failOperation("Fastboot-сессия BROKEN во время финальной проверки partition size")
+            }
+            if (targetSize != null && targetSize > 0L && canonicalFile.length() > targetSize) {
+                failOperation(
+                    "Файл ${canonicalFile.name} (${formatBytesShort(canonicalFile.length())}) больше раздела " +
+                        "${authorization.partitionName} (${formatBytesShort(targetSize)})"
+                )
+            }
+
+            val preparationMode = FastbootFlashPreparationPolicy.forGuidedPartition(plan.basePartition)
+            var prepared: PreparedFastbootDataArtifact? = null
+            try {
+                val activePrepared = prepareGuidedFastbootDataArtifact(
+                    proto = proto,
+                    sourceFile = canonicalFile,
+                    targetPartition = authorization.partitionName,
+                    mode = preparationMode
+                )
+                prepared = activePrepared
+                if (currentTransportSessionId() != plan.deviceSessionId || proto.isSessionBroken) {
+                    failOperation("Quick Flash session changed after staging; flash command was not sent")
+                }
+
+                // Exactly one mutation call. No loop and no automatic retry.
+                val result = proto.flashPartitionDetailed(authorization.partitionName, activePrepared.stagedFile)
+                recordFastbootDataEvidenceFromFlash(proto, result, activePrepared)
+                if (!result.success) {
+                    failOperation(formatFlashFailure(authorization.partitionName, result))
+                }
+                log("✅ Quick Flash completed: exactly one flash command for ${authorization.partitionName}")
+            } finally {
+                prepared?.let { releaseFastbootStagedArtifact(it, "confirmed quick flash finished") }
             }
         }
     }

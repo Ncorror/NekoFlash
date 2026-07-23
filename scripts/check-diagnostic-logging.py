@@ -14,7 +14,6 @@ vm = (ROOT / "app/src/main/java/ru/forum/adbfastboottool/DeviceViewModel.kt").re
 store = (ROOT / "app/src/main/java/ru/forum/adbfastboottool/DiagnosticLogStore.kt").read_text(encoding="utf-8")
 policy = (ROOT / "app/src/main/java/ru/forum/adbfastboottool/DiagnosticLogPolicy.kt").read_text(encoding="utf-8")
 fastboot = (ROOT / "app/src/main/java/ru/forum/adbfastboottool/FastbootProtocol.kt").read_text(encoding="utf-8")
-report = (ROOT / "app/src/main/java/ru/forum/adbfastboottool/ForumReportManager.kt").read_text(encoding="utf-8")
 main = (ROOT / "app/src/main/java/ru/forum/adbfastboottool/MainActivity.kt").read_text(encoding="utf-8")
 
 log_file_only = vm.split("fun logFileOnly(message: String)", 1)[-1].split("private fun appendCompactMessageLocked", 1)[0]
@@ -32,31 +31,24 @@ require("progressLogStepPercent(debugLogging)" in fastboot, "Fastboot DATA progr
 require("uiProgressStepPercent" in fastboot, "UI progress must remain independent from file log cadence")
 require("fun progressLogStepPercent" in policy, "progress cadence policy missing")
 
-for token in (
-    "logs/compact-",
-    "logs/trace-",
-    "session-summary.json",
-    "partition-inventory.json",
-    "forum-report.v6",
-):
-    require(token in report, f"diagnostic ZIP missing {token}")
-for token in ("currentLogFiles()", "currentTraceLogFiles()", "currentDiagnosticSessionSummary()"):
-    require(token in main, f"MainActivity report wiring missing {token}")
 
+# The full forum ZIP exporter is intentionally outside the active V6 scope.
+for removed_name in ("ForumReportManager.kt", "DiagnosticReportFormatter.kt", "DiagnosticArchiveVerifier.kt"):
+    require(not (ROOT / "app/src/main/java/ru/forum/adbfastboottool" / removed_name).exists(), f"removed exporter returned: {removed_name}")
+for token in ("SelfTestForumReport", "createForumReport(", "runSelfTestForumReportFromUi(", "Полный диагностический ZIP создаётся"):
+    require(token not in main, f"removed forum-report UI/command token returned: {token}")
+require("selftest.v3" in vm and "ReportSanitizer.sanitizeLines" in vm, "sanitized TXT/JSON self-test must remain")
 
 # Diagnostic readiness and ADB single-reader invariants.
 mode = (ROOT / "app/src/main/java/ru/forum/adbfastboottool/DiagnosticModePolicy.kt").read_text(encoding="utf-8")
 readiness = (ROOT / "app/src/main/java/ru/forum/adbfastboottool/DiagnosticReadiness.kt").read_text(encoding="utf-8")
-archive = (ROOT / "app/src/main/java/ru/forum/adbfastboottool/DiagnosticArchiveVerifier.kt").read_text(encoding="utf-8")
 adb = (ROOT / "app/src/main/java/ru/forum/adbfastboottool/AdbProtocol.kt").read_text(encoding="utf-8")
 dispatcher = (ROOT / "app/src/main/java/ru/forum/adbfastboottool/AdbPacketDispatcher.kt").read_text(encoding="utf-8")
 adb_read_only = (ROOT / "app/src/main/java/ru/forum/adbfastboottool/AdbReadOnlyPolicy.kt").read_text(encoding="utf-8")
 for token in ("EXTENDED_READ_ONLY", "USB_STRESS_READ_ONLY", "mutationLockRequired"):
     require(token in mode, f"diagnostic mode policy missing {token}")
-for token in ("READ_ONLY", "ZIP_PROBE", "BULK_ENDPOINTS", "TRANSPORT_CLEAN"):
+for token in ("READ_ONLY", "BULK_ENDPOINTS", "TRANSPORT_CLEAN"):
     require(token in readiness, f"readiness check missing {token}")
-for token in ("DiagnosticArchiveVerifier.verify", "usb-session.json"):
-    require(token in report, f"diagnostic report readiness missing {token}")
 for token in ("readOnlyMutationLock", "BrokenReasonCode", "runMutationPreflight"):
     require(token in fastboot, f"Fastboot diagnostic guard missing {token}")
 require("AdbPacketDispatcher" in adb and "startPacketDispatcher()" in adb, "ADB single-reader dispatcher not wired")

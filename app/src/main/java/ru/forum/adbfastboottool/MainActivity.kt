@@ -51,12 +51,14 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.switchmaterial.SwitchMaterial
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.Locale
+import java.util.UUID
 
 class MainActivity : AppCompatActivity() {
 
@@ -108,6 +110,7 @@ class MainActivity : AppCompatActivity() {
     private var terminalReturnWindow = "home"
     private var restoringWindowState = false
     private var highRiskActionsUnlocked = false
+    private var quickFlashExpertModeEnabled = false
     private var overlayProtectionLogged = false
     private var redirectingToWelcome = false
 
@@ -175,7 +178,6 @@ class MainActivity : AppCompatActivity() {
         data object LocalStatus : TerminalAction()
         data object SelfTest : TerminalAction()
         data object SelfTestReport : TerminalAction()
-        data object SelfTestForumReport : TerminalAction()
         data object OpenReportsFolder : TerminalAction()
         data class RawFastboot(val command: String) : TerminalAction()
         data class DestructiveFastboot(val command: String, val risk: String) : TerminalAction()
@@ -364,18 +366,15 @@ class MainActivity : AppCompatActivity() {
         findViewById<View>(R.id.btnFlashRebootMode).setOnClickListener { showRebootMenu() }
         // Тонкая кнопка терминала над плитками Fastboot.
         findViewById<View>(R.id.btnFastbootTerminal).setOnClickListener { switchTab("console") }
-        findViewById<View>(R.id.btnFastbootDataSelfTest).setOnClickListener { showFastbootDataSelfTestDialog() }
-        findViewById<View>(R.id.btnFastbootDataSharedStorageProbe).setOnClickListener {
-            showFastbootSharedStorageProbeDialog()
+        findViewById<View>(R.id.btnFastbootDataSelfTest).setOnClickListener {
+            openFastbootDiagnosticAction(getString(R.string.layout_fastboot_data_self_test_button)) {
+                showFastbootDataSelfTestDialog()
+            }
         }
-        findViewById<View>(R.id.btnFastbootDataQualifyImage).setOnClickListener {
-            showFastbootDataQualificationFileSelector()
-        }
-        findViewById<View>(R.id.btnFastbootDataAutoMatrix).setOnClickListener {
-            showFastbootAutoMatrixDialog()
-        }
-        findViewById<View>(R.id.btnFastbootDataContentProbe).setOnClickListener {
-            showFastbootContentProbeFileSelector()
+        findViewById<View>(R.id.btnFastbootDataAdvanced).setOnClickListener {
+            openFastbootDiagnosticAction(getString(R.string.layout_fastboot_data_advanced_button)) {
+                showFastbootAdvancedDiagnosticsDialog()
+            }
         }
         findViewById<View>(R.id.btnConsoleTerminal).setOnClickListener { switchTab("console") }
         findViewById<View>(R.id.btnTerminalMinimize).setOnClickListener { minimizeTerminal() }
@@ -404,15 +403,45 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btnQueueClear).setOnClickListener { clearFlashQueue() }
         guardClick(R.id.btnQueueStart) { confirmFlashQueue() }
 
-        // v4 UI: прямые кнопки разделов (vbmeta УДАЛЕНА)
-        fun flashPartBtn(partition: String) {
-            showFileSelector(".img") { file -> showFlashConfirmation(partition, file) }
+        // Slice C: Recovery-first UI. Expert targets are hidden by default and
+        // all visible actions are resolved through QuickFlashTopologyCandidateBuilder.
+        val expertSwitch = findViewById<SwitchMaterial>(R.id.switchQuickFlashExpert)
+        expertSwitch.isChecked = false
+        renderQuickFlashExpertMode(false)
+        expertSwitch.setOnCheckedChangeListener { _, enabled ->
+            renderQuickFlashExpertMode(enabled)
+            viewModel.log(
+                getString(
+                    if (enabled) R.string.quick_flash_ui_enabled_log
+                    else R.string.quick_flash_ui_disabled_log
+                )
+            )
         }
-        findViewById<View>(R.id.btnFlashBoot).setOnClickListener       { flashPartBtn("boot") }
-        findViewById<View>(R.id.btnFlashInitBoot).setOnClickListener   { flashPartBtn("init_boot") }
-        findViewById<View>(R.id.btnFlashRecovery).setOnClickListener   { flashPartBtn("recovery") }
-        findViewById<View>(R.id.btnFlashVendorBoot).setOnClickListener { flashPartBtn("vendor_boot") }
-        findViewById<View>(R.id.btnFlashDtbo).setOnClickListener       { flashPartBtn("dtbo") }
+        findViewById<View>(R.id.btnFlashRecovery).setOnClickListener {
+            startQuickFlashTargetFlow(QuickFlashTarget.RECOVERY)
+        }
+        findViewById<View>(R.id.btnFlashBoot).setOnClickListener {
+            startQuickFlashTargetFlow(QuickFlashTarget.BOOT)
+        }
+        findViewById<View>(R.id.btnFlashInitBoot).setOnClickListener {
+            startQuickFlashTargetFlow(QuickFlashTarget.INIT_BOOT)
+        }
+        findViewById<View>(R.id.btnFlashVendorBoot).setOnClickListener {
+            startQuickFlashTargetFlow(QuickFlashTarget.VENDOR_BOOT)
+        }
+        findViewById<View>(R.id.btnFlashDtbo).setOnClickListener {
+            startQuickFlashTargetFlow(QuickFlashTarget.DTBO)
+        }
+        findViewById<View>(R.id.btnFlashVbmeta).setOnClickListener {
+            startQuickFlashTargetFlow(QuickFlashTarget.VBMETA)
+        }
+        findViewById<View>(R.id.btnFlashVendorKernelBoot).setOnClickListener {
+            startQuickFlashTargetFlow(QuickFlashTarget.VENDOR_KERNEL_BOOT)
+        }
+        findViewById<View>(R.id.btnFlashManual).setOnClickListener {
+            showManualQuickFlashTargetDialog()
+        }
+        viewModel.log(getString(R.string.quick_flash_legacy_queue_hidden))
 
         // Единое меню Reboot (BottomSheet) — собирает все варианты перезагрузки.
         findViewById<Button>(R.id.btnAdbSideload).setOnClickListener {
@@ -815,12 +844,6 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        if (isSelfTestForumReportCommand(rawLower)) {
-            viewModel.log("> $raw")
-            runSelfTestForumReportFromUi()
-            return
-        }
-
         if (isSelfTestReportCommand(rawLower)) {
             viewModel.log("> $raw")
             runSelfTestReportFromUi()
@@ -919,7 +942,6 @@ class MainActivity : AppCompatActivity() {
             TerminalAction.LocalStatus -> viewModel.logConnectionStatus()
             TerminalAction.SelfTest -> viewModel.runSelfTest()
             TerminalAction.SelfTestReport -> runSelfTestReportFromUi()
-            TerminalAction.SelfTestForumReport -> runSelfTestForumReportFromUi()
             TerminalAction.OpenReportsFolder -> openReportsFolder()
             is TerminalAction.RawFastboot -> viewModel.runFastbootCommand(action.command)
             is TerminalAction.DestructiveFastboot -> confirmDestructiveFastbootCommand(action.command, action.risk)
@@ -944,7 +966,6 @@ class MainActivity : AppCompatActivity() {
             TerminalAction.LocalStatus -> viewModel.logConnectionStatus()
             TerminalAction.SelfTest -> viewModel.runSelfTest()
             TerminalAction.SelfTestReport -> runSelfTestReportFromUi()
-            TerminalAction.SelfTestForumReport -> runSelfTestForumReportFromUi()
             TerminalAction.OpenReportsFolder -> openReportsFolder()
             is TerminalAction.AdbService -> viewModel.runAdbService(action.service)
             is TerminalAction.AdbShell -> viewModel.runAdbShell(action.command)
@@ -1626,7 +1647,12 @@ class MainActivity : AppCompatActivity() {
     private fun registerMiLoginLauncher() {
         miLoginLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             if (result.resultCode != Activity.RESULT_OK) {
-                viewModel.log("Вход в Mi-аккаунт отменён")
+                val reason = result.data?.getStringExtra(MiLoginActivity.EXTRA_LOGIN_ERROR)?.trim().orEmpty()
+                if (reason.isBlank()) {
+                    viewModel.log("Вход в Mi-аккаунт отменён пользователем")
+                } else {
+                    viewModel.log("❌ Вход в Mi-аккаунт не завершён: $reason")
+                }
                 return@registerForActivityResult
             }
             val passToken = result.data?.getStringExtra("passToken")
@@ -1636,7 +1662,7 @@ class MainActivity : AppCompatActivity() {
                 viewModel.log("❌ Вход в Mi-аккаунт: не получены данные авторизации")
                 return@registerForActivityResult
             }
-            viewModel.log("🔑 Вход выполнен (ID: $userId). Получение unlockApi-сессии...")
+            viewModel.log("🔑 Вход выполнен. Получение unlockApi-сессии...")
             miAuthExchangeJob?.cancel()
             miAuthExchangeState = MiAuthExchangeState.LOADING
             miAuthExchangeJob = lifecycleScope.launch {
@@ -1661,6 +1687,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startMiLogin() {
+        viewModel.log("🔑 Открыта официальная страница входа Xiaomi для unlockApi")
         miLoginLauncher.launch(Intent(this, MiLoginActivity::class.java))
     }
 
@@ -1918,6 +1945,39 @@ class MainActivity : AppCompatActivity() {
         FastbootProtocol.DataTransportMode.NATIVE_USBFS_PIPELINE_128K,
         FastbootProtocol.DataTransportMode.NATIVE_USBFS_PIPELINE_256K
     )
+
+    private fun openFastbootDiagnosticAction(label: String, action: () -> Unit) {
+        viewModel.log("Fastboot DATA: нажато «$label»")
+        if (viewModel.fastbootProtocol == null) {
+            val message = getString(R.string.fastboot_data_no_device)
+            viewModel.log("⚠️ Fastboot DATA: $message")
+            Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+            return
+        }
+        action()
+    }
+
+    private fun showFastbootAdvancedDiagnosticsDialog() {
+        val labels = arrayOf(
+            getString(R.string.layout_fastboot_data_shared_probe_button),
+            getString(R.string.layout_fastboot_data_qualify_image_button),
+            getString(R.string.layout_fastboot_data_auto_matrix_button),
+            getString(R.string.layout_fastboot_data_content_probe_button)
+        )
+        MaterialAlertDialogBuilder(this)
+            .setTitle(getString(R.string.fastboot_data_advanced_title))
+            .setItems(labels) { _, which ->
+                viewModel.log("Fastboot DATA: выбран расширенный тест «${labels[which]}»")
+                when (which) {
+                    0 -> showFastbootSharedStorageProbeDialog()
+                    1 -> showFastbootDataQualificationFileSelector()
+                    2 -> showFastbootAutoMatrixDialog()
+                    3 -> showFastbootContentProbeFileSelector()
+                }
+            }
+            .setNegativeButton(getString(R.string.cancel_upper), null)
+            .show()
+    }
 
     private fun showFastbootAutoMatrixDialog() {
         val product = viewModel.fastbootProtocol?.compatibilityProduct?.trim().orEmpty().ifBlank { "unknown" }
@@ -2255,10 +2315,8 @@ class MainActivity : AppCompatActivity() {
             readOnlyLabel to { toggleDiagnosticReadOnlyFromUi() },
             "СКОПИРОВАТЬ КРАТКИЙ ИТОГ" to { copyDiagnosticSummary() },
             getString(R.string.reports_open_folder) to { openReportsFolder() },
-            getString(R.string.reports_forum_zip) to { createForumReport() },
             getString(R.string.reports_log_actions) to { showLogActions() },
-            getString(R.string.reports_selftest) to { runSelfTestReportFromUi() },
-            getString(R.string.reports_selftest_forum) to { runSelfTestForumReportFromUi() }
+            getString(R.string.reports_selftest) to { runSelfTestReportFromUi() }
         )
         val container = android.widget.LinearLayout(this).apply {
             orientation = android.widget.LinearLayout.VERTICAL
@@ -2616,6 +2674,330 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun renderQuickFlashExpertMode(enabled: Boolean) {
+        quickFlashExpertModeEnabled = enabled
+        findViewById<View>(R.id.containerQuickFlashExpertTargets).visibility =
+            if (enabled) View.VISIBLE else View.GONE
+        findViewById<TextView>(R.id.tvQuickFlashExpertState).setText(
+            if (enabled) R.string.quick_flash_expert_on else R.string.quick_flash_expert_off
+        )
+    }
+
+    private fun startQuickFlashTargetFlow(
+        target: QuickFlashTarget,
+        manualPartitionName: String? = null,
+        manualPartitionConfirmation: String? = null
+    ) {
+        if (!QuickFlashUiPolicy.isVisible(target, quickFlashExpertModeEnabled)) {
+            blockQuickFlash(getString(R.string.quick_flash_expert_required))
+            return
+        }
+        showFileSelector(".img") { file ->
+            val inventorySessionId = viewModel.currentTransportSessionId()?.takeIf { it.isNotBlank() }
+            val inventory = viewModel.currentFastbootPartitionInventory()
+            if (inventorySessionId == null || inventory == null) {
+                MaterialAlertDialogBuilder(this)
+                    .setTitle(getString(R.string.quick_flash_inventory_required_title))
+                    .setMessage(getString(R.string.quick_flash_inventory_required_message))
+                    .setNegativeButton(getString(R.string.cancel_upper), null)
+                    .setPositiveButton(getString(R.string.quick_flash_refresh)) { _, _ ->
+                        refreshDeviceDataFromUi()
+                    }
+                    .show()
+                return@showFileSelector
+            }
+
+            viewModel.log(getString(R.string.quick_flash_hashing, file.name))
+            lifecycleScope.launch {
+                val sha256 = withContext(Dispatchers.IO) {
+                    runCatching { HashUtils.calculateSha256(file) }
+                }.getOrElse { error ->
+                    blockQuickFlash("SHA-256: ${error.message ?: error.javaClass.simpleName}")
+                    return@launch
+                }
+
+                if (viewModel.currentTransportSessionId() != inventorySessionId) {
+                    blockQuickFlash(getString(R.string.quick_flash_session_changed))
+                    return@launch
+                }
+
+                val result = QuickFlashTopologyCandidateBuilder.buildFromInventory(
+                    QuickFlashTopologyCandidateBuilder.InventoryRequest(
+                        inventory = inventory,
+                        imageDisplayName = file.name,
+                        expertModeEnabled = quickFlashExpertModeEnabled,
+                        manualPartitionName = manualPartitionName,
+                        sessionBroken = viewModel.fastbootProtocol?.isSessionBroken == true
+                    )
+                )
+                val candidates = result.candidates.filter { it.target == target }
+                if (!result.canChooseTarget || candidates.isEmpty()) {
+                    val technical = result.errors.joinToString().ifBlank { result.status.name }
+                    blockQuickFlash(
+                        getString(R.string.quick_flash_no_candidate) + "\n\n" + technical
+                    )
+                    return@launch
+                }
+                showQuickFlashCandidateSelector(
+                    target = target,
+                    candidates = candidates,
+                    file = file,
+                    sha256 = sha256,
+                    expectedSessionId = inventorySessionId,
+                    manualPartitionConfirmation = manualPartitionConfirmation
+                )
+            }
+        }
+    }
+
+    private fun showManualQuickFlashTargetDialog() {
+        if (!quickFlashExpertModeEnabled) {
+            blockQuickFlash(getString(R.string.quick_flash_expert_required))
+            return
+        }
+        val padding = (16 * resources.displayMetrics.density).toInt()
+        val first = EditText(this).apply {
+            hint = getString(R.string.quick_flash_manual_hint)
+            inputType = InputType.TYPE_CLASS_TEXT
+            setSingleLine(true)
+        }
+        val repeated = EditText(this).apply {
+            hint = getString(R.string.quick_flash_manual_repeat_hint)
+            inputType = InputType.TYPE_CLASS_TEXT
+            setSingleLine(true)
+        }
+        val body = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(padding, 0, padding, 0)
+            addView(first)
+            addView(repeated)
+        }
+        MaterialAlertDialogBuilder(this)
+            .setTitle(getString(R.string.quick_flash_manual_title))
+            .setMessage(getString(R.string.quick_flash_manual_message))
+            .setView(body)
+            .setNegativeButton(getString(R.string.cancel_upper), null)
+            .setPositiveButton(getString(R.string.continue_upper)) { _, _ ->
+                val partition = first.text?.toString()?.trim()?.lowercase(Locale.US).orEmpty()
+                val confirmation = repeated.text?.toString()?.trim()?.lowercase(Locale.US).orEmpty()
+                when {
+                    partition != confirmation -> blockQuickFlash(getString(R.string.quick_flash_manual_mismatch))
+                    !QuickFlashPlanValidator.isManualPartitionAllowed(partition) -> {
+                        blockQuickFlash(getString(R.string.quick_flash_manual_forbidden))
+                    }
+                    else -> startQuickFlashTargetFlow(
+                        target = QuickFlashTarget.MANUAL,
+                        manualPartitionName = partition,
+                        manualPartitionConfirmation = confirmation
+                    )
+                }
+            }
+            .show()
+    }
+
+    private fun showQuickFlashCandidateSelector(
+        target: QuickFlashTarget,
+        candidates: List<QuickFlashCandidate>,
+        file: File,
+        sha256: String,
+        expectedSessionId: String,
+        manualPartitionConfirmation: String?
+    ) {
+        if (candidates.size == 1) {
+            showQuickFlashPlanConfirmation(
+                target,
+                candidates,
+                candidates.single(),
+                file,
+                sha256,
+                expectedSessionId,
+                manualPartitionConfirmation
+            )
+            return
+        }
+        val items = candidates.map(::quickFlashCandidateLabel).toTypedArray()
+        MaterialAlertDialogBuilder(this)
+            .setTitle(getString(R.string.quick_flash_candidate_title, target.name.lowercase(Locale.US)))
+            .setMessage(
+                getString(
+                    R.string.quick_flash_candidate_message,
+                    file.name,
+                    formatFileSize(file.length()),
+                    sha256
+                )
+            )
+            .setItems(items) { _, which ->
+                showQuickFlashPlanConfirmation(
+                    target,
+                    candidates,
+                    candidates[which],
+                    file,
+                    sha256,
+                    expectedSessionId,
+                    manualPartitionConfirmation
+                )
+            }
+            .setNegativeButton(getString(R.string.cancel_upper), null)
+            .show()
+    }
+
+    private fun showQuickFlashPlanConfirmation(
+        target: QuickFlashTarget,
+        candidates: List<QuickFlashCandidate>,
+        candidate: QuickFlashCandidate,
+        file: File,
+        sha256: String,
+        expectedSessionId: String,
+        manualPartitionConfirmation: String?
+    ) {
+        if (!ensureGuidedFlashAllowed(candidate.basePartition)) return
+        if (viewModel.fastbootProtocol?.isConnected != true) {
+            blockQuickFlash(getString(R.string.error_no_fastboot))
+            return
+        }
+        if (viewModel.currentTransportSessionId() != expectedSessionId) {
+            blockQuickFlash(getString(R.string.quick_flash_session_changed))
+            return
+        }
+        val sessionId = expectedSessionId
+        val diagnostics = viewModel.currentFastbootDiagnostics()
+        if (diagnostics?.unlocked?.equals("no", ignoreCase = true) == true) {
+            blockQuickFlash("Bootloader unlocked = no")
+            return
+        }
+        val deviceLabel = viewModel.currentConnectionInfo()
+            ?.takeIf { it.isNotBlank() }
+            ?: diagnostics?.product?.takeIf { it.isNotBlank() }
+            ?: "Fastboot device"
+        val validation = QuickFlashPlanValidator.validate(
+            QuickFlashPlanRequest(
+                deviceSessionId = sessionId,
+                deviceDisplayName = deviceLabel,
+                target = target,
+                selectedPartitionName = candidate.partitionName,
+                candidates = candidates,
+                imageUri = file.toURI().toString(),
+                imageDisplayName = file.name,
+                imageSizeBytes = file.length(),
+                imageSha256 = sha256,
+                expertModeEnabled = quickFlashExpertModeEnabled,
+                manualPartitionConfirmation = manualPartitionConfirmation
+            )
+        )
+        val plan = validation.plan
+        if (!validation.canProceed || plan == null) {
+            blockQuickFlash(validation.errors.joinToString())
+            return
+        }
+        val ticketIssue = QuickFlashMutationGate.issueConfirmation(
+            plan = plan,
+            confirmationId = UUID.randomUUID().toString()
+        )
+        val confirmationTicket = ticketIssue.ticket
+        if (!ticketIssue.issued || confirmationTicket == null) {
+            blockQuickFlash(ticketIssue.errors.joinToString())
+            return
+        }
+
+        val preflight = PreflightValidator.validateFlash(
+            context = this,
+            partition = candidate.basePartition,
+            file = file,
+            currentSlot = diagnostics?.currentSlot,
+            safePartitions = setOf(candidate.basePartition)
+        )
+        preflight.toDisplayText().lines().forEach { line ->
+            if (line.isNotBlank()) viewModel.log(line)
+        }
+        val slotLabel = quickFlashSlotLabel(candidate.slot)
+        val evidenceLabel = quickFlashEvidenceLabel(candidate.evidence)
+        val builder = MaterialAlertDialogBuilder(this)
+            .setTitle(getString(R.string.quick_flash_plan_title))
+            .setIcon(R.drawable.ic_nf_recovery_green)
+            .setMessage(
+                getString(
+                    R.string.quick_flash_plan_message,
+                    plan.deviceDisplayName,
+                    plan.imageDisplayName,
+                    formatFileSize(plan.imageSizeBytes),
+                    plan.imageSha256,
+                    plan.target.name.lowercase(Locale.US),
+                    plan.partitionName,
+                    slotLabel,
+                    evidenceLabel,
+                    plan.commandPreview,
+                    plan.confirmationFingerprint().take(16),
+                    preflight.toDisplayText()
+                )
+            )
+            .setNegativeButton(getString(R.string.cancel_upper), null)
+
+        if (preflight.canProceed) {
+            builder.setPositiveButton(getString(R.string.preflight_proceed)) { _, _ ->
+                val execute = {
+                    when {
+                        viewModel.currentTransportSessionId() != plan.deviceSessionId -> {
+                            blockQuickFlash(getString(R.string.quick_flash_session_changed))
+                        }
+                        plan.target.isExpert && !quickFlashExpertModeEnabled -> {
+                            blockQuickFlash(getString(R.string.quick_flash_expert_disabled_after_plan))
+                        }
+                        !QuickFlashPlanValidator.validatePlan(plan).canProceed -> {
+                            blockQuickFlash(getString(R.string.quick_flash_no_candidate))
+                        }
+                        else -> viewModel.runConfirmedQuickFlash(
+                            plan = plan,
+                            sourceFile = file,
+                            ticket = confirmationTicket,
+                            expertModeEnabled = quickFlashExpertModeEnabled
+                        )
+                    }
+                }
+                if (PreflightValidator.requiresDoubleConfirm(plan.basePartition)) {
+                    confirmCriticalFlash(plan.basePartition, execute)
+                } else {
+                    execute()
+                }
+            }
+        } else {
+            builder.setPositiveButton(getString(R.string.preflight_blocked), null)
+        }
+        builder.show()
+    }
+
+    private fun quickFlashCandidateLabel(candidate: QuickFlashCandidate): String =
+        getString(
+            R.string.quick_flash_candidate_label,
+            candidate.partitionName,
+            quickFlashSlotLabel(candidate.slot),
+            quickFlashEvidenceLabel(candidate.evidence)
+        )
+
+    private fun quickFlashSlotLabel(slot: QuickFlashSlot): String = getString(
+        when (slot) {
+            QuickFlashSlot.UNSLOTTED -> R.string.quick_flash_candidate_slot_unslotted
+            QuickFlashSlot.SLOT_A -> R.string.quick_flash_candidate_slot_a
+            QuickFlashSlot.SLOT_B -> R.string.quick_flash_candidate_slot_b
+        }
+    )
+
+    private fun quickFlashEvidenceLabel(evidence: QuickFlashCandidateEvidence): String = getString(
+        when (evidence) {
+            QuickFlashCandidateEvidence.POINT_QUERY -> R.string.quick_flash_candidate_evidence_point
+            QuickFlashCandidateEvidence.INVENTORY,
+            QuickFlashCandidateEvidence.UNCONFIRMED -> R.string.quick_flash_candidate_evidence_inventory
+        }
+    )
+
+    private fun blockQuickFlash(message: String) {
+        viewModel.log("⛔ Quick Flash: $message")
+        MaterialAlertDialogBuilder(this)
+            .setTitle(getString(R.string.quick_flash_blocked_title))
+            .setMessage(message)
+            .setPositiveButton(getString(R.string.close_upper), null)
+            .show()
+    }
+
     private fun showFlashConfirmation(partition: String, file: File) {
         if (!ensureGuidedFlashAllowed(partition)) return
         if (viewModel.fastbootProtocol?.isConnected != true) {
@@ -2933,7 +3315,6 @@ class MainActivity : AppCompatActivity() {
         val sub = tokens.getOrNull(1)?.lowercase(Locale.US)
         return when (sub) {
             "report", "export", "log", "txt", "json" -> TerminalAction.SelfTestReport
-            "forum", "zip", "bundle", "full", "support" -> TerminalAction.SelfTestForumReport
             else -> TerminalAction.SelfTest
         }
     }
@@ -2961,31 +3342,6 @@ class MainActivity : AppCompatActivity() {
             rawLower == "doctor json" ||
             rawLower == "adb self-test report" ||
             rawLower == "fastboot self-test report"
-    }
-
-    private fun isSelfTestForumReportCommand(rawLower: String): Boolean {
-        return rawLower == "self-test forum" ||
-            rawLower == "self-test zip" ||
-            rawLower == "self-test bundle" ||
-            rawLower == "self-test full" ||
-            rawLower == "self-test support" ||
-            rawLower == "selftest forum" ||
-            rawLower == "selftest zip" ||
-            rawLower == "selftest bundle" ||
-            rawLower == "selftest full" ||
-            rawLower == "selftest support" ||
-            rawLower == "smoke-test forum" ||
-            rawLower == "smoke-test zip" ||
-            rawLower == "smoke-test bundle" ||
-            rawLower == "smoke-test full" ||
-            rawLower == "smoke-test support" ||
-            rawLower == "doctor forum" ||
-            rawLower == "doctor zip" ||
-            rawLower == "doctor bundle" ||
-            rawLower == "doctor full" ||
-            rawLower == "doctor support" ||
-            rawLower == "adb self-test forum" ||
-            rawLower == "fastboot self-test forum"
     }
 
     private fun runDiagnosticReadinessFromUi() {
@@ -3065,101 +3421,6 @@ class MainActivity : AppCompatActivity() {
             .setTitle("Self-test отчёт создан")
             .setMessage("Файлы сохранены:\n${artifacts.textFile.absolutePath}\n${artifacts.jsonFile.absolutePath}\n\nОтчёты санитизированы: серийники, приватные пути и host-идентификаторы замаскированы. TXT удобно читать человеку, JSON удобно прикладывать к баг-репорту.")
             .setPositiveButton(getString(R.string.share_upper)) { _, _ -> shareGenericFile(artifacts.textFile, "text/plain", "ADB Fastboot Tool self-test report") }
-            .setNeutralButton("ОТКРЫТЬ REPORTS") { _, _ -> openReportsFolder() }
-            .setNegativeButton(getString(R.string.close_upper), null)
-            .show()
-    }
-
-    private fun runSelfTestForumReportFromUi() {
-        if (!ensureWorkspaceReady()) return
-        viewModel.runSelfTestReportArtifacts { artifacts ->
-            lifecycleScope.launch(Dispatchers.IO) {
-                try {
-                    val report = ForumReportManager.createReport(
-                        context = this@MainActivity,
-                        usbManager = usbManager,
-                        workspace = workspacePath,
-                        currentLogFile = viewModel.currentLogFile(),
-                        compactLogFiles = viewModel.currentLogFiles(),
-                        traceLogFiles = viewModel.currentTraceLogFiles(),
-                        sessionSummary = viewModel.currentDiagnosticSessionSummary(),
-                        partitionInventory = viewModel.currentFastbootPartitionInventory(),
-                        usbSessionSnapshot = viewModel.currentUsbSessionSnapshot(),
-                        buildId = viewModel.currentBuildId(),
-                        diagnosticMode = viewModel.currentDiagnosticMode(),
-                        readOnlyMutationLock = viewModel.isReadOnlyMutationLockEnabled(),
-                        transportSessionId = viewModel.currentTransportSessionId(),
-                        visibleLogLines = viewModel.logSnapshot(),
-                        connectionInfo = viewModel.currentConnectionInfo(),
-                        fastbootDiagnostics = viewModel.currentFastbootDiagnostics(),
-                        adbDiagnostics = viewModel.currentAdbDiagnostics(),
-                        debugLogging = viewModel.isDebugLoggingEnabled(),
-                        extraFiles = listOf(
-                            artifacts.textFile to "self-test/selftest.txt",
-                            artifacts.jsonFile to "self-test/selftest.json"
-                        )
-                    )
-                    val verification = DiagnosticArchiveVerifier.verify(
-                        report,
-                        requireTrace = viewModel.currentDiagnosticMode() != DiagnosticModePolicy.Mode.NORMAL || viewModel.isDebugLoggingEnabled()
-                    )
-                    viewModel.log("✅ Self-test ZIP для форума создан: ${report.absolutePath} (privacy: sanitized)")
-                    viewModel.log("✅ ${verification.message}")
-                    runOnUiThread { showForumReportDialog(report, verification) }
-                } catch (e: Exception) {
-                    viewModel.log("ОШИБКА: не удалось создать ZIP с self-test: ${e.message ?: e.javaClass.simpleName}")
-                }
-            }
-        }
-    }
-
-
-    private fun createForumReport() {
-        if (!ensureWorkspaceReady()) return
-        lifecycleScope.launch(Dispatchers.IO) {
-            try {
-                val report = ForumReportManager.createReport(
-                    context = this@MainActivity,
-                    usbManager = usbManager,
-                    workspace = workspacePath,
-                    currentLogFile = viewModel.currentLogFile(),
-                    compactLogFiles = viewModel.currentLogFiles(),
-                    traceLogFiles = viewModel.currentTraceLogFiles(),
-                    sessionSummary = viewModel.currentDiagnosticSessionSummary(),
-                    partitionInventory = viewModel.currentFastbootPartitionInventory(),
-                    usbSessionSnapshot = viewModel.currentUsbSessionSnapshot(),
-                    buildId = viewModel.currentBuildId(),
-                    diagnosticMode = viewModel.currentDiagnosticMode(),
-                    readOnlyMutationLock = viewModel.isReadOnlyMutationLockEnabled(),
-                    transportSessionId = viewModel.currentTransportSessionId(),
-                    visibleLogLines = viewModel.logSnapshot(),
-                    connectionInfo = viewModel.currentConnectionInfo(),
-                    fastbootDiagnostics = viewModel.currentFastbootDiagnostics(),
-                    adbDiagnostics = viewModel.currentAdbDiagnostics(),
-                    debugLogging = viewModel.isDebugLoggingEnabled()
-                )
-                val verification = DiagnosticArchiveVerifier.verify(
-                    report,
-                    requireTrace = viewModel.currentDiagnosticMode() != DiagnosticModePolicy.Mode.NORMAL || viewModel.isDebugLoggingEnabled()
-                )
-                viewModel.log("✅ Отчёт для форума создан: ${report.absolutePath} (privacy: sanitized)")
-                viewModel.log("✅ ${verification.message}")
-                runOnUiThread { showForumReportDialog(report, verification) }
-            } catch (e: Exception) {
-                viewModel.log("ОШИБКА: не удалось создать отчёт для форума: ${e.message ?: e.javaClass.simpleName}")
-            }
-        }
-    }
-
-    private fun showForumReportDialog(
-        report: File,
-        verification: DiagnosticArchiveVerifier.Result = DiagnosticArchiveVerifier.verify(report, requireTrace = false)
-    ) {
-        val verificationText = if (verification.valid) verification.message else "ВНИМАНИЕ: ${verification.message}"
-        MaterialAlertDialogBuilder(this)
-            .setTitle(getString(R.string.dialog_report_title))
-            .setMessage(getString(R.string.report_created_message, report.absolutePath) + "\n\n" + verificationText)
-            .setPositiveButton(getString(R.string.share_upper)) { _, _ -> shareGenericFile(report, "application/zip", "ADB Fastboot Tool forum report") }
             .setNeutralButton("ОТКРЫТЬ REPORTS") { _, _ -> openReportsFolder() }
             .setNegativeButton(getString(R.string.close_upper), null)
             .show()
@@ -3258,7 +3519,7 @@ class MainActivity : AppCompatActivity() {
                 getString(R.string.log_dialog_message, file.absolutePath) +
                     "\n\nКомпактных сегментов: ${viewModel.currentLogFiles().size}" +
                     "\nTrace-сегментов: ${viewModel.currentTraceLogFiles().size}" +
-                    "\nПолный диагностический ZIP создаётся через меню «Отчёты»."
+                    "\n" + getString(R.string.log_dialog_reports_note)
             )
             .setPositiveButton(getString(R.string.copy_path_upper)) { _, _ ->
                 copyTextToClipboard("ADB Fastboot log", file.absolutePath, getString(R.string.log_path_copied))
