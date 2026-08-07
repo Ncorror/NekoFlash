@@ -373,6 +373,20 @@ class DeviceViewModel(
         sessionSummaryFile
     }
 
+    fun flushDiagnostics(reason: String, terminal: Boolean = false) {
+        synchronized(logLock) {
+            flushSuppressedDuplicatesLocked()
+            if (terminal) diagnosticSessionTracker.recordTermination(reason)
+            appendRawToTraceFile(
+                formatLogLine(
+                    "[session-flush] reason=$reason terminal=$terminal " +
+                        "transportSession=${activeTransportSessionId ?: "none"}"
+                )
+            )
+            persistSessionSummary()
+        }
+    }
+
     private fun formatLogLine(message: String): String {
         val stamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
         return "[$stamp] $message\n"
@@ -461,7 +475,6 @@ class DeviceViewModel(
                         return@withLock
                     }
 
-                    clearFastbootStaging("новая USB generation=$generation")
                     pendingUsbTargetKey = null
                     connectedUsbTarget = candidate
                     connectedDeviceInfo = buildDeviceInfo(candidate)
@@ -683,7 +696,6 @@ class DeviceViewModel(
             diagnosticSessionTracker.recordTermination(reason)
             flushDiagnostics("DISCONNECT:$reason", terminal = false)
         }
-        clearFastbootStaging(reason)
         pendingUsbTargetKey = null
         connectedUsbTarget = null
         connectedUsbManager = null

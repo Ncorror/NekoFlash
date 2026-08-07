@@ -1864,7 +1864,6 @@ class MainActivity : AppCompatActivity() {
         val text = buildString {
             appendLine("Build: ${snapshot.buildId}")
             appendLine("Session: ${snapshot.sessionId}")
-            appendLine("Diagnostic mode: ${snapshot.diagnosticMode}")
             appendLine("Transport session: ${snapshot.activeTransportSessionId ?: "none"}")
             appendLine()
             appendLine("Messages: info=${snapshot.infoCount}, success=${snapshot.successCount}, warnings=${snapshot.warningCount}, errors=${snapshot.errorCount}")
