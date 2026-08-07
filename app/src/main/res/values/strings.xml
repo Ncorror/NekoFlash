@@ -327,4 +327,5 @@ Unlock</string>
     <string name="flash_progress_cancelled">Operation cancelled</string>
     <string name="console_resize_handle_desc">Drag up or down to resize Console. Double-tap to reset its height.</string>
 
+    <string name="device_workspace_value">%1$s | %2$s | session=%3$s</string>
 </resources>

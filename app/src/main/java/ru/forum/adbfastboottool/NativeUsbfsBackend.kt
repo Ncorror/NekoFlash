@@ -96,8 +96,8 @@ object NativeUsbfsBackend {
         }
         val stateUnavailable = queryFailed || raw == null || raw.size < BACKEND_STATE_FIELD_COUNT
         return BackendState(
-            poisoned = stateUnavailable || raw?.getOrNull(0) == 1L,
-            nativeTransferActive = stateUnavailable || raw?.getOrNull(1) == 1L,
+            poisoned = stateUnavailable || raw.getOrNull(0) == 1L,
+            nativeTransferActive = stateUnavailable || raw.getOrNull(1) == 1L,
             nativeTransferToken = raw?.getOrNull(2) ?: 0L,
             confirmedBytes = raw?.getOrNull(3) ?: 0L,
             submittedBytes = raw?.getOrNull(4) ?: 0L,

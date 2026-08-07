@@ -2814,8 +2814,12 @@ class MainActivity : AppCompatActivity() {
             inventoryPart
         )
         val session = viewModel.currentTransportSessionId() ?: "нет"
-        findViewById<TextView>(R.id.tvDeviceWorkspaceValue).text =
-            "$workspace | ${viewModel.currentBuildId()} | session=$session"
+        findViewById<TextView>(R.id.tvDeviceWorkspaceValue).text = getString(
+            R.string.device_workspace_value,
+            workspace,
+            viewModel.currentBuildId(),
+            session
+        )
     }
 
 

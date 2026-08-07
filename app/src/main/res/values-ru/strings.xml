@@ -331,4 +331,5 @@ Unlock</string>
     <string name="flash_progress_cancelled">Операция отменена</string>
     <string name="console_resize_handle_desc">Потяните вверх или вниз, чтобы изменить высоту Console. Двойное нажатие сбрасывает высоту.</string>
 
+    <string name="device_workspace_value">%1$s | %2$s | сессия=%3$s</string>
 </resources>
