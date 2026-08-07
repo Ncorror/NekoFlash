@@ -1012,12 +1012,14 @@ class DeviceViewModel(
         mainHandler.post(block)
     }
 
-    fun runFastbootCommand(cmd: String) {
+    fun runFastbootCommand(cmd: String, heavy: Boolean = true) {
         startOperation(
             text(R.string.notif_fastboot_command),
-            text(R.string.notif_executing, cmd)
+            text(R.string.notif_executing, cmd),
+            heavy = heavy
         ) {
             val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
+            if (!proto.isConnected) failOperation(text(R.string.error_no_fastboot))
             if (!proto.sendCommand(cmd)) failOperation("Fastboot-команда завершилась ошибкой: $cmd")
         }
     }

@@ -827,7 +827,21 @@ class MainActivity : AppCompatActivity() {
             null -> return
             TerminalAction.LocalStatus -> viewModel.logConnectionStatus()
             TerminalAction.OpenReportsFolder -> openReportsFolder()
-            is TerminalAction.RawFastboot -> viewModel.runFastbootCommand(action.command)
+            is TerminalAction.RawFastboot -> {
+                val hostOp = action.command.substringBefore(' ').substringBefore(':')
+                if (!hostOp.matches(Regex("^-{0,2}[A-Za-z0-9][A-Za-z0-9._-]*$"))) {
+                    viewModel.log("❌ Некорректная Fastboot-команда: $hostOp")
+                } else if (viewModel.fastbootProtocol?.isConnected != true) {
+                    viewModel.log(
+                        DiagnosticLogPolicy.Level.ERROR,
+                        "ОШИБКА: Fastboot-устройство не подключено. Команда не отправлена."
+                    )
+                } else {
+                    // Raw/OEM passthrough остаётся разрешённым; terminal FAIL/OKAY
+                    // показывается в Console без блокирующего progress-dialog.
+                    viewModel.runFastbootCommand(action.command, heavy = false)
+                }
+            }
             is TerminalAction.FastbootFlash -> viewModel.runFlash(action.partition, action.file)
             is TerminalAction.FastbootDownloadAndRun -> viewModel.runFastbootDownloadAndRun(action.file, action.commandAfterDownload)
             is TerminalAction.FastbootLogicalInfo -> viewModel.inspectFastbootLogicalPartition(action.partition)
@@ -847,8 +861,26 @@ class MainActivity : AppCompatActivity() {
             null -> return
             TerminalAction.LocalStatus -> viewModel.logConnectionStatus()
             TerminalAction.OpenReportsFolder -> openReportsFolder()
-            is TerminalAction.AdbService -> viewModel.runAdbService(action.service)
-            is TerminalAction.AdbShell -> viewModel.runAdbShell(action.command)
+            is TerminalAction.AdbService -> {
+                if (viewModel.adbProtocol?.isConnected != true) {
+                    viewModel.log(
+                        DiagnosticLogPolicy.Level.ERROR,
+                        "ОШИБКА: ADB-устройство не подключено. Команда не отправлена."
+                    )
+                } else {
+                    viewModel.runAdbService(action.service)
+                }
+            }
+            is TerminalAction.AdbShell -> {
+                if (viewModel.adbProtocol?.isConnected != true) {
+                    viewModel.log(
+                        DiagnosticLogPolicy.Level.ERROR,
+                        "ОШИБКА: ADB-устройство не подключено. Команда не отправлена."
+                    )
+                } else {
+                    viewModel.runAdbShell(action.command)
+                }
+            }
             is TerminalAction.AdbPush -> viewModel.runAdbPush(action.localFile, action.remotePath)
             is TerminalAction.AdbPull -> viewModel.runAdbPull(action.remotePath, action.localFile)
             is TerminalAction.AdbInstall -> viewModel.runAdbInstall(action.packageFile, action.options)

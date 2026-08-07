@@ -1,3 +1,10 @@
+## 6.0.0-alpha7 build 221 - Terminal error UX
+
+- Missing ADB/Fastboot connection is reported inline in Console.
+- Raw Fastboot terminal commands no longer open the blocking flash progress dialog.
+- Non-ASCII host Fastboot operation tokens are rejected before USB execution.
+- Valid raw/OEM Fastboot passthrough remains available on a connected device.
+
 # История изменений NekoFlash
 
 ## V6.0.0-alpha7 — UI cleanup + hardware-test readiness
