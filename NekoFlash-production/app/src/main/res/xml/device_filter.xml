@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        Универсальный attach-фильтр для Android USB transport.
+
+        ADB и Fastboot используют vendor-specific USB интерфейсы (class 0xFF).
+        Android DeviceFilter сопоставляет class-фильтр не только с device
+        descriptor, но и с interface descriptors, поэтому один wildcard по
+        class=255 охватывает:
+          - canonical ADB:      0xFF / 0x42 / 0x01;
+          - canonical Fastboot: 0xFF / 0x42 / 0x03;
+          - OEM Fastboot с нестандартными subclass/protocol;
+          - новые VID/PID без обновления списка производителей.
+
+        Этот фильтр только доставляет attach intent. Он НЕ определяет протокол.
+        UsbDeviceInspector отдельно требует корректный bulk IN+OUT pair:
+          - canonical/compat интерфейсы могут подключаться автоматически;
+          - generic vendor bulk interface показывается только для ручного выбора;
+          - Fastboot считается подключённым лишь после успешного protocol exchange.
+    -->
+    <usb-device class="255" />
+</resources>

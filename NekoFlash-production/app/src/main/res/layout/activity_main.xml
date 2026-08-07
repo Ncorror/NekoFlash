@@ -1,0 +1,503 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    UI V6 — restrained cyber-dark shell over unchanged operational logic:
+    - Console is a persistent Material Bottom Sheet over the active page
+    - The collapsed sheet reserves a safe viewport at the bottom of the content
+    - Ambiguous empty history glyphs are hidden from the compact console
+    - Orange is reserved for brand/primary emphasis; secondary controls are dark
+    - Navigation and transport logic remain unchanged
+    - vbmeta remains removed from the normal queue/menu
+-->
+<androidx.coordinatorlayout.widget.CoordinatorLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/rootCoordinator"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:id="@+id/mainContent"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+    <!-- ═══ PERSISTENT HEADER: brand + persistent connection state + actions ═══ -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:background="@drawable/bg_app_header"
+        android:gravity="center_vertical"
+        android:paddingStart="14dp"
+        android:paddingEnd="10dp"
+        android:orientation="horizontal">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center_vertical"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:letterSpacing="0.08"
+                android:text="@string/app_name"
+                android:textColor="@color/accent"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:ellipsize="end"
+                android:fontFamily="monospace"
+                android:maxLines="1"
+                android:text="@string/layout_status_no_device"
+                android:textColor="@color/text_muted"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- SCAN -->
+        <!-- Импорт файла — глобально доступен с любой вкладки -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnScan"
+            android:layout_width="40dp"
+            android:layout_height="36dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:text="@string/layout_icon_scan"
+            android:textSize="16sp"
+            android:layout_marginStart="6dp"
+            app:backgroundTint="@color/bg_elevated"
+            app:cornerRadius="12dp" />
+
+        <!-- EXPERT режим убран из хедера — профиль теперь в Настройках -->
+
+        <!-- СТОП (красная) — всегда видна -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnCancel"
+            android:layout_width="40dp"
+            android:layout_height="36dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:text="@string/layout_icon_cancel"
+            android:textSize="16sp"
+            android:layout_marginStart="6dp"
+            app:backgroundTint="#32171A"
+            app:cornerRadius="12dp" />
+    </LinearLayout>
+
+    <!-- ═══ OTG-индикатор: тонкая строка под верхней панелью ═══════════════ -->
+    <TextView
+        android:id="@+id/tvOtgStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="10dp"
+        android:layout_marginTop="6dp"
+        android:layout_marginEnd="10dp"
+        android:layout_marginBottom="6dp"
+        android:background="@drawable/bg_otg_strip"
+        android:gravity="center_vertical"
+        android:minHeight="34dp"
+        android:text="@string/otg_status_checking"
+        android:textColor="@color/text_secondary"
+        android:textSize="11sp"
+        android:fontFamily="monospace" />
+
+    <!-- ═══ НАВИГАЦИЯ: 4 иконки ══════════════════════════════════════════ -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:background="@color/bg_header"
+        android:orientation="horizontal">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/tabHome"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:text="@string/layout_icon_home"
+            android:textSize="11sp"
+            android:lineSpacingExtra="1dp"
+            android:gravity="center"
+            android:maxLines="2"
+            android:paddingHorizontal="0dp"
+            app:textAllCaps="false"
+            android:textColor="@color/accent"
+            app:backgroundTint="@color/bg_elevated"
+            app:cornerRadius="0dp" />
+
+        <View android:layout_width="1dp" android:layout_height="match_parent" android:background="@color/stroke" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/tabFastboot"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:text="@string/layout_icon_fastboot"
+            android:textSize="11sp"
+            android:lineSpacingExtra="1dp"
+            android:gravity="center"
+            android:maxLines="2"
+            android:paddingHorizontal="0dp"
+            app:textAllCaps="false"
+            android:textColor="@color/text_secondary"
+            app:backgroundTint="@color/bg_card"
+            app:cornerRadius="0dp" />
+
+        <View android:layout_width="1dp" android:layout_height="match_parent" android:background="@color/stroke" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/tabAdb"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:text="@string/layout_icon_adb"
+            android:textSize="11sp"
+            android:lineSpacingExtra="1dp"
+            android:gravity="center"
+            android:maxLines="2"
+            android:paddingHorizontal="0dp"
+            app:textAllCaps="false"
+            android:textColor="@color/text_secondary"
+            app:backgroundTint="@color/bg_card"
+            app:cornerRadius="0dp" />
+
+        <View android:layout_width="1dp" android:layout_height="match_parent" android:background="@color/stroke" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/tabUnlock"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:text="@string/layout_icon_unlock_tab"
+            android:textSize="11sp"
+            android:lineSpacingExtra="1dp"
+            android:gravity="center"
+            android:maxLines="2"
+            android:paddingHorizontal="0dp"
+            app:textAllCaps="false"
+            android:textColor="@color/text_secondary"
+            app:backgroundTint="@color/bg_card"
+            app:cornerRadius="0dp" />
+
+        <View android:layout_width="1dp" android:layout_height="match_parent" android:background="@color/stroke" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/tabSettings"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:text="@string/layout_icon_settings_tab"
+            android:textSize="11sp"
+            android:lineSpacingExtra="1dp"
+            android:gravity="center"
+            android:maxLines="2"
+            android:paddingHorizontal="0dp"
+            app:textAllCaps="false"
+            android:textColor="@color/text_secondary"
+            app:backgroundTint="@color/bg_card"
+            app:cornerRadius="0dp" />
+    </LinearLayout>
+
+    <!-- ═══ КОНТЕНТ (верхняя половина, скроллируется) ═══════════════════ -->
+    <FrameLayout
+        android:id="@+id/contentContainer"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:paddingBottom="@dimen/console_collapsed_height">
+
+        <!-- ── HOME ─────────────────────────────────────────────────── -->
+        <include layout="@layout/page_home" />
+
+        <!-- ── FLASH (⚡) ───────────────────────────────────────────── -->
+        <include layout="@layout/page_fastboot" />
+
+        <!-- ── SIDELOAD (↯) ──────────────────────────────────────────── -->
+        <include layout="@layout/page_adb" />
+
+
+        <!-- ── НАСТРОЙКИ (Settings) — наполняется программно ─────────── -->
+        <ScrollView
+            android:id="@+id/pageSettings"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:overScrollMode="ifContentScrolls"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:id="@+id/settingsContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="14dp" />
+        </ScrollView>
+
+        <!-- ── РАЗБЛОКИРОВКА ЗАГРУЗЧИКА (Mi Unlock) — наполняется программно ── -->
+        <ScrollView
+            android:id="@+id/pageUnlock"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:overScrollMode="ifContentScrolls"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:id="@+id/unlockContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="14dp" />
+        </ScrollView>
+
+
+        </FrameLayout>
+    </LinearLayout>
+
+    <!-- ═══ ЛОГ — PERSISTENT MATERIAL BOTTOM SHEET ═══════════════════ -->
+    <LinearLayout
+        android:id="@+id/consolePanel"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/bg_bottom_sheet"
+        android:elevation="16dp"
+        android:orientation="vertical"
+        app:behavior_expandedOffset="0dp"
+        app:behavior_fitToContents="false"
+        app:behavior_halfExpandedRatio="0.55"
+        app:behavior_hideable="false"
+        app:behavior_peekHeight="@dimen/console_collapsed_height"
+        app:behavior_skipCollapsed="false"
+        app:layout_behavior="com.google.android.material.bottomsheet.BottomSheetBehavior">
+
+        <FrameLayout
+            android:id="@+id/consoleResizeHandle"
+            android:layout_width="match_parent"
+            android:layout_height="20dp"
+            android:clickable="true"
+            android:contentDescription="@string/console_resize_handle_desc"
+            android:focusable="true">
+
+            <View
+                android:layout_width="46dp"
+                android:layout_height="4dp"
+                android:layout_gravity="center"
+                android:background="@drawable/bg_console_handle" />
+        </FrameLayout>
+
+        <!-- Заголовок CONSOLE — кликабельный, сворачивает/разворачивает -->
+        <LinearLayout
+            android:id="@+id/consoleHeader"
+            android:layout_width="match_parent"
+            android:layout_height="46dp"
+            android:background="@drawable/bg_console_header"
+            android:gravity="center_vertical"
+            android:paddingStart="14dp"
+            android:paddingEnd="12dp"
+            android:orientation="horizontal"
+            android:clickable="true"
+            android:focusable="true">
+
+            <!-- Стрелка состояния (▼ развёрнуто / ▲ свёрнуто) -->
+            <TextView
+                android:id="@+id/tvConsoleToggle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/layout_icon_down"
+                android:textColor="@color/accent"
+                android:textSize="11sp"
+                android:layout_marginEnd="8dp"
+                android:fontFamily="monospace" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/layout_console_title"
+                android:textColor="@color/accent"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.15"
+                android:fontFamily="monospace" />
+
+            <!-- Превью последней строки (видно когда свёрнуто) -->
+            <TextView
+                android:id="@+id/tvConsolePeek"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="10dp"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:textColor="@color/text_muted"
+                android:textSize="11sp"
+                android:fontFamily="monospace" />
+
+            <!-- Открывает сохранённые логи и диагностические сессии.
+                 Это действие, а не переключатель режима Console/Terminal. -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnConsoleLogs"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:layout_marginStart="8dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:paddingStart="9dp"
+                android:paddingEnd="10dp"
+                android:text="@string/console_logs_button"
+                android:textAllCaps="false"
+                android:textColor="@color/text_primary"
+                android:textSize="11sp"
+                android:visibility="gone"
+                app:backgroundTint="@color/bg_card"
+                app:cornerRadius="10dp"
+                app:icon="@drawable/ic_nf_reports"
+                app:iconGravity="textStart"
+                app:iconPadding="5dp"
+                app:iconSize="15dp"
+                app:iconTint="@color/accent"
+                app:strokeColor="#806A4428"
+                app:strokeWidth="1dp" />
+
+            <!-- Кнопки истории (видны когда развёрнуто) -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnHistoryUp"
+                android:visibility="gone"
+                android:layout_width="28dp"
+                android:layout_height="26dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:text="@string/layout_icon_up"
+                android:textSize="11sp"
+                android:textColor="@color/text_muted"
+                app:backgroundTint="@color/bg_card"
+                app:cornerRadius="9dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnHistoryDown"
+                android:visibility="gone"
+                android:layout_width="28dp"
+                android:layout_height="26dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:text="@string/layout_icon_down"
+                android:textSize="11sp"
+                android:textColor="@color/text_muted"
+                android:layout_marginStart="4dp"
+                app:backgroundTint="@color/bg_card"
+                app:cornerRadius="9dp" />
+
+            <!-- Единая консоль: переключатели «Логи»/«Терминал» удалены. -->
+        </LinearLayout>
+
+        <!-- Тело консоли занимает всё пространство между header и нижней кромкой sheet.
+             RelativeLayout сохраняет фиксированную нижнюю строку без вложенных layout_weight. -->
+        <RelativeLayout
+            android:id="@+id/consoleBody"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1">
+
+            <!-- Единая строка команды, закреплённая снизу; доступна только в PRO. -->
+            <LinearLayout
+                android:id="@+id/consoleInputBar"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_alignParentBottom="true"
+                android:background="@color/bg_header"
+                android:gravity="center_vertical"
+                android:paddingHorizontal="8dp"
+                android:orientation="horizontal"
+                android:visibility="gone">
+
+                <EditText
+                    android:id="@+id/etCommand"
+                    android:layout_width="0dp"
+                    android:layout_height="38dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_console_input"
+                    android:fontFamily="monospace"
+                    android:hint="@string/layout_command_hint"
+                    android:textColorHint="@color/text_muted"
+                    android:textColor="@color/text_primary"
+                    android:textSize="12sp"
+                    android:imeOptions="actionSend"
+                    android:inputType="textNoSuggestions"
+                    android:importantForAutofill="no"
+                    android:maxLines="1"
+                    android:paddingHorizontal="10dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnSend"
+                    android:layout_width="50dp"
+                    android:layout_height="38dp"
+                    android:layout_marginStart="7dp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:contentDescription="@string/terminal_send"
+                    android:text=""
+                    app:backgroundTint="@color/bg_elevated"
+                    app:cornerRadius="13dp"
+                    app:icon="@drawable/ic_send"
+                    app:iconGravity="textStart"
+                    app:iconPadding="0dp"
+                    app:iconSize="21dp"
+                    app:iconTint="@color/accent"
+                    app:strokeColor="#806A4428"
+                    app:strokeWidth="1dp" />
+            </LinearLayout>
+
+            <!-- Единый вывод Console. RecyclerView создаёт только видимые строки,
+                 поэтому длинные ADB/Fastboot-сессии не раздувают один TextView. -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvConsoleOutput"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_alignParentTop="true"
+                android:layout_above="@id/consoleInputBar"
+                android:clipToPadding="false"
+                android:overScrollMode="ifContentScrolls"
+                android:paddingHorizontal="10dp"
+                android:paddingTop="4dp"
+                android:paddingBottom="2dp"
+                android:scrollbars="vertical" />
+        </RelativeLayout>
+    </LinearLayout>
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

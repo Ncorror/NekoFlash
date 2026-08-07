@@ -1,0 +1,13 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <dimen name="welcome_horizontal_padding">24dp</dimen>
+    <dimen name="welcome_top_padding">28dp</dimen>
+    <dimen name="welcome_bottom_padding">12dp</dimen>
+    <dimen name="welcome_panel_padding_horizontal">12dp</dimen>
+    <dimen name="welcome_panel_padding_vertical">9dp</dimen>
+    <dimen name="welcome_chip_height">42dp</dimen>
+    <dimen name="welcome_risk_row_height">42dp</dimen>
+    <dimen name="welcome_status_height">28dp</dimen>
+    <dimen name="welcome_primary_button_height">46dp</dimen>
+    <dimen name="console_collapsed_height">66dp</dimen>
+</resources>

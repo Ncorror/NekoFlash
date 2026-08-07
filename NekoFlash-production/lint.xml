@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<lint>
+    <!-- AGP 8.13 officially uses Gradle 8.13 as its default supported pairing. -->
+    <issue id="AndroidGradlePluginVersion">
+        <ignore regexp="A newer version of Gradle than 8[.]13 is available" />
+    </issue>
+
+    <!-- Core 1.19.0 requires API 37 / AGP 9.1; Core 1.17.0 is the API-36 pin. -->
+    <issue id="GradleDependency">
+        <ignore regexp="A newer version of androidx[.]core:core-ktx than 1[.]17[.]0 is available" />
+    </issue>
+</lint>

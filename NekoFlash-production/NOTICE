@@ -1,0 +1,73 @@
+NekoFlash
+Copyright 2026 Ncorror
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+================================================================================
+Protocols and technical foundation
+================================================================================
+
+NekoFlash implements the ADB and Fastboot wire protocols and AVB/vbmeta image
+parsing based on the public specifications of the Android Open Source Project
+(AOSP), licensed under the Apache License, Version 2.0.
+
+    Android Open Source Project
+    Copyright (C) The Android Open Source Project
+    https://source.android.com
+    Licensed under the Apache License, Version 2.0
+
+The protocol implementations in NekoFlash are independent original work written
+in Kotlin on top of the Android USB Host API (UsbManager / UsbDeviceConnection).
+No source code from AOSP is copied into this product.
+
+================================================================================
+Acknowledgements (ideas and inspiration, not code)
+================================================================================
+
+The following open-source projects inspired ideas and approaches in NekoFlash.
+No source code from these projects is included; only concepts were studied.
+
+  * termux-adb / termux-api (https://github.com/nohajc/termux-adb)
+      Inspiration for operating ADB/USB from Android without root.
+
+  * MiUnlockTool by offici5l (https://github.com/offici5l/MiUnlockTool)
+      Licensed under the Apache License, Version 2.0.
+      The Mi Unlock request sequence and signed transport were studied and
+      independently re-implemented in Kotlin on HttpURLConnection.
+
+  * migate by offici5l (https://github.com/offici5l/migate)
+      Licensed under the MIT License.
+      The unlockApi service-login sequence (serviceLogin, nonce/ssecurity,
+      clientSign, service cookies) and dataCenterZone resolution were studied
+      and independently re-implemented in Kotlin.
+
+  * MiTools by offici5l (https://github.com/offici5l/MiTool)
+      Licensed under the Apache License, Version 2.0.
+      Earlier Mi account and phone-side flashing concepts were studied.
+
+  * Xiaomi Flash Master
+      UI inspiration (e.g. recovery accent treatment).
+
+================================================================================
+Third-party libraries
+================================================================================
+
+This product uses the following libraries, each under its own license:
+
+  * AndroidX libraries — Apache License, Version 2.0
+  * Material Components for Android — Apache License, Version 2.0
+  * Kotlin Standard Library and Coroutines — Apache License, Version 2.0
+
+================================================================================
+Images (NOT covered by the Apache 2.0 license)
+================================================================================
+
+The application icon and the welcome screen artwork are
+Copyright 2026 Ncorror. All rights reserved.
+
+These images were produced with the assistance of AI image tools and further
+refined manually. Unlike the source code, they are NOT licensed under the
+Apache License 2.0 and are NOT granted for reuse, redistribution, or
+modification. Anyone redistributing or forking this project must replace these
+images with their own artwork. The Apache 2.0 license applies to the source
+code only.

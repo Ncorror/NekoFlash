@@ -1,0 +1,7 @@
+# Canonical checkout bytes for deterministic SHA256SUMS across Termux/Linux/Windows.
+* text=auto eol=lf
+*.bat text eol=crlf
+*.jar binary
+*.jpg binary
+*.png binary
+*.zip binary
