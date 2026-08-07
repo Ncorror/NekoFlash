@@ -432,7 +432,7 @@
             android:layout_height="0dp"
             android:layout_weight="1">
 
-            <!-- Единая строка команды, закреплённая снизу; доступна только в PRO. -->
+            <!-- Единая строка команды: всегда доступна в развёрнутой Console. -->
             <LinearLayout
                 android:id="@+id/consoleInputBar"
                 android:layout_width="match_parent"
@@ -442,7 +442,7 @@
                 android:gravity="center_vertical"
                 android:paddingHorizontal="8dp"
                 android:orientation="horizontal"
-                android:visibility="gone">
+                android:visibility="visible">
 
                 <EditText
                     android:id="@+id/etCommand"

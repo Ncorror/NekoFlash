@@ -13,7 +13,7 @@
         android:orientation="vertical"
         android:padding="10dp">
 
-        <!-- HOMEINFO-001: карточка устройства и рабочей папки. Поведение сохраняется. -->
+        <!-- HOMEINFO-ALPHA7: компактный dashboard реального устройства/USB transport. -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/cardHomeDeviceInfo"
             android:layout_width="match_parent"
@@ -102,154 +102,23 @@
                     android:id="@+id/tvDeviceWorkspaceValue"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:text="@string/device_workspace_placeholder"
-                    android:textIsSelectable="true"
+                    android:layout_marginTop="6dp"
+                    android:text="@string/device_transport_placeholder"
                     android:textColor="@color/status_info"
                     android:textSize="11sp"
                     android:fontFamily="monospace" />
 
-                <!-- Кнопки действий -->
-                <LinearLayout
+                <!-- Единственное действие dashboard: перечитать реальные данные устройства. -->
+                <com.google.android.material.button.MaterialButton
+                    style="@style/Widget.NekoFlash.SecondaryAction"
+                    android:id="@+id/btnHomeRefreshData"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
+                    android:layout_height="40dp"
                     android:layout_marginTop="10dp"
-                    android:orientation="horizontal">
-
-                    <com.google.android.material.button.MaterialButton
-                        style="@style/Widget.NekoFlash.SecondaryAction"
-                        android:id="@+id/btnHomeRefreshData"
-                        android:layout_width="0dp"
-                        android:layout_height="40dp"
-                        android:layout_weight="1"
-                        android:text="@string/layout_refresh"
-                        android:textSize="12sp" />
-
-                    <com.google.android.material.button.MaterialButton
-                        style="@style/Widget.NekoFlash.SecondaryAction"
-                        android:id="@+id/btnHomePartitions"
-                        android:layout_width="0dp"
-                        android:layout_height="40dp"
-                        android:layout_weight="1"
-                        android:layout_marginStart="6dp"
-                        android:enabled="false"
-                        android:text="@string/layout_partitions"
-                        android:textSize="12sp" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:orientation="horizontal">
-
-                    <com.google.android.material.button.MaterialButton
-                        style="@style/Widget.NekoFlash.SecondaryAction"
-                        android:id="@+id/btnHomeOpenWorkspace"
-                        android:layout_width="0dp"
-                        android:layout_height="40dp"
-                        android:layout_weight="1"
-                        android:text="@string/home_open_workspace"
-                        android:textSize="11sp" />
-
-                    <com.google.android.material.button.MaterialButton
-                        style="@style/Widget.NekoFlash.SecondaryAction"
-                        android:id="@+id/btnHomeCopyWorkspace"
-                        android:layout_width="0dp"
-                        android:layout_height="40dp"
-                        android:layout_weight="1"
-                        android:layout_marginStart="6dp"
-                        android:text="@string/home_copy_workspace"
-                        android:textSize="11sp" />
-                </LinearLayout>
+                    android:text="@string/layout_refresh"
+                    android:textSize="12sp" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
-
-        <!-- HOMEACTIONS-001: четыре главных сценария V6. -->
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/cardHomePrimaryActions"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            app:cardBackgroundColor="@color/bg_card"
-            app:cardCornerRadius="16dp"
-            app:strokeColor="@color/stroke"
-            app:strokeWidth="1dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="12dp">
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="@string/home_primary_actions_title"
-                    android:textColor="@color/accent"
-                    android:textSize="11sp"
-                    android:textStyle="bold"
-                    android:letterSpacing="0.1"
-                    android:fontFamily="monospace" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:orientation="horizontal">
-
-                    <com.google.android.material.button.MaterialButton
-                        style="@style/Widget.NekoFlash.PartitionTile"
-                        android:id="@+id/btnHomeTerminal"
-                        android:layout_width="0dp"
-                        android:layout_height="52dp"
-                        android:layout_weight="1"
-                        android:text="@string/home_action_terminal"
-                        android:textAllCaps="false"
-                        android:textSize="12sp" />
-
-                    <com.google.android.material.button.MaterialButton
-                        style="@style/Widget.NekoFlash.PartitionTile"
-                        android:id="@+id/btnHomeQuickFlash"
-                        android:layout_width="0dp"
-                        android:layout_height="52dp"
-                        android:layout_weight="1"
-                        android:layout_marginStart="6dp"
-                        android:text="@string/home_action_quick_flash"
-                        android:textAllCaps="false"
-                        android:textSize="12sp" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:orientation="horizontal">
-
-                    <com.google.android.material.button.MaterialButton
-                        style="@style/Widget.NekoFlash.PartitionTile"
-                        android:id="@+id/btnHomeSideload"
-                        android:layout_width="0dp"
-                        android:layout_height="52dp"
-                        android:layout_weight="1"
-                        android:text="@string/home_action_sideload"
-                        android:textAllCaps="false"
-                        android:textSize="12sp" />
-
-                    <com.google.android.material.button.MaterialButton
-                        style="@style/Widget.NekoFlash.PartitionTile"
-                        android:id="@+id/btnHomeMiUnlock"
-                        android:layout_width="0dp"
-                        android:layout_height="52dp"
-                        android:layout_weight="1"
-                        android:layout_marginStart="6dp"
-                        android:text="@string/home_action_mi_unlock"
-                        android:textAllCaps="false"
-                        android:textSize="12sp" />
-                </LinearLayout>
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-
         <!-- Operation Center / Recovery-style result panel -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/cardOperationCenter"

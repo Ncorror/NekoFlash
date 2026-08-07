@@ -1,5 +1,14 @@
 # История изменений NekoFlash
 
+## V6.0.0-alpha7 — UI cleanup + hardware-test readiness
+
+- Restored the real ADB/Fastboot command input in the persistent Console.
+- Simplified Home into a device/transport dashboard; removed duplicate navigation/workspace actions.
+- Reworked Recovery-first Quick Flash to readable two-column targets and removed hardcoded `vendor_kernel_boot`.
+- Simplified Mi Unlock to account state + action, removing tutorial-only requirements/process cards.
+- Refit the approved launcher artwork into the Android adaptive-icon safe area.
+- Version: `6.0.0-alpha7` (`versionCode 220`).
+
 
 ## V6.0.0-alpha6 development — `6.0.0-alpha6-dev-nekoflash` (`218`)
 

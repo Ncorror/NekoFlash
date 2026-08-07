@@ -240,9 +240,7 @@ class MainActivity : AppCompatActivity() {
             refreshConnectionStatusLabel()
             updateDeviceOverview()
         }
-        viewModel.fastbootPartitionInventory.observe(this) { snapshot ->
-            // Read-only inventory is refreshed only by an explicit user action.
-            findViewById<Button>(R.id.btnHomePartitions).isEnabled = snapshot != null
+        viewModel.fastbootPartitionInventory.observe(this) {
             updateDeviceOverview()
         }
         viewModel.adbPeerMode.observe(this) {
@@ -341,26 +339,7 @@ class MainActivity : AppCompatActivity() {
         findViewById<View>(R.id.btnBlockImportQueue).setOnClickListener { startImportFilePicker() }
         // Режим перезагрузки в блоке прошивки — то же меню, что было на главной.
         findViewById<View>(R.id.btnFlashRebootMode).setOnClickListener { showRebootMenu() }
-        // Тонкая кнопка терминала над плитками Fastboot.
-        findViewById<View>(R.id.btnFastbootTerminal).setOnClickListener {
-            openConsole(requestCommandFocus = true)
-        }
         findViewById<Button>(R.id.btnHomeRefreshData).setOnClickListener { refreshDeviceDataFromUi() }
-        findViewById<Button>(R.id.btnHomePartitions).setOnClickListener { showPartitionInventoryDialog() }
-        findViewById<Button>(R.id.btnHomeOpenWorkspace).setOnClickListener { openWorkspaceFolder() }
-        findViewById<Button>(R.id.btnHomeCopyWorkspace).setOnClickListener {
-            copyTextToClipboard(
-                "NekoFlash workspace",
-                workspaceDisplayPath(),
-                getString(R.string.home_workspace_path_copied)
-            )
-        }
-        findViewById<Button>(R.id.btnHomeTerminal).setOnClickListener {
-            openConsole(requestCommandFocus = true)
-        }
-        findViewById<Button>(R.id.btnHomeQuickFlash).setOnClickListener { switchTab("fastboot") }
-        findViewById<Button>(R.id.btnHomeSideload).setOnClickListener { switchTab("adb") }
-        findViewById<Button>(R.id.btnHomeMiUnlock).setOnClickListener { switchTab("unlock") }
         findViewById<Button>(R.id.btnOperationCenterConsole).setOnClickListener {
             openConsole(requestCommandFocus = false)
         }
@@ -391,9 +370,6 @@ class MainActivity : AppCompatActivity() {
         }
         findViewById<View>(R.id.btnFlashVbmeta).setOnClickListener {
             startDirectFlash("vbmeta")
-        }
-        findViewById<View>(R.id.btnFlashVendorKernelBoot).setOnClickListener {
-            startDirectFlash("vendor_kernel_boot")
         }
         findViewById<View>(R.id.btnFlashManual).setOnClickListener {
             showManualQuickFlashTargetDialog()
@@ -2115,9 +2091,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * Страница «Разблокировка загрузчика» (Mi Unlock). Каркас этапа 1 —
-     * объясняет процесс и показывает шаги. Логин в Mi-аккаунт и сама
-     * разблокировка добавляются на следующих этапах.
+     * Action-first Mi Unlock page: account state, Fastboot precondition and unlock action.
      */
     private fun runMiUnlockFromUi(auth: MiAccountClient.AuthResult) {
         openConsole(requestCommandFocus = false)
@@ -2165,15 +2139,8 @@ class MainActivity : AppCompatActivity() {
         container.addView(title("🔓 РАЗБЛОКИРОВКА ЗАГРУЗЧИКА", "#E9782B"))
 
         container.addView(card().apply {
-            addView(body("Разблокировка загрузчика Xiaomi через официальный протокол Mi Unlock. Нужна для прошивки recovery, boot и других поддерживаемых образов.", "#F3F6FA"))
-            addView(body("⚠️ Разблокировка СТИРАЕТ все данные устройства и снимает часть гарантий защиты. Выполняйте осознанно."))
-        })
-
-        container.addView(title("ТРЕБОВАНИЯ"))
-        container.addView(card().apply {
-            addView(body("1. Mi-аккаунт, привязанный к устройству (Настройки → Mi аккаунт)."))
-            addView(body("2. Получено одобрение разблокировки в официальном приложении/настройках Xiaomi (привязка аккаунта 7+ дней)."))
-            addView(body("3. Устройство переведено в режим Fastboot и подключено по OTG."))
+            addView(body("Mi Unlock Xiaomi • Fastboot через USB/OTG", "#F3F6FA"))
+            addView(body("⚠️ Разблокировка стирает все данные устройства.", "#F2B766"))
         })
 
         container.addView(title("ВХОД В MI-АККАУНТ"))
@@ -2247,15 +2214,6 @@ class MainActivity : AppCompatActivity() {
                 })
             })
         }
-
-        container.addView(title("ПРОЦЕСС (как будет)"))
-        container.addView(card().apply {
-            addView(body("• Вход в Mi-аккаунт (официальная страница Xiaomi)"))
-            addView(body("• Проверка статуса одобрения"))
-            addView(body("• Чтение токена устройства (fastboot)"))
-            addView(body("• Запрос ключа разблокировки у Mi API"))
-            addView(body("• Выполнение fastboot oem unlock"))
-        })
     }
 
     private fun buildSettingsPage() {
@@ -2770,7 +2728,6 @@ class MainActivity : AppCompatActivity() {
             val bytes = diagnostics.maxDownloadSizeBytes
             if (bytes != null && bytes > 0L) "$raw / ${formatFileSize(bytes)}" else raw
         } ?: "—"
-        val workspace = if (::workspacePath.isInitialized) workspacePath.absolutePath else "/sdcard/Download/$folderName"
 
         val serialno = diagnostics?.serialno?.let { " | Serial: $it" } ?: ""
         val slotExtra = buildString {
@@ -2813,11 +2770,16 @@ class MainActivity : AppCompatActivity() {
             superPart,
             inventoryPart
         )
-        val session = viewModel.currentTransportSessionId() ?: "нет"
+        val session = viewModel.currentTransportSessionId() ?: "—"
+        val transportInfo = connectionInfo
+            ?.split(" | ")
+            ?.drop(1)
+            ?.joinToString(" • ")
+            ?.ifBlank { null }
+            ?: "—"
         findViewById<TextView>(R.id.tvDeviceWorkspaceValue).text = getString(
-            R.string.device_workspace_value,
-            workspace,
-            viewModel.currentBuildId(),
+            R.string.device_transport_value,
+            transportInfo,
             session
         )
     }

@@ -35,7 +35,7 @@
     <string name="battery_optimization_message">For long flashing, it is better to disable battery restrictions for this app. This lowers the risk that Android stops the process during file transfer.</string>
     <string name="battery_optimization_open_error">ERROR: could not open battery settings: %1$s</string>
     <string name="system_terminal_ready">[System] Terminal ready…</string>
-    <string name="security_full_terminal_active">[Terminal] Full ADB/Fastboot mode is active. Whitelist removed.</string>
+    <string name="security_full_terminal_active">[Terminal] Direct ADB/Fastboot commands are available.</string>
     <string name="log_cleared">[Log cleared]</string>
     <string name="connection_status_header">=== CONNECTION STATUS ===</string>
     <string name="state_label">State: %1$s</string>
@@ -93,10 +93,9 @@ Not requested:
     <string name="wake_lock_released">✅ WakeLock released.</string>
     <string name="wake_lock_error">⚠️ WakeLock could not be acquired: %1$s</string>
     <string name="wake_lock_release_error">⚠️ WakeLock release error: %1$s</string>
-    <string name="log_init_v20">Interface v2.1: full ADB/Fastboot terminal enabled without strict whitelist. SYSTEM_ALERT_WINDOW is not requested.</string>
+    <string name="log_init_v20">Alpha7 interface: ADB/Fastboot terminal ready. SYSTEM_ALERT_WINDOW is not requested.</string>
 
     <!-- UX v3 full-window redesign -->
-    <string name="device_workspace_placeholder">Workspace: /sdcard/Download/NekoFlash</string>
     <string name="flash_queue_empty">Queue is empty. Choose a partition below and select an .img file.</string>
     <string name="flash_queue_empty_log">ОШИБКА: очередь прошивки пуста</string>
     <string name="flash_queue_updated_log">Queue updated: %1$s → %2$s</string>
@@ -136,7 +135,6 @@ Sideload</string>
     <string name="layout_bl_empty">BL: —</string>
     <string name="layout_max_dl_empty">Max DL: —</string>
     <string name="layout_refresh">↻ Refresh</string>
-    <string name="layout_partitions">☷ Partitions</string>
     <string name="partition_inventory_title">Partition inventory</string>
     <string name="partition_inventory_empty">The inventory has not been collected yet. Connect a device in Fastboot and tap Refresh.</string>
     <string name="partition_inventory_filter_hint">Filter by name or type</string>
@@ -160,7 +158,6 @@ Sideload</string>
     <string name="quick_flash_other_targets">OTHER PRIMARY TARGETS</string>
     <string name="quick_flash_manual_target">Manual partition name</string>
     <string name="layout_partition_vbmeta">vbmeta</string>
-    <string name="layout_partition_vendor_kernel_boot">vendor_kernel_boot</string>
     <string name="quick_flash_manual_title">Manual Quick Flash target</string>
     <string name="quick_flash_manual_hint">Partition name</string>
     <string name="quick_flash_legacy_queue_hidden">Legacy multi-flash queue is hidden in Recovery-first Quick Flash.</string>
@@ -220,7 +217,6 @@ Sideload</string>
     <string name="settings_open_permissions">🔐  Permissions</string>
     <string name="settings_open_battery">🔋  Battery optimization</string>
     <string name="terminal_batch_syntax_hint">💡 This looks like PC batch/shell script syntax ("%1$s"), not a fastboot/adb command — the device has no such wire command. Open the .bat/.sh file and run its fastboot/adb commands one at a time, skipping control lines like echo/if/for/set/pause/labels.</string>
-    <string name="layout_fastboot_terminal">Open terminal</string>
     <string name="layout_sideload_import">Import file</string>
 <string name="settings_section_system">SYSTEM</string>
     <string name="settings_section_service">SERVICE</string>
@@ -280,16 +276,9 @@ Unlock</string>
     <string name="mi_login_missing_cookies">Xiaomi completed the sign-in, but the required unlockApi session cookies were not returned. Try again or sign out of Xiaomi Account in the browser first.</string>
     <string name="mi_login_cancelled_by_user">Login was cancelled by the user.</string>
 
-    <string name="home_open_workspace">Open folder</string>
-    <string name="home_copy_workspace">Copy path</string>
     <string name="home_workspace_opening">Opening workspace: %1$s</string>
     <string name="home_workspace_open_failed">Could not open the folder. The path was copied.</string>
     <string name="home_workspace_path_copied">Workspace path copied</string>
-    <string name="home_primary_actions_title">MAIN TOOLS</string>
-    <string name="home_action_terminal">Terminal</string>
-    <string name="home_action_quick_flash">Quick Flash</string>
-    <string name="home_action_sideload">ADB Sideload</string>
-    <string name="home_action_mi_unlock">Mi Unlock</string>
 
     <string name="logs_sheet_title">LOGS &amp; SESSIONS</string>
     <string name="logs_current_summary">Current session</string>
@@ -327,5 +316,6 @@ Unlock</string>
     <string name="flash_progress_cancelled">Operation cancelled</string>
     <string name="console_resize_handle_desc">Drag up or down to resize Console. Double-tap to reset its height.</string>
 
-    <string name="device_workspace_value">%1$s | %2$s | session=%3$s</string>
+    <string name="device_transport_placeholder">USB: —\nSession: —</string>
+    <string name="device_transport_value">USB: %1$s\nSession: %2$s</string>
 </resources>

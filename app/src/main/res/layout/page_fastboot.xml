@@ -14,28 +14,6 @@
         android:orientation="vertical"
         android:padding="10dp">
 
-        <!-- Тонкая кнопка вызова терминала (отдельный цвет) -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnFastbootTerminal"
-            android:layout_width="match_parent"
-            android:layout_height="44dp"
-            android:layout_marginBottom="9dp"
-            android:insetTop="0dp"
-            android:insetBottom="0dp"
-            android:text="@string/layout_fastboot_terminal"
-            android:textAllCaps="false"
-            android:textColor="@color/text_primary"
-            android:textSize="12sp"
-            android:fontFamily="monospace"
-            app:backgroundTint="@color/bg_elevated"
-            app:cornerRadius="12dp"
-            app:icon="@drawable/ic_terminal_keyboard"
-            app:iconGravity="textStart"
-            app:iconPadding="8dp"
-            app:iconSize="18dp"
-            app:iconTint="@color/accent"
-            app:strokeColor="#806A4428"
-            app:strokeWidth="1dp" />
 
         <!-- Recovery-first Quick Flash: one image, one concrete target, one confirmation -->
         <com.google.android.material.card.MaterialCardView
@@ -135,14 +113,11 @@
                     android:textSize="11sp"
                     android:textStyle="bold"
                     android:letterSpacing="0.08"
-                    android:fontFamily="monospace" />
-
-                <LinearLayout
+                    android:fontFamily="monospace" />                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="7dp"
+                    android:layout_marginTop="8dp"
                     android:orientation="horizontal">
-
                     <com.google.android.material.button.MaterialButton
                         style="@style/Widget.NekoFlash.PartitionTile"
                         android:id="@+id/btnFlashBoot"
@@ -152,25 +127,14 @@
                         android:text="@string/layout_partition_boot"
                         android:textSize="12sp"
                         android:textStyle="bold" />
-
                     <com.google.android.material.button.MaterialButton
                         style="@style/Widget.NekoFlash.PartitionTile"
                         android:id="@+id/btnFlashInitBoot"
                         android:layout_width="0dp"
                         android:layout_height="48dp"
                         android:layout_weight="1"
-                        android:layout_marginStart="6dp"
+                        android:layout_marginStart="7dp"
                         android:text="@string/layout_partition_init_boot"
-                        android:textSize="11sp" />
-
-                    <com.google.android.material.button.MaterialButton
-                        style="@style/Widget.NekoFlash.PartitionTile"
-                        android:id="@+id/btnFlashVendorBoot"
-                        android:layout_width="0dp"
-                        android:layout_height="48dp"
-                        android:layout_weight="1"
-                        android:layout_marginStart="6dp"
-                        android:text="@string/layout_partition_vendor_boot"
                         android:textSize="11sp" />
                 </LinearLayout>
 
@@ -180,47 +144,41 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
                     android:orientation="vertical">
-
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="horizontal">
-
+                        <com.google.android.material.button.MaterialButton
+                            style="@style/Widget.NekoFlash.PartitionTile"
+                            android:id="@+id/btnFlashVendorBoot"
+                            android:layout_width="0dp"
+                            android:layout_height="48dp"
+                            android:layout_weight="1"
+                            android:text="@string/layout_partition_vendor_boot"
+                            android:textSize="11sp" />
                         <com.google.android.material.button.MaterialButton
                             style="@style/Widget.NekoFlash.PartitionTile"
                             android:id="@+id/btnFlashDtbo"
                             android:layout_width="0dp"
                             android:layout_height="48dp"
                             android:layout_weight="1"
+                            android:layout_marginStart="7dp"
                             android:text="@string/layout_partition_dtbo"
                             android:textSize="12sp" />
-
-                        <com.google.android.material.button.MaterialButton
-                            style="@style/Widget.NekoFlash.PartitionTile"
-                            android:id="@+id/btnFlashVbmeta"
-                            android:layout_width="0dp"
-                            android:layout_height="48dp"
-                            android:layout_weight="1"
-                            android:layout_marginStart="6dp"
-                            android:text="@string/layout_partition_vbmeta"
-                            android:textSize="11sp" />
-
-                        <com.google.android.material.button.MaterialButton
-                            style="@style/Widget.NekoFlash.PartitionTile"
-                            android:id="@+id/btnFlashVendorKernelBoot"
-                            android:layout_width="0dp"
-                            android:layout_height="48dp"
-                            android:layout_weight="1"
-                            android:layout_marginStart="6dp"
-                            android:text="@string/layout_partition_vendor_kernel_boot"
-                            android:textSize="11sp" />
                     </LinearLayout>
-
+                    <com.google.android.material.button.MaterialButton
+                        style="@style/Widget.NekoFlash.PartitionTile"
+                        android:id="@+id/btnFlashVbmeta"
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:layout_marginTop="7dp"
+                        android:text="@string/layout_partition_vbmeta"
+                        android:textSize="11sp" />
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnFlashManual"
                         android:layout_width="match_parent"
                         android:layout_height="46dp"
-                        android:layout_marginTop="6dp"
+                        android:layout_marginTop="7dp"
                         android:insetTop="0dp"
                         android:insetBottom="0dp"
                         android:text="@string/quick_flash_manual_target"
@@ -238,8 +196,8 @@
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnFlashRebootMode"
                     android:layout_width="match_parent"
-                    android:layout_height="44dp"
-                    android:layout_marginTop="10dp"
+                    android:layout_height="42dp"
+                    android:layout_marginTop="16dp"
                     android:insetTop="0dp"
                     android:insetBottom="0dp"
                     android:text="@string/layout_flash_reboot_mode"

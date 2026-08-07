@@ -35,7 +35,7 @@
     <string name="battery_optimization_message">Для долгой прошивки лучше отключить ограничения батареи для этого приложения. Это снижает риск, что Android остановит процесс во время передачи файла.</string>
     <string name="battery_optimization_open_error">ОШИБКА: не удалось открыть настройки батареи: %1$s</string>
     <string name="system_terminal_ready">[Система] Терминал готов…</string>
-    <string name="security_full_terminal_active">[Терминал] Полный ADB/Fastboot режим активирован. Whitelist снят.</string>
+    <string name="security_full_terminal_active">[Терминал] ADB/Fastboot-команды доступны напрямую.</string>
     <string name="log_cleared">[Лог очищен]</string>
     <string name="connection_status_header">=== СТАТУС ПОДКЛЮЧЕНИЯ ===</string>
     <string name="state_label">Состояние: %1$s</string>
@@ -93,10 +93,9 @@
     <string name="wake_lock_released">✅ WakeLock освобождён.</string>
     <string name="wake_lock_error">⚠️ Не удалось включить WakeLock: %1$s</string>
     <string name="wake_lock_release_error">⚠️ Ошибка освобождения WakeLock: %1$s</string>
-    <string name="log_init_v20">Интерфейс v2.1: включён полный ADB/Fastboot-терминал без жёсткого whitelist. SYSTEM_ALERT_WINDOW не запрашивается.</string>
+    <string name="log_init_v20">Интерфейс alpha7: ADB/Fastboot-терминал готов. SYSTEM_ALERT_WINDOW не запрашивается.</string>
 
     <!-- UX v3 full-window redesign -->
-    <string name="device_workspace_placeholder">Папка: /sdcard/Download/NekoFlash</string>
     <string name="flash_queue_empty">Очередь пуста. Выберите раздел ниже и укажите .img файл.</string>
     <string name="flash_queue_empty_log">ОШИБКА: очередь прошивки пуста</string>
     <string name="flash_queue_updated_log">Очередь обновлена: %1$s → %2$s</string>
@@ -136,7 +135,6 @@ Sideload</string>
     <string name="layout_bl_empty">BL: —</string>
     <string name="layout_max_dl_empty">Max DL: —</string>
     <string name="layout_refresh">↻ Обновить</string>
-    <string name="layout_partitions">☷ Разделы</string>
     <string name="partition_inventory_title">Инвентаризация разделов</string>
     <string name="partition_inventory_empty">Инвентаризация ещё не получена. Подключите устройство в Fastboot и нажмите «Обновить».</string>
     <string name="partition_inventory_filter_hint">Фильтр по имени или типу</string>
@@ -160,7 +158,6 @@ Sideload</string>
     <string name="quick_flash_other_targets">ДРУГИЕ ОСНОВНЫЕ ЦЕЛИ</string>
     <string name="quick_flash_manual_target">Ручное имя раздела</string>
     <string name="layout_partition_vbmeta">vbmeta</string>
-    <string name="layout_partition_vendor_kernel_boot">vendor_kernel_boot</string>
     <string name="quick_flash_manual_title">Ручная цель Quick Flash</string>
     <string name="quick_flash_manual_hint">Имя раздела</string>
     <string name="quick_flash_legacy_queue_hidden">Старая очередь нескольких прошивок скрыта в Recovery-first Quick Flash.</string>
@@ -222,7 +219,6 @@ Sideload</string>
     <string name="settings_open_permissions">🔐  Разрешения</string>
     <string name="settings_open_battery">🔋  Оптимизация батареи</string>
     <string name="terminal_batch_syntax_hint">💡 Это синтаксис ПК-батника/shell-скрипта («%1$s»), а не команда fastboot/adb — у устройства нет такой wire-команды. Откройте .bat/.sh файл и выполняйте fastboot/adb-команды из него по одной, без служебных строк echo/if/for/set/pause/label.</string>
-    <string name="layout_fastboot_terminal">Открыть терминал</string>
     <string name="layout_sideload_import">Импорт файла</string>
 <string name="settings_section_system">СИСТЕМА</string>
     <string name="settings_section_service">СЕРВИС</string>
@@ -284,16 +280,9 @@ Unlock</string>
     <string name="mi_login_missing_cookies">Xiaomi завершила вход, но не вернула обязательные cookies сессии unlockApi. Повторите вход или сначала выйдите из Mi Аккаунта в браузере.</string>
     <string name="mi_login_cancelled_by_user">Вход отменён пользователем.</string>
 
-    <string name="home_open_workspace">Открыть папку</string>
-    <string name="home_copy_workspace">Копировать путь</string>
     <string name="home_workspace_opening">Открываю рабочую папку: %1$s</string>
     <string name="home_workspace_open_failed">Не удалось открыть папку. Путь скопирован.</string>
     <string name="home_workspace_path_copied">Путь к рабочей папке скопирован</string>
-    <string name="home_primary_actions_title">ОСНОВНЫЕ ИНСТРУМЕНТЫ</string>
-    <string name="home_action_terminal">Терминал</string>
-    <string name="home_action_quick_flash">Быстрая прошивка</string>
-    <string name="home_action_sideload">ADB Sideload</string>
-    <string name="home_action_mi_unlock">Mi Unlock</string>
 
     <string name="logs_sheet_title">ЛОГИ И СЕССИИ</string>
     <string name="logs_current_summary">Текущая сессия</string>
@@ -331,5 +320,6 @@ Unlock</string>
     <string name="flash_progress_cancelled">Операция отменена</string>
     <string name="console_resize_handle_desc">Потяните вверх или вниз, чтобы изменить высоту Console. Двойное нажатие сбрасывает высоту.</string>
 
-    <string name="device_workspace_value">%1$s | %2$s | сессия=%3$s</string>
+    <string name="device_transport_placeholder">USB: —\nСессия: —</string>
+    <string name="device_transport_value">USB: %1$s\nСессия: %2$s</string>
 </resources>
