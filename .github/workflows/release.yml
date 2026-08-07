@@ -164,6 +164,15 @@ jobs:
 
           echo "NEKOFLASH_KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"
 
+      - name: Make Gradle Wrapper executable
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          chmod +x scripts/*.sh 2>/dev/null || true
+          test -x gradlew
+          ls -l gradlew
+
       - name: Android lint
         timeout-minutes: 15
         shell: bash
