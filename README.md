@@ -17,8 +17,10 @@ NekoFlash — Android USB Host приложение для прямой рабо
 
 ```bash
 python3 scripts/update-checksums.py
-./gradlew --no-daemon --warning-mode all lintDebug assembleDebug assembleRelease
+./gradlew --no-daemon --warning-mode all lintDebug assembleDebug
 ```
+
+Signed release собирается отдельно при наличии постоянного release key через `./gradlew --no-daemon --warning-mode all assembleRelease` или `bash scripts/build-apk.sh release`.
 
 Требования и offline/CI сценарии: [BUILDING.md](BUILDING.md).
 

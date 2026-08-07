@@ -9,6 +9,34 @@ if /I not "%MODE%"=="debug" if /I not "%MODE%"=="release" if /I not "%MODE%"=="a
   exit /b 2
 )
 
+if /I "%MODE%"=="release" goto CHECK_RELEASE_SIGNING
+if /I "%MODE%"=="all" goto CHECK_RELEASE_SIGNING
+goto AFTER_RELEASE_SIGNING_CHECK
+
+:CHECK_RELEASE_SIGNING
+if "%NEKOFLASH_KEYSTORE_PATH%"=="" (
+  echo ERROR: release/all build requires NEKOFLASH_KEYSTORE_PATH.
+  echo Run scripts\build-apk.bat debug for a debug-only build.
+  exit /b 1
+)
+if not exist "%NEKOFLASH_KEYSTORE_PATH%" (
+  echo ERROR: release keystore not found: %NEKOFLASH_KEYSTORE_PATH%
+  exit /b 1
+)
+if "%NEKOFLASH_STORE_PASSWORD%"=="" (
+  echo ERROR: release/all build requires NEKOFLASH_STORE_PASSWORD.
+  exit /b 1
+)
+if "%NEKOFLASH_KEY_ALIAS%"=="" (
+  echo ERROR: release/all build requires NEKOFLASH_KEY_ALIAS.
+  exit /b 1
+)
+if "%NEKOFLASH_KEY_PASSWORD%"=="" (
+  echo ERROR: release/all build requires NEKOFLASH_KEY_PASSWORD.
+  exit /b 1
+)
+:AFTER_RELEASE_SIGNING_CHECK
+
 REM Permanent semantic guards only (version-stamped check-v5*.py tripwires removed in cleanup).
 
 if not exist gradle\wrapper\gradle-wrapper.jar (

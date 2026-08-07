@@ -3,11 +3,11 @@
 Этот документ содержит только reviewed sanitised summary. Raw logs с serial, USB topology, пользовательскими путями, account ID, cookie values и tokens в Git не коммитятся. Исторический факт не является PASS для текущей сборки.
 
 
-## Current exact-head software evidence and next device gate
+## Current alpha8 validation boundary
 
-Latest reviewed exact head: `a40262ed615c108229e2e7d9b18bb896b3f628e6`, GitHub Actions run `30847362607`. Android Lint `0/0`, Debug/Release APK PASS, pure/JVM `27/27`, all static/safety guards PASS. CI evidence archive SHA-256: `1dfe511a831e6b927229eb1a72cb4f468e5a780823d561a0bc3f7b17146b5821`.
+Current source state: `6.0.0-alpha8` / `versionCode 222`. This audit refreshed static/source evidence only. Full Android Lint/Debug/Signed Release verdict and physical USB/ADB/Fastboot evidence must be produced on an environment with Android SDK/Gradle cache and real devices.
 
-This is software/CI evidence only. Exact-head device evidence is still open. After branch consolidation and green exact main CI, the session on 2026-08-04 must execute Gate 0 from `PROJECT_STATE.md`: cold start, Welcome/Home, Console collapsed/half/expanded, IME/Back/rotation/restart, Logs/privacy, ADB reconnect/read-only shell and read-only Fastboot handshake. Do not run real Sideload, Quick Flash mutation or final Mi Unlock before Gate 0 PASS.
+Do not treat archived CI runs below as proof for the current alpha8 exact source. They remain historical evidence for earlier heads only. Before APK publication, collect fresh exact-head `lintDebug`, `assembleDebug`, signed `assembleRelease`, certificate continuity and hardware smoke evidence.
 
 ## Историческая база до V6
 

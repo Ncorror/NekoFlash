@@ -260,12 +260,9 @@ class MainActivity : AppCompatActivity() {
             } else {
                 window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                 restoreBrightness()
-                // v4: лог всегда виден, не нужно переключать вкладку
             }
             updateDeviceOverview()
             updateOperationCenter(viewModel.logSnapshot())
-            if (!active) {
-            }
         }
 
         viewModel.operationSteps.observe(this) { steps -> renderOperationSteps(steps) }
@@ -1265,7 +1262,12 @@ class MainActivity : AppCompatActivity() {
             viewModel.log("❌ Некорректный размер: $raw. Используйте байты, 512M, 2G или 0x...")
             return null
         }
-        val bytes = value * multiplier
+        val bytes = try {
+            Math.multiplyExact(value, multiplier)
+        } catch (_: ArithmeticException) {
+            viewModel.log("❌ Размер слишком большой: $raw")
+            return null
+        }
         if (bytes <= 0L) {
             viewModel.log("❌ Размер должен быть больше нуля")
             return null
@@ -3481,19 +3483,23 @@ class MainActivity : AppCompatActivity() {
 
     // ─── Авто-снижение яркости во время записи ───────────────────────────────
     private var savedBrightness: Float = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+    private var brightnessReduced: Boolean = false
 
     private fun applyReducedBrightness() {
+        if (brightnessReduced) return
         runCatching {
             val attributes = window.attributes
             savedBrightness = attributes.screenBrightness
             attributes.screenBrightness = 0.15f // Экран остаётся читаемым без лишнего нагрева.
             window.attributes = attributes
+            brightnessReduced = true
         }.onFailure { error ->
             android.util.Log.w("NekoFlash", "Unable to reduce screen brightness", error)
         }
     }
 
     private fun restoreBrightness() {
+        if (!brightnessReduced) return
         runCatching {
             val attributes = window.attributes
             attributes.screenBrightness = savedBrightness
@@ -3501,6 +3507,8 @@ class MainActivity : AppCompatActivity() {
         }.onFailure { error ->
             android.util.Log.w("NekoFlash", "Unable to restore screen brightness", error)
         }
+        brightnessReduced = false
+        savedBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
     }
 
     override fun onStop() {

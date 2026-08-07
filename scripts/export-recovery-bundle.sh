@@ -2,8 +2,7 @@
 # Export two complementary artifacts without Git metadata, local SDK paths,
 # signing material, APKs or generated build outputs:
 #   1. recovery ZIP: source + chat continuity + restore instructions;
-#   2. reviewed-source ZIP: bootstrap-compatible input for the publisher that
-#      already exists on protected main before this update is merged.
+#   2. reviewed-source ZIP: compact source-only input for Termux publisher.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -56,8 +55,8 @@ rsync -a \
   "$ROOT/" "$RECOVERY_SOURCE_ROOT/"
 
 # The companion source ZIP intentionally has one wrapper directory and the
-# project root directly below it. This is accepted by both the old protected-
-# main publisher and the updated nested-bundle-aware publisher.
+# project root directly below it. This is the most compact input for
+# scripts/termux-publish.sh; the recovery ZIP is accepted too when needed.
 rsync -a "$RECOVERY_SOURCE_ROOT/" "$PUBLISH_SOURCE_ROOT/"
 
 bash "$ROOT/scripts/export-chat-context.sh" \
@@ -77,7 +76,7 @@ bash "$ROOT/scripts/export-chat-context.sh" \
   fi
   printf '\nSOURCE contains the complete reviewed project tree.\n'
   printf 'CHAT_CONTEXT contains the compact new-chat handoff.\n'
-  printf 'Use the separately generated NekoFlash-reviewed-source ZIP for the first protected-main publication.\n'
+  printf 'Use the separately generated NekoFlash-reviewed-source ZIP for the compact source-only publication.\n'
   printf 'Each outer ZIP has a sibling .sha256 file with a relative filename.\n'
 } > "$BUNDLE_ROOT/RECOVERY_MANIFEST.txt"
 
@@ -88,25 +87,21 @@ RECOVERY PURPOSE
 3. SOURCE/ contains the complete code if the original workspace is lost.
 
 NEXT GITHUB PUBLICATION
-Use the separately generated NekoFlash-reviewed-source-*.zip. Publish only from
-clean protected main through a short-lived Pull Request branch.
+Publish only from clean protected main through a short-lived Pull Request branch.
+Use the generated reviewed-source ZIP for the smallest source-only import; the
+current publisher also accepts the generated recovery ZIP and imports only SOURCE/.
 
 cd "$HOME/NekoFlash"
 git fetch origin --prune --tags
 git switch main
 git pull --ff-only origin main
-BASE_MAIN_SHA="3f416744347ec5a44cc7d64668760b0778bf473e"
-git merge-base --is-ancestor "$BASE_MAIN_SHA" origin/main || {
-  echo "STOP: confirmed Batch 1 baseline is not present in origin/main"
-  exit 1
-}
 test -z "$(git status --porcelain)" || {
   git status --short
   echo "STOP: main working tree is not clean"
   exit 1
 }
 
-SOURCE_ZIP="$HOME/storage/downloads/THIS_REVIEWED_SOURCE.zip"
+SOURCE_ZIP="$HOME/storage/downloads/NekoFlash-reviewed-source-YYYYMMDD-HHMMSS.zip"
 SOURCE_SHA256_FILE="$SOURCE_ZIP.sha256"
 (
   cd "$(dirname "$SOURCE_ZIP")"
@@ -114,16 +109,16 @@ SOURCE_SHA256_FILE="$SOURCE_ZIP.sha256"
 )
 EXPECTED_SHA="$(awk '{print $1}' "$SOURCE_SHA256_FILE")"
 
-NEKOFLASH_PR_BRANCH="termux/audit-native-usbfs-raii-batch2" \
 bash scripts/termux-publish.sh \
   --source-zip "$SOURCE_ZIP" \
   --sha256 "$EXPECTED_SHA" \
-  "Harden native USBFS resource ownership with RAII"
+  "Import reviewed NekoFlash update"
 
 Use the PR_URL printed by the publisher:
 
-gh pr checks --repo Ncorror/NekoFlash --watch PR_URL
-gh pr merge --repo Ncorror/NekoFlash --merge --delete-branch PR_URL
+PR_URL="PASTE_PRINTED_PR_URL_HERE"
+gh pr checks --repo Ncorror/NekoFlash --watch "$PR_URL"
+gh pr merge --repo Ncorror/NekoFlash --merge --delete-branch "$PR_URL"
 
 cd "$HOME/NekoFlash"
 git switch main
@@ -132,18 +127,20 @@ git fetch origin --prune
 bash scripts/termux-ci.sh
 
 FALLBACK WHEN ONLY THE RECOVERY ZIP SURVIVES
-Repack its inner SOURCE directory into a plain source ZIP before invoking the
-old publisher:
+Use the recovery ZIP directly with the current nested-bundle-aware publisher.
 
-RECOVERY_ZIP="$HOME/storage/downloads/THIS_RECOVERY_BUNDLE.zip"
-TMP_RECOVERY="$(mktemp -d)"
-unzip -q "$RECOVERY_ZIP" -d "$TMP_RECOVERY"
-SOURCE_DIR="$(find "$TMP_RECOVERY" -type f -name PROJECT_MASTER_TRACKER.md -print -quit | xargs dirname)"
+RECOVERY_ZIP="$HOME/storage/downloads/NekoFlash-recovery-YYYYMMDD-HHMMSS.zip"
+RECOVERY_SHA256_FILE="$RECOVERY_ZIP.sha256"
 (
-  cd "$(dirname "$SOURCE_DIR")"
-  zip -qr "$HOME/storage/downloads/NekoFlash-reviewed-source-repacked.zip" "$(basename "$SOURCE_DIR")"
+  cd "$(dirname "$RECOVERY_ZIP")"
+  sha256sum -c "$(basename "$RECOVERY_SHA256_FILE")"
 )
-rm -rf "$TMP_RECOVERY"
+EXPECTED_SHA="$(awk '{print $1}' "$RECOVERY_SHA256_FILE")"
+
+bash scripts/termux-publish.sh \
+  --source-zip "$RECOVERY_ZIP" \
+  --sha256 "$EXPECTED_SHA" \
+  "Import reviewed NekoFlash update"
 
 Never force-push, push directly to protected main, replace .git, or copy signing
 files from an archive.

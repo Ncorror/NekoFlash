@@ -180,7 +180,7 @@ Download/NekoFlash-reviewed-source-YYYYMMDD-HHMMSS.zip
 Download/NekoFlash-reviewed-source-YYYYMMDD-HHMMSS.zip.sha256
 ```
 
-Recovery ZIP содержит `SOURCE/`, `CHAT_CONTEXT/NekoFlash-chat-context.txt`, manifest и restore commands. Его загружают в новый чат и сначала просят прочитать chat context и canonical state. Companion `reviewed-source` ZIP содержит только publishable source в layout, который понимает и старая версия publisher на текущем protected `main`, и обновлённая версия. Для первого PR этого batch использовать именно `reviewed-source` ZIP; nested recovery import становится доступен после merge обновлённого publisher.
+Recovery ZIP содержит `SOURCE/`, `CHAT_CONTEXT/NekoFlash-chat-context.txt`, manifest и restore commands. Его загружают в новый чат и сначала просят прочитать chat context и canonical state. Companion `reviewed-source` ZIP содержит только publishable source и обычно удобнее для публикации. Текущий `scripts/termux-publish.sh` также принимает nested recovery bundle и импортирует только найденный `SOURCE/`, не затягивая chat/restoration files в репозиторий.
 
 ## Политика тегов
 

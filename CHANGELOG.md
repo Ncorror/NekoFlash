@@ -1,3 +1,14 @@
+## 6.0.0-alpha8 build 222 - Project audit cleanup
+
+- Synchronized active project version/build identifiers to `6.0.0-alpha8` / `222`.
+- Fixed terminal Fastboot size parsing so oversized numeric values fail explicitly instead of overflowing `Long` byte counts.
+- Made operation brightness reduction idempotent and restored saved brightness state predictably.
+- Aligned local APK scripts and release documentation with the fail-closed signed-release invariant: unsigned production release artifacts are not advertised or copied.
+- Removed stale recovery-bundle publication commands with hardcoded old baseline SHA, PR branch and commit message.
+- Removed the unreferenced terminal keyboard drawable and unused coroutine imports.
+- Removed the final orphaned `home_workspace_path_copied` resource left after Home workspace-action cleanup.
+- Hardened local release builds to verify the permanent NekoFlash certificate before packaging and re-verify the produced APK with `apksigner`.
+
 ## 6.0.0-alpha7 build 221 - Terminal error UX
 
 - Missing ADB/Fastboot connection is reported inline in Console.

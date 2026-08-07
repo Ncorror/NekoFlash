@@ -11,10 +11,10 @@ python3 scripts/update-checksums.py
 ## 2. Android build
 
 ```bash
-./gradlew --no-daemon --warning-mode all lintDebug assembleDebug assembleRelease
+./gradlew --no-daemon --warning-mode all lintDebug assembleDebug
 ```
 
-Ошибка загрузки Gradle/SDK/DNS не считается успешной сборкой; такой commit нужно собрать в окружении с готовым toolchain/cache.
+Ошибка загрузки Gradle/SDK/DNS не считается успешной сборкой; такой commit нужно собрать в окружении с готовым toolchain/cache. Signed release проверяется отдельным `assembleRelease` только при наличии постоянного release key.
 
 ## 3. Production behavior
 
@@ -22,7 +22,7 @@ Release не должен возвращать test/mock/self-test/qualification
 
 ## 4. Signing
 
-Production release требует release keystore и проверки certificate continuity. Без `NEKOFLASH_KEYSTORE_PATH`, `NEKOFLASH_STORE_PASSWORD`, `NEKOFLASH_KEY_ALIAS`, `NEKOFLASH_KEY_PASSWORD` Gradle создаёт unsigned release artifact.
+Production release требует постоянный NekoFlash release keystore и проверки certificate continuity. `scripts/build-apk.sh release/all` сверяет SHA-256 сертификата keystore с закреплённым production fingerprint и после сборки проверяет APK через `apksigner`. Без полного `NEKOFLASH_*` набора, при другом keystore или несовпадении сертификата release завершается ошибкой; unsigned production APK не выпускается.
 
 ## 5. Publication
 
@@ -30,6 +30,7 @@ Production release требует release keystore и проверки certifica
 - обновить changelog/current project state;
 - пересоздать `SHA256SUMS`;
 - получить green lint/assemble для exact source commit;
+- получить signed `assembleRelease` с постоянным ключом перед публикацией APK;
 - проверить реальный ADB/Fastboot path на целевом hardware;
 - приложить APK/source archive/checksum;
 - не публиковать raw account/device identifiers.

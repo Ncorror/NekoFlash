@@ -1,6 +1,15 @@
 # NekoFlash — current project state
 
-Дата: **2026-08-07**.
+Дата: **2026-08-08**.
+
+## Current audit cleanup — 6.0.0-alpha8 build 222
+
+- Version/build identifiers are synchronized to `6.0.0-alpha8` / `222`.
+- Local APK scripts fail early when release signing material is absent instead of advertising unsigned release artifacts.
+- Recovery bundle restore instructions are generic and no longer embed stale branch names, baseline SHAs or old commit messages.
+- Terminal Fastboot size parsing rejects numeric overflow instead of allowing wrapped byte counts.
+- Operation brightness reduction is idempotent across repeated operation-state emissions.
+- Unreferenced terminal keyboard drawable and unused coroutine imports were removed.
 
 ## Runtime profile
 

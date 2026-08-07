@@ -74,7 +74,7 @@ Android Lint, Android NDK compile и Debug/Release APK для Batch 2 имеют
 
 - `scripts/export-recovery-bundle.sh` создаёт один ZIP с publishable source tree, компактным chat context, manifest и восстановительными командами.
 - Bundle исключает `.git`, local SDK paths, signing material, APK/AAB/SO/O/build outputs.
-- exporter создаёт recovery ZIP для нового чата и отдельный bootstrap-compatible `reviewed-source` ZIP для первой публикации через старый publisher на текущем `main`; после merge обновлённый `scripts/termux-publish.sh` также умеет читать вложенный recovery bundle без импорта соседних chat/evidence файлов.
+- exporter создаёт recovery ZIP для нового чата и отдельный compact `reviewed-source` ZIP для публикации; текущий `scripts/termux-publish.sh` умеет читать и plain source ZIP, и вложенный recovery bundle без импорта соседних chat/evidence файлов.
 
 ### Следующие batches
 

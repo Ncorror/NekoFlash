@@ -35,7 +35,7 @@
 
 ```bash
 python3 scripts/update-checksums.py
-./gradlew --no-daemon --warning-mode all lintDebug assembleDebug assembleRelease
+./gradlew --no-daemon --warning-mode all lintDebug assembleDebug
 ```
 
-Физический USB path проверяется только на реальном устройстве; source/lint/assemble не являются hardware verdict.
+Signed release дополнительно требует постоянный release key и отдельный `assembleRelease`/`scripts/build-apk.sh release`. Физический USB path проверяется только на реальном устройстве; source/lint/assemble не являются hardware verdict.

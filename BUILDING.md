@@ -14,10 +14,21 @@
 ```bash
 python3 scripts/update-checksums.py
 ./gradlew --no-daemon --warning-mode all lintDebug assembleDebug
-
-Signed release собирается только при наличии постоянного NekoFlash release key.
-CI проверяет подпись APK и SHA-256 сертификата через `apksigner`.
 ```
+
+Signed release собирается только при наличии постоянного NekoFlash release key:
+
+```bash
+export NEKOFLASH_KEYSTORE_PATH=/path/to/nekoflash-release.jks
+export NEKOFLASH_STORE_PASSWORD=...
+export NEKOFLASH_KEY_ALIAS=...
+export NEKOFLASH_KEY_PASSWORD=...
+./gradlew --no-daemon --warning-mode all assembleRelease
+# или
+bash scripts/build-apk.sh release
+```
+
+CI и `scripts/build-apk.sh` проверяют continuity постоянного release-сертификата; после локальной release-сборки APK дополнительно проходит `apksigner verify --print-certs`. Без `NEKOFLASH_*`, при другом keystore или несовпадении сертификата release packaging завершается ошибкой.
 
 В production source отсутствуют отдельные test/mock/qualification modules. Build pipeline не запускает unit/instrumentation test matrix.
 
