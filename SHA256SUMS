@@ -1,5 +1,6 @@
 fe1bc654c6873f92935d1cd7998c35aa586d18d8277a86669217b596275ce170  ./.gitattributes
 e7cd89ec0f167173730ba44bd9f42b49acd2163f587c472471e3e382aafd48b6  ./.github/workflows/build.yml
+8d3ff99a0d957c6de951b282125a4b973651237420c3cc89a93bb4bdf16d114a  ./.github/workflows/release.yml
 3f05772583a4c6a36bf0d5a487d62f7785f0a411949e4ac3e092d08ed7482e2b  ./.gitignore
 9fafbae6293b7fca74f28ba020a2574c79162c790d3a167d2d5f55f3643b13f4  ./BUILDING.md
 583233a2e69cc0e2f698b3dc41ca5faaa19574b92c09ab9c304db82721628a1b  ./CHANGELOG.md
@@ -9,7 +10,7 @@ c27202cec34aa6a86b334992b529395cd7cd1fd08ba6b36c3cc2f215e96c2f93  ./NOTICE
 dde875e7d4389fae0c29af0c7b5da94e39c54cf452b8c6b76a1bac78d84a95fe  ./PROJECT_MASTER_TRACKER.md
 fc91a6c5b1706368558eb560d0763d842160a1881b1b81c34d88065cf5f52ade  ./README.md
 f8998b5a3fc15bb4468dafb0cd5fec6313b978b949e13310a2795a048a8705de  ./WELCOME_ARTWORK_SHA256.txt
-eb9f65d3a8e8dd7eb1f9ef7ea65acefd5e6ccd73e1780933197947f1aa3a90c9  ./app/build.gradle
+6056b0d6fd22d9e428c2d9d3276f7175bc08b06bf18422719209e7241b375adc  ./app/build.gradle
 6e83455d7092b6fd29a6aac28433a8fc3cadc80aa86baa97529f289e9c6b35e0  ./app/proguard-rules.pro
 c4f2bc61940e9b228d5bea56a1c9636b37897dcab2fa913c15ac0a3714a08b32  ./app/src/main/AndroidManifest.xml
 e9c27e92fa6ccee517e65b8efe3b6624eafe6a13f45b688f2d70c2bc3d58f1f8  ./app/src/main/cpp/CMakeLists.txt

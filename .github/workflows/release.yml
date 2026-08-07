@@ -1,0 +1,339 @@
+name: Publish NekoFlash Release
+
+run-name: Release ${{ github.ref_name }}
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+env:
+  EXPECTED_RELEASE_CERT_SHA256: "b122576dcaa5b1ceebd977545314bd515432f9e3fa50733fa8153a1e48a6c19e"
+
+jobs:
+  release:
+    name: Build, verify and publish signed APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout tagged source
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Validate release tag and project version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TAG="${GITHUB_REF_NAME}"
+
+          VERSION_NAME="$(
+            sed -nE \
+              's/^[[:space:]]*versionName[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' \
+              app/build.gradle |
+            head -n 1
+          )"
+
+          VERSION_CODE="$(
+            sed -nE \
+              's/^[[:space:]]*versionCode[[:space:]]*=[[:space:]]*([0-9]+).*/\1/p' \
+              app/build.gradle |
+            head -n 1
+          )"
+
+          test -n "$VERSION_NAME"
+          test -n "$VERSION_CODE"
+
+          EXPECTED_TAG="v${VERSION_NAME}"
+
+          echo "Tag:          $TAG"
+          echo "Version name: $VERSION_NAME"
+          echo "Version code: $VERSION_CODE"
+
+          if [ "$TAG" != "$EXPECTED_TAG" ]; then
+            echo "::error::Tag '$TAG' does not match project version '$EXPECTED_TAG'"
+            exit 1
+          fi
+
+          case "$VERSION_NAME" in
+            *dev*|*snapshot*|*SNAPSHOT*)
+              echo "::error::Development version cannot be published: $VERSION_NAME"
+              exit 1
+              ;;
+          esac
+
+          echo "version_name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
+          echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Verify Gradle Wrapper
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -s gradle/wrapper/gradle-wrapper.jar
+          test -s gradle/wrapper/gradle-wrapper.properties
+
+          git ls-files \
+            --error-unmatch \
+            gradle/wrapper/gradle-wrapper.jar \
+            >/dev/null
+
+          sha256sum gradle/wrapper/gradle-wrapper.jar
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Prepare and verify permanent release key
+        env:
+          NEKOFLASH_KEYSTORE_BASE64: ${{ secrets.NEKOFLASH_KEYSTORE_BASE64 }}
+          NEKOFLASH_STORE_PASSWORD: ${{ secrets.NEKOFLASH_STORE_PASSWORD }}
+          NEKOFLASH_KEY_ALIAS: ${{ secrets.NEKOFLASH_KEY_ALIAS }}
+          NEKOFLASH_KEY_PASSWORD: ${{ secrets.NEKOFLASH_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          [ -n "$NEKOFLASH_KEYSTORE_BASE64" ] || {
+            echo "::error::Missing NEKOFLASH_KEYSTORE_BASE64"
+            exit 1
+          }
+
+          [ -n "$NEKOFLASH_STORE_PASSWORD" ] || {
+            echo "::error::Missing NEKOFLASH_STORE_PASSWORD"
+            exit 1
+          }
+
+          [ -n "$NEKOFLASH_KEY_ALIAS" ] || {
+            echo "::error::Missing NEKOFLASH_KEY_ALIAS"
+            exit 1
+          }
+
+          [ -n "$NEKOFLASH_KEY_PASSWORD" ] || {
+            echo "::error::Missing NEKOFLASH_KEY_PASSWORD"
+            exit 1
+          }
+
+          KEYSTORE_PATH="$RUNNER_TEMP/nekoflash-release.jks"
+
+          printf '%s' "$NEKOFLASH_KEYSTORE_BASE64" |
+            base64 --decode > "$KEYSTORE_PATH"
+
+          chmod 600 "$KEYSTORE_PATH"
+          test -s "$KEYSTORE_PATH"
+
+          CERT_PEM="$RUNNER_TEMP/nekoflash-release-cert.pem"
+
+          keytool \
+            -exportcert \
+            -rfc \
+            -keystore "$KEYSTORE_PATH" \
+            -storepass "$NEKOFLASH_STORE_PASSWORD" \
+            -alias "$NEKOFLASH_KEY_ALIAS" \
+            > "$CERT_PEM"
+
+          ACTUAL_CERT_SHA256="$(
+            openssl x509 \
+              -in "$CERT_PEM" \
+              -noout \
+              -fingerprint \
+              -sha256 |
+            sed 's/^.*=//' |
+            tr -d ':' |
+            tr '[:upper:]' '[:lower:]'
+          )"
+
+          echo "Expected certificate: $EXPECTED_RELEASE_CERT_SHA256"
+          echo "Actual certificate:   $ACTUAL_CERT_SHA256"
+
+          if [ "$ACTUAL_CERT_SHA256" != "$EXPECTED_RELEASE_CERT_SHA256" ]; then
+            echo "::error::Release certificate SHA-256 mismatch"
+            exit 1
+          fi
+
+          echo "NEKOFLASH_KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"
+
+      - name: Android lint
+        timeout-minutes: 15
+        shell: bash
+        run: |
+          set -o pipefail
+
+          ./gradlew :app:lintDebug \
+            --no-daemon \
+            --stacktrace \
+            --warning-mode all \
+            --console=plain 2>&1 |
+          tee lint_log.txt
+
+      - name: Build signed Release APK
+        timeout-minutes: 20
+        env:
+          NEKOFLASH_STORE_PASSWORD: ${{ secrets.NEKOFLASH_STORE_PASSWORD }}
+          NEKOFLASH_KEY_ALIAS: ${{ secrets.NEKOFLASH_KEY_ALIAS }}
+          NEKOFLASH_KEY_PASSWORD: ${{ secrets.NEKOFLASH_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          set -o pipefail
+
+          ./gradlew :app:assembleRelease \
+            --no-daemon \
+            --stacktrace \
+            --warning-mode all \
+            --console=plain 2>&1 |
+          tee release_build_log.txt
+
+      - name: Verify APK signature and release certificate
+        id: apk
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          RELEASE_APK="$(
+            find app/build/outputs/apk/release \
+              -type f \
+              -name '*.apk' \
+              -print \
+              -quit
+          )"
+
+          test -n "$RELEASE_APK"
+          test -f "$RELEASE_APK"
+
+          SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+
+          [ -n "$SDK_ROOT" ] || {
+            echo "::error::Android SDK root not found"
+            exit 1
+          }
+
+          APKSIGNER="$(
+            find "$SDK_ROOT/build-tools" \
+              -type f \
+              -name apksigner \
+              -print |
+            sort -V |
+            tail -n 1
+          )"
+
+          [ -n "$APKSIGNER" ] || {
+            echo "::error::apksigner not found"
+            exit 1
+          }
+
+          "$APKSIGNER" \
+            verify \
+            --verbose \
+            --print-certs \
+            "$RELEASE_APK" |
+          tee apk-signature.txt
+
+          APK_CERT_SHA256="$(
+            sed -nE \
+              's/^.*certificate SHA-256 digest:[[:space:]]*([0-9A-Fa-f:]+).*$/\1/p' \
+              apk-signature.txt |
+            head -n 1 |
+            tr -d ':' |
+            tr '[:upper:]' '[:lower:]'
+          )"
+
+          test -n "$APK_CERT_SHA256"
+
+          echo "Expected APK certificate: $EXPECTED_RELEASE_CERT_SHA256"
+          echo "Actual APK certificate:   $APK_CERT_SHA256"
+
+          if [ "$APK_CERT_SHA256" != "$EXPECTED_RELEASE_CERT_SHA256" ]; then
+            echo "::error::APK is not signed with the permanent NekoFlash release key"
+            exit 1
+          fi
+
+          echo "source_apk=$RELEASE_APK" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare release package
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          VERSION_NAME="${{ steps.version.outputs.version_name }}"
+          VERSION_CODE="${{ steps.version.outputs.version_code }}"
+          SOURCE_APK="${{ steps.apk.outputs.source_apk }}"
+
+          mkdir -p release-dist
+
+          FINAL_APK="NekoFlash-${VERSION_NAME}.apk"
+
+          cp "$SOURCE_APK" "release-dist/$FINAL_APK"
+          cp apk-signature.txt release-dist/apk-signature.txt
+
+          cat > release-dist/build-info.txt <<EOF
+          NekoFlash release
+          versionName=$VERSION_NAME
+          versionCode=$VERSION_CODE
+          gitTag=$GITHUB_REF_NAME
+          gitCommit=$GITHUB_SHA
+          gitRunId=$GITHUB_RUN_ID
+          releaseSigned=true
+          certificateSha256=$EXPECTED_RELEASE_CERT_SHA256
+          EOF
+
+          cd release-dist
+
+          sha256sum "$FINAL_APK" > "${FINAL_APK}.sha256"
+
+          echo
+          echo "=== RELEASE FILES ==="
+          ls -lh
+
+          echo
+          echo "=== BUILD INFO ==="
+          cat build-info.txt
+
+          echo
+          echo "=== SHA256 ==="
+          cat "${FINAL_APK}.sha256"
+
+      - name: Upload verified release bundle
+        uses: actions/upload-artifact@v6
+        with:
+          name: NekoFlash-${{ steps.version.outputs.version_name }}-release
+          path: release-dist/*
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION_NAME: ${{ steps.version.outputs.version_name }}
+          TAG: ${{ steps.version.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          EXTRA_FLAGS=()
+
+          case "$VERSION_NAME" in
+            *-alpha*|*-beta*|*-rc*)
+              EXTRA_FLAGS+=(--prerelease)
+              ;;
+          esac
+
+          gh release create "$TAG" \
+            release-dist/NekoFlash-"$VERSION_NAME".apk \
+            release-dist/NekoFlash-"$VERSION_NAME".apk.sha256 \
+            release-dist/apk-signature.txt \
+            release-dist/build-info.txt \
+            --verify-tag \
+            --title "NekoFlash $VERSION_NAME" \
+            --generate-notes \
+            "${EXTRA_FLAGS[@]}"
