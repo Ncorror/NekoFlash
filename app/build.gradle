@@ -56,8 +56,8 @@ android {
 
     buildTypes {
         release {
-            // Release signing is enabled only when all four NEKOFLASH_* variables are present.
-            // Without secrets Gradle still creates an explicitly unsigned release artifact.
+            // Production release signing requires all four NEKOFLASH_* variables.
+            // Unsigned release packaging is blocked below before task execution.
             if (releaseSigningReady) {
                 signingConfig = signingConfigs.release
             }
@@ -113,4 +113,21 @@ dependencies {
 
     // Palette API — динамическое извлечение цветов из bg_welcome.jpg
     implementation('androidx.palette:palette-ktx:1.0.0')
+}
+
+
+// Production invariant: a release package must never be emitted unsigned.
+// Debug/lint tasks remain usable without the release key.
+gradle.taskGraph.whenReady { graph ->
+    def releasePackagingRequested =
+            graph.hasTask("${project.path}:assembleRelease") ||
+            graph.hasTask("${project.path}:packageRelease") ||
+            graph.hasTask("${project.path}:bundleRelease")
+
+    if (releasePackagingRequested && !releaseSigningReady) {
+        throw new GradleException(
+                "Release packaging requires the permanent NekoFlash signing key. " +
+                "Unsigned production artifacts are forbidden."
+        )
+    }
 }

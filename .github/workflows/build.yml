@@ -10,6 +10,9 @@ on:
 permissions:
   contents: read
 
+env:
+  EXPECTED_RELEASE_CERT_SHA256: "b122576dcaa5b1ceebd977545314bd515432f9e3fa50733fa8153a1e48a6c19e"
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -26,137 +29,335 @@ jobs:
 
       - name: Verify Gradle Wrapper checkout
         run: |
-          set -e
+          set -euo pipefail
           test -s gradle/wrapper/gradle-wrapper.jar
           test -s gradle/wrapper/gradle-wrapper.properties
           git ls-files --error-unmatch gradle/wrapper/gradle-wrapper.jar >/dev/null
           sha256sum gradle/wrapper/gradle-wrapper.jar
 
-      - name: Set up Gradle and validate Wrapper
+      - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
 
       - name: Make scripts executable
         run: |
           chmod +x gradlew
-          chmod +x scripts/*.sh || true
+          chmod +x scripts/*.sh 2>/dev/null || true
 
       - name: Print Gradle version
         run: ./gradlew --version
 
-      - name: Prepare optional release signing
+      - name: Android lint
+        timeout-minutes: 15
+        run: |
+          set -o pipefail
+          ./gradlew :app:lintDebug \
+            --no-daemon \
+            --stacktrace \
+            --warning-mode all \
+            --console=plain 2>&1 | tee lint_log.txt
+
+      - name: Build Debug APK
+        timeout-minutes: 15
+        run: |
+          set -o pipefail
+          ./gradlew :app:assembleDebug \
+            --no-daemon \
+            --stacktrace \
+            --warning-mode all \
+            --console=plain 2>&1 | tee debug_build_log.txt
+
+      - name: Prepare Debug artifact
+        run: |
+          set -euo pipefail
+
+          VERSION_NAME="$(
+            sed -nE \
+              's/^[[:space:]]*versionName[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' \
+              app/build.gradle | head -1
+          )"
+
+          DEBUG_APK="$(
+            find app/build/outputs/apk/debug \
+              -type f \
+              -name '*.apk' \
+              -print \
+              -quit
+          )"
+
+          test -n "$VERSION_NAME"
+          test -n "$DEBUG_APK"
+          test -f "$DEBUG_APK"
+
+          mkdir -p artifacts/debug
+
+          cp "$DEBUG_APK" \
+            "artifacts/debug/NekoFlash-${VERSION_NAME}-debug.apk"
+
+          cd artifacts/debug
+          sha256sum *.apk > checksums-sha256.txt
+
+          ls -lh
+          cat checksums-sha256.txt
+
+      - name: Upload Debug APK
+        uses: actions/upload-artifact@v6
+        with:
+          name: NekoFlash-${{ github.sha }}-debug
+          path: artifacts/debug/*
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Require and verify release signing key
+        if: ${{ github.event_name != 'pull_request' }}
         env:
           NEKOFLASH_KEYSTORE_BASE64: ${{ secrets.NEKOFLASH_KEYSTORE_BASE64 }}
           NEKOFLASH_STORE_PASSWORD: ${{ secrets.NEKOFLASH_STORE_PASSWORD }}
           NEKOFLASH_KEY_ALIAS: ${{ secrets.NEKOFLASH_KEY_ALIAS }}
           NEKOFLASH_KEY_PASSWORD: ${{ secrets.NEKOFLASH_KEY_PASSWORD }}
         run: |
-          set -e
-          CONFIGURED=0
-          [ -n "$NEKOFLASH_KEYSTORE_BASE64" ] && CONFIGURED=$((CONFIGURED + 1))
-          [ -n "$NEKOFLASH_STORE_PASSWORD" ] && CONFIGURED=$((CONFIGURED + 1))
-          [ -n "$NEKOFLASH_KEY_ALIAS" ] && CONFIGURED=$((CONFIGURED + 1))
-          [ -n "$NEKOFLASH_KEY_PASSWORD" ] && CONFIGURED=$((CONFIGURED + 1))
+          set -euo pipefail
 
-          if [ "$CONFIGURED" -eq 0 ]; then
-            echo "No signing secrets configured: release APK will be unsigned."
-            echo "NEKOFLASH_RELEASE_SIGNED=false" >> "$GITHUB_ENV"
-            exit 0
-          fi
-          if [ "$CONFIGURED" -ne 4 ]; then
-            echo "Partial signing configuration is not allowed. Configure all four NEKOFLASH signing secrets or none."
+          [ -n "$NEKOFLASH_KEYSTORE_BASE64" ] || {
+            echo "::error::Missing NEKOFLASH_KEYSTORE_BASE64"
+            exit 1
+          }
+
+          [ -n "$NEKOFLASH_STORE_PASSWORD" ] || {
+            echo "::error::Missing NEKOFLASH_STORE_PASSWORD"
+            exit 1
+          }
+
+          [ -n "$NEKOFLASH_KEY_ALIAS" ] || {
+            echo "::error::Missing NEKOFLASH_KEY_ALIAS"
+            exit 1
+          }
+
+          [ -n "$NEKOFLASH_KEY_PASSWORD" ] || {
+            echo "::error::Missing NEKOFLASH_KEY_PASSWORD"
+            exit 1
+          }
+
+          KEYSTORE_PATH="$RUNNER_TEMP/nekoflash-release.jks"
+
+          printf '%s' "$NEKOFLASH_KEYSTORE_BASE64" |
+            base64 --decode > "$KEYSTORE_PATH"
+
+          chmod 600 "$KEYSTORE_PATH"
+          test -s "$KEYSTORE_PATH"
+
+          CERT_PEM="$RUNNER_TEMP/nekoflash-release-cert.pem"
+
+          keytool \
+            -exportcert \
+            -rfc \
+            -keystore "$KEYSTORE_PATH" \
+            -storepass "$NEKOFLASH_STORE_PASSWORD" \
+            -alias "$NEKOFLASH_KEY_ALIAS" \
+            > "$CERT_PEM"
+
+          ACTUAL_CERT_SHA256="$(
+            openssl x509 \
+              -in "$CERT_PEM" \
+              -noout \
+              -fingerprint \
+              -sha256 |
+            sed 's/^.*=//' |
+            tr -d ':' |
+            tr '[:upper:]' '[:lower:]'
+          )"
+
+          echo "Expected certificate: $EXPECTED_RELEASE_CERT_SHA256"
+          echo "Actual certificate:   $ACTUAL_CERT_SHA256"
+
+          if [ "$ACTUAL_CERT_SHA256" != "$EXPECTED_RELEASE_CERT_SHA256" ]; then
+            echo "::error::Release certificate SHA-256 mismatch"
             exit 1
           fi
 
-          KEYSTORE_PATH="$RUNNER_TEMP/nekoflash-release.keystore"
-          printf '%s' "$NEKOFLASH_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
-          test -s "$KEYSTORE_PATH"
-
           echo "NEKOFLASH_KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"
-          echo "NEKOFLASH_STORE_PASSWORD=$NEKOFLASH_STORE_PASSWORD" >> "$GITHUB_ENV"
-          echo "NEKOFLASH_KEY_ALIAS=$NEKOFLASH_KEY_ALIAS" >> "$GITHUB_ENV"
-          echo "NEKOFLASH_KEY_PASSWORD=$NEKOFLASH_KEY_PASSWORD" >> "$GITHUB_ENV"
-          echo "NEKOFLASH_RELEASE_SIGNED=true" >> "$GITHUB_ENV"
 
-      - name: Print runner memory before Android build
-        run: |
-          echo "CPUs: $(nproc)"
-          free -h
-          df -h .
+          echo "Release keystore verified."
 
-      - name: Android lint
-        timeout-minutes: 15
-        run: |
-          set -o pipefail
-          ./gradlew :app:lintDebug --no-daemon --stacktrace --warning-mode all --console=plain 2>&1 | tee lint_log.txt
-
-      - name: Build Debug APK
-        timeout-minutes: 15
-        run: |
-          set -o pipefail
-          ./gradlew :app:assembleDebug --no-daemon --stacktrace --warning-mode all --console=plain 2>&1 | tee debug_build_log.txt
-
-      - name: Build Release APK
+      - name: Build signed Release APK
+        if: ${{ github.event_name != 'pull_request' }}
         timeout-minutes: 20
+        env:
+          NEKOFLASH_STORE_PASSWORD: ${{ secrets.NEKOFLASH_STORE_PASSWORD }}
+          NEKOFLASH_KEY_ALIAS: ${{ secrets.NEKOFLASH_KEY_ALIAS }}
+          NEKOFLASH_KEY_PASSWORD: ${{ secrets.NEKOFLASH_KEY_PASSWORD }}
         run: |
           set -o pipefail
-          ./gradlew :app:assembleRelease --no-daemon --stacktrace --warning-mode all --console=plain 2>&1 | tee release_build_log.txt
+
+          ./gradlew :app:assembleRelease \
+            --no-daemon \
+            --stacktrace \
+            --warning-mode all \
+            --console=plain 2>&1 | tee release_build_log.txt
+
+      - name: Verify Release APK signature
+        if: ${{ github.event_name != 'pull_request' }}
+        run: |
+          set -euo pipefail
+
+          RELEASE_APK="$(
+            find app/build/outputs/apk/release \
+              -type f \
+              -name '*.apk' \
+              -print \
+              -quit
+          )"
+
+          test -n "$RELEASE_APK"
+          test -f "$RELEASE_APK"
+
+          SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+
+          [ -n "$SDK_ROOT" ] || {
+            echo "::error::Android SDK root not found"
+            exit 1
+          }
+
+          APKSIGNER="$(
+            find "$SDK_ROOT/build-tools" \
+              -type f \
+              -name apksigner \
+              -print |
+            sort -V |
+            tail -1
+          )"
+
+          [ -n "$APKSIGNER" ] || {
+            echo "::error::apksigner not found"
+            exit 1
+          }
+
+          set -o pipefail
+
+          "$APKSIGNER" \
+            verify \
+            --verbose \
+            --print-certs \
+            "$RELEASE_APK" |
+            tee apk-signature.txt
+
+          APK_CERT_SHA256="$(
+            awk -F': ' '
+              tolower($0) ~ /certificate sha-256 digest/ {
+                print $2
+                exit
+              }
+            ' apk-signature.txt |
+            tr -d ':' |
+            tr '[:upper:]' '[:lower:]'
+          )"
+
+          [ -n "$APK_CERT_SHA256" ] || {
+            echo "::error::Unable to read APK certificate SHA-256"
+            exit 1
+          }
+
+          echo "Expected APK certificate: $EXPECTED_RELEASE_CERT_SHA256"
+          echo "Actual APK certificate:   $APK_CERT_SHA256"
+
+          if [ "$APK_CERT_SHA256" != "$EXPECTED_RELEASE_CERT_SHA256" ]; then
+            echo "::error::Signed APK certificate does not match NekoFlash release key"
+            exit 1
+          fi
+
+          echo "APK signature and certificate verified."
+
+      - name: Prepare signed Release artifact
+        if: ${{ github.event_name != 'pull_request' }}
+        run: |
+          set -euo pipefail
+
+          VERSION_NAME="$(
+            sed -nE \
+              's/^[[:space:]]*versionName[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' \
+              app/build.gradle | head -1
+          )"
+
+          VERSION_CODE="$(
+            sed -nE \
+              's/^[[:space:]]*versionCode[[:space:]]*=[[:space:]]*([0-9]+).*/\1/p' \
+              app/build.gradle | head -1
+          )"
+
+          RELEASE_APK="$(
+            find app/build/outputs/apk/release \
+              -type f \
+              -name '*.apk' \
+              -print \
+              -quit
+          )"
+
+          test -n "$VERSION_NAME"
+          test -n "$VERSION_CODE"
+          test -n "$RELEASE_APK"
+          test -f "$RELEASE_APK"
+
+          mkdir -p artifacts/release
+
+          FINAL_APK="artifacts/release/NekoFlash-${VERSION_NAME}-release.apk"
+
+          cp "$RELEASE_APK" "$FINAL_APK"
+          cp apk-signature.txt artifacts/release/apk-signature.txt
+
+          cat > artifacts/release/build-info.txt <<EOF
+          NekoFlash build
+          versionName=$VERSION_NAME
+          versionCode=$VERSION_CODE
+          gitCommit=$GITHUB_SHA
+          gitRunId=$GITHUB_RUN_ID
+          gitRunNumber=$GITHUB_RUN_NUMBER
+          releaseSigned=true
+          certificateSha256=$EXPECTED_RELEASE_CERT_SHA256
+          EOF
+
+          cd artifacts/release
+
+          if find . -type f -iname '*unsigned*' | grep -q .; then
+            echo "::error::Unsigned artifact detected"
+            exit 1
+          fi
+
+          sha256sum *.apk > checksums-sha256.txt
+
+          ls -lh
+          cat build-info.txt
+          cat checksums-sha256.txt
+
+      - name: Upload signed Release APK
+        if: ${{ github.event_name != 'pull_request' }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: NekoFlash-${{ github.sha }}-release
+          path: artifacts/release/*
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Show build errors if failed
         if: failure()
         run: |
           echo "==================== BUILD ERRORS ===================="
-          for log in lint_log.txt debug_build_log.txt release_build_log.txt; do
+
+          for log in \
+            lint_log.txt \
+            debug_build_log.txt \
+            release_build_log.txt \
+            apk-signature.txt
+          do
             if [ -f "$log" ]; then
               echo "---- $log ----"
-              grep -E "^e: |error:|FAILED|What went wrong|Unresolved|Caused by|resource .* not found|garbage collector is thrashing|OutOfMemoryError" "$log" | head -120 || true
+
+              grep -E \
+                "^e: |error:|FAILED|What went wrong|Unresolved|Caused by|resource .* not found|OutOfMemoryError|certificate|signature" \
+                "$log" |
+                head -160 || true
             fi
           done
+
           echo "======================================================"
-
-      - name: Prepare release artifacts
-        run: |
-          set -e
-          VERSION_NAME=$(sed -nE 's/^[[:space:]]*versionName[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' app/build.gradle | head -1)
-          DEBUG_APK=$(find app/build/outputs/apk/debug -name "*.apk" | head -1)
-          RELEASE_APK=$(find app/build/outputs/apk/release -name "*.apk" | head -1)
-          test -n "$DEBUG_APK" && test -f "$DEBUG_APK"
-          test -n "$RELEASE_APK" && test -f "$RELEASE_APK"
-
-          mkdir -p forum-build
-          cp "$DEBUG_APK" "forum-build/NekoFlash-${VERSION_NAME}-debug.apk"
-          if [ "${NEKOFLASH_RELEASE_SIGNED:-false}" = "true" ]; then
-            cp "$RELEASE_APK" "forum-build/NekoFlash-${VERSION_NAME}-release-signed.apk"
-          else
-            cp "$RELEASE_APK" "forum-build/NekoFlash-${VERSION_NAME}-release-unsigned.apk"
-          fi
-
-          VERSION_CODE=$(sed -nE 's/^[[:space:]]*versionCode[[:space:]]*=[[:space:]]*([0-9]+).*/\1/p' app/build.gradle | head -1)
-          cat > forum-build/build-info.txt <<EOF
-          NekoFlash build
-          versionName=$VERSION_NAME
-          versionCode=$VERSION_CODE
-          gitCommit=${GITHUB_SHA}
-          gitRunId=${GITHUB_RUN_ID}
-          gitRunNumber=${GITHUB_RUN_NUMBER}
-          releaseSigned=${NEKOFLASH_RELEASE_SIGNED:-false}
-          EOF
-
-          cd forum-build
-          sha256sum *.apk > checksums-sha256.txt
-          ls -lh
-          cat build-info.txt
-          cat checksums-sha256.txt
-
-      - name: Upload APKs and checksums
-        uses: actions/upload-artifact@v6
-        with:
-          name: NekoFlash-${{ github.sha }}-apk
-          path: |
-            forum-build/*.apk
-            forum-build/checksums-sha256.txt
-            forum-build/build-info.txt
-          if-no-files-found: error
-          retention-days: 30
 
       - name: Upload build and lint reports
         if: always()
@@ -167,6 +368,7 @@ jobs:
             lint_log.txt
             debug_build_log.txt
             release_build_log.txt
+            apk-signature.txt
             app/build/reports/lint-results-*.html
             app/build/reports/lint-results-*.xml
           if-no-files-found: ignore

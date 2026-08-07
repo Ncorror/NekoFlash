@@ -13,7 +13,10 @@
 
 ```bash
 python3 scripts/update-checksums.py
-./gradlew --no-daemon --warning-mode all lintDebug assembleDebug assembleRelease
+./gradlew --no-daemon --warning-mode all lintDebug assembleDebug
+
+Signed release собирается только при наличии постоянного NekoFlash release key.
+CI проверяет подпись APK и SHA-256 сертификата через `apksigner`.
 ```
 
 В production source отсутствуют отдельные test/mock/qualification modules. Build pipeline не запускает unit/instrumentation test matrix.
