@@ -33,3 +33,23 @@ Signed release собирается отдельно при наличии по�
 - [Release process](docs/RELEASE_PROCESS.md)
 
 Исторические alpha5/alpha6 планы и hardware reports сохранены только как архив решений и не определяют текущий runtime behavior.
+
+
+## License and project identity
+
+NekoFlash source code, documentation, build scripts, and ordinary UI resources
+are licensed under the Apache License 2.0 unless a file or accompanying notice
+states otherwise. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
+The NekoFlash launcher artwork and welcome-screen artwork are intentionally
+excluded from the Apache-2.0 grant; exact paths and reuse terms are listed in
+[ASSETS_LICENSE.md](ASSETS_LICENSE.md). Third-party dependency and Android-robot
+attributions are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), while
+non-bundled reference projects are listed in
+[ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md).
+
+NekoFlash is an independent project and is not affiliated with or endorsed by
+Google, Xiaomi, MiForge, Termux, or the referenced open-source projects. Product
+names and trademarks belong to their respective owners.
+
+Current data-handling behavior is summarized in [PRIVACY.md](PRIVACY.md).

@@ -242,7 +242,9 @@ Sideload</string>
 Инструмент прошивки Android через USB-host (ADB/Fastboot).
 Прошивка без ПК — телефон прошивает телефон.
 
-Используйте на свой риск. Прошивка может превратить устройство в кирпич.</string>
+Используйте на свой риск. Прошивка может превратить устройство в кирпич.
+
+Android robot attribution: The Android robot is reproduced or modified from work created and shared by Google and used according to terms described in the Creative Commons 3.0 Attribution License. Android is a trademark of Google LLC.</string>
     <string name="layout_icon_settings_tab">⚙
 Настр.</string>
     <string name="layout_flash_reboot_mode">Reboot</string>

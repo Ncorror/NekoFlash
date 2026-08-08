@@ -238,7 +238,9 @@ This cannot be undone.</string>
 Android USB-host flashing tool (ADB/Fastboot).
 Flash without a PC — phone flashes phone.
 
-Use at your own risk. Flashing can brick a device.</string>
+Use at your own risk. Flashing can brick a device.
+
+Android robot attribution: The Android robot is reproduced or modified from work created and shared by Google and used according to terms described in the Creative Commons 3.0 Attribution License. Android is a trademark of Google LLC.</string>
     <string name="layout_icon_settings_tab">⚙
 Настр.</string>
     <string name="layout_flash_reboot_mode">Reboot</string>
