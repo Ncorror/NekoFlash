@@ -19,16 +19,16 @@ python3 scripts/update-checksums.py
 Signed release собирается только при наличии постоянного NekoFlash release key:
 
 ```bash
-export NEKOFLASH_KEYSTORE_PATH=/path/to/nekoflash-release.jks
-export NEKOFLASH_STORE_PASSWORD=...
-export NEKOFLASH_KEY_ALIAS=...
-export NEKOFLASH_KEY_PASSWORD=...
+export NEKOFLASH_RELEASE_STORE_FILE=/path/to/nekoflash-release.jks
+export NEKOFLASH_RELEASE_STORE_PASSWORD=...
+export NEKOFLASH_RELEASE_KEY_ALIAS=...
+export NEKOFLASH_RELEASE_KEY_PASSWORD=...
 ./gradlew --no-daemon --warning-mode all assembleRelease
 # или
 bash scripts/build-apk.sh release
 ```
 
-CI и `scripts/build-apk.sh` проверяют continuity постоянного release-сертификата; после локальной release-сборки APK дополнительно проходит `apksigner verify --print-certs`. Без `NEKOFLASH_*`, при другом keystore или несовпадении сертификата release packaging завершается ошибкой.
+CI и `scripts/build-apk.sh` проверяют continuity постоянного release-сертификата; после локальной release-сборки APK дополнительно проходит `apksigner verify --print-certs`. Без полного `NEKOFLASH_RELEASE_*` набора, при другом keystore или несовпадении сертификата release packaging завершается ошибкой. Legacy `NEKOFLASH_KEYSTORE_PATH`/`NEKOFLASH_STORE_PASSWORD`/`NEKOFLASH_KEY_ALIAS`/`NEKOFLASH_KEY_PASSWORD` принимаются только как fallback для существующих локальных профилей.
 
 В production source отсутствуют отдельные test/mock/qualification modules. Build pipeline не запускает unit/instrumentation test matrix.
 

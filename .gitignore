@@ -31,3 +31,9 @@ __pycache__/
 
 # Gradle Wrapper is required in Git even when a global excludes file ignores *.jar.
 !gradle/wrapper/gradle-wrapper.jar
+# Local signing/auth material
+*.jks
+*.keystore
+keystore.properties
+release-signing.env
+.github-token

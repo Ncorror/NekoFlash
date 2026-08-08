@@ -3,10 +3,10 @@ plugins {
     id('org.jetbrains.kotlin.android')
 }
 
-def releaseKeystorePath = System.getenv("NEKOFLASH_KEYSTORE_PATH")
-def releaseStorePassword = System.getenv("NEKOFLASH_STORE_PASSWORD")
-def releaseKeyAlias = System.getenv("NEKOFLASH_KEY_ALIAS")
-def releaseKeyPassword = System.getenv("NEKOFLASH_KEY_PASSWORD")
+def releaseKeystorePath = System.getenv("NEKOFLASH_RELEASE_STORE_FILE") ?: System.getenv("NEKOFLASH_KEYSTORE_PATH")
+def releaseStorePassword = System.getenv("NEKOFLASH_RELEASE_STORE_PASSWORD") ?: System.getenv("NEKOFLASH_STORE_PASSWORD")
+def releaseKeyAlias = System.getenv("NEKOFLASH_RELEASE_KEY_ALIAS") ?: System.getenv("NEKOFLASH_KEY_ALIAS")
+def releaseKeyPassword = System.getenv("NEKOFLASH_RELEASE_KEY_PASSWORD") ?: System.getenv("NEKOFLASH_KEY_PASSWORD")
 def releaseSigningReady = [
         releaseKeystorePath,
         releaseStorePassword,
@@ -29,13 +29,13 @@ android {
         applicationId = "ru.forum.adbfastboottool"
         minSdk = 26
         targetSdk = 34
-        versionCode = 222
-        versionName = "6.0.0-alpha8"
+        versionCode = 223
+        versionName = "6.0.0-alpha9"
         def buildCommit = (System.getenv("GITHUB_SHA") ?: System.getenv("NEKOFLASH_BUILD_COMMIT") ?: "local").trim()
         def buildRunId = (System.getenv("GITHUB_RUN_ID") ?: System.getenv("NEKOFLASH_BUILD_RUN_ID") ?: "local").trim()
         buildConfigField("String", "BUILD_COMMIT", "\"${buildCommit.replace('\\', '_').replace('\"', '_')}\"")
         buildConfigField("String", "BUILD_RUN_ID", "\"${buildRunId.replace('\\', '_').replace('\"', '_')}\"")
-        buildConfigField("String", "BUILD_ID", "\"6.0.0-alpha8+${buildCommit.take(12)}.${buildRunId}\"")
+        buildConfigField("String", "BUILD_ID", "\"6.0.0-alpha9+${buildCommit.take(12)}.${buildRunId}\"")
         externalNativeBuild {
             cmake {
                 cppFlags("-std=c++17 -Wall -Wextra -Werror")
@@ -127,6 +127,8 @@ gradle.taskGraph.whenReady { graph ->
     if (releasePackagingRequested && !releaseSigningReady) {
         throw new GradleException(
                 "Release packaging requires the permanent NekoFlash signing key. " +
+                "Set NEKOFLASH_RELEASE_STORE_FILE, NEKOFLASH_RELEASE_STORE_PASSWORD, " +
+                "NEKOFLASH_RELEASE_KEY_ALIAS and NEKOFLASH_RELEASE_KEY_PASSWORD. " +
                 "Unsigned production artifacts are forbidden."
         )
     }

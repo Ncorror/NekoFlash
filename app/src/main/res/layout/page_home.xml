@@ -13,7 +13,7 @@
         android:orientation="vertical"
         android:padding="10dp">
 
-        <!-- HOMEINFO-ALPHA8: компактный dashboard реального устройства/USB transport. -->
+        <!-- HOMEINFO-ALPHA9: компактный dashboard реального устройства/USB transport. -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/cardHomeDeviceInfo"
             android:layout_width="match_parent"

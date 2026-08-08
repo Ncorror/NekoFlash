@@ -3,11 +3,11 @@
 Этот документ содержит только reviewed sanitised summary. Raw logs с serial, USB topology, пользовательскими путями, account ID, cookie values и tokens в Git не коммитятся. Исторический факт не является PASS для текущей сборки.
 
 
-## Current alpha8 validation boundary
+## Current alpha9 validation boundary
 
-Current source state: `6.0.0-alpha8` / `versionCode 222`. This audit refreshed static/source evidence only. Full Android Lint/Debug/Signed Release verdict and physical USB/ADB/Fastboot evidence must be produced on an environment with Android SDK/Gradle cache and real devices.
+Current source state: `6.0.0-alpha9` / `versionCode 223`. This audit refreshed static/source evidence only. Full Android Lint/Debug/Signed Release verdict and physical USB/ADB/Fastboot evidence must be produced on an environment with Android SDK/Gradle cache and real devices.
 
-Do not treat archived CI runs below as proof for the current alpha8 exact source. They remain historical evidence for earlier heads only. Before APK publication, collect fresh exact-head `lintDebug`, `assembleDebug`, signed `assembleRelease`, certificate continuity and hardware smoke evidence.
+Do not treat archived CI runs below as proof for the current alpha9 exact source. They remain historical evidence for earlier heads only. Before APK publication, collect fresh exact-head `lintDebug`, `assembleDebug`, signed `assembleRelease`, certificate continuity and hardware smoke evidence.
 
 ## Историческая база до V6
 

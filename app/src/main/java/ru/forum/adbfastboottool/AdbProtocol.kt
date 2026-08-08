@@ -107,6 +107,12 @@ class AdbProtocol(
         "/tmp/install.log"
     )
 
+    private fun clearPendingInboundPayload() {
+        pendingInboundChecksum = null
+        pendingInboundLength = 0
+        pendingInboundCommand = 0L
+    }
+
     enum class PeerMode { DEVICE, RECOVERY, SIDELOAD, UNKNOWN }
 
     enum class SideloadFailureKind { FILE, TRANSPORT, PROTOCOL }
@@ -178,9 +184,7 @@ class AdbProtocol(
         directReadFailureCode = null
         directReadFailureMessage = null
         peerProtocolVersion = LOCAL_ADB_VERSION
-        pendingInboundChecksum = null
-        pendingInboundLength = 0
-        pendingInboundCommand = 0L
+        clearPendingInboundPayload()
 
         val iface = findAdbInterface() ?: run {
             onLog("ОШИБКА: ADB интерфейс не найден")
@@ -2612,9 +2616,7 @@ class AdbProtocol(
                 onLog("❌ $directReadFailureMessage")
                 return null
             }
-            pendingInboundChecksum = null
-            pendingInboundLength = 0
-            pendingInboundCommand = 0L
+            clearPendingInboundPayload()
         } else {
             pendingInboundChecksum = chk
             pendingInboundLength = len
@@ -2631,9 +2633,7 @@ class AdbProtocol(
         val expectedChecksum = pendingInboundChecksum
         val expectedLength = pendingInboundLength
         val command = pendingInboundCommand
-        pendingInboundChecksum = null
-        pendingInboundLength = 0
-        pendingInboundCommand = 0L
+        clearPendingInboundPayload()
 
         if (length != expectedLength) {
             directReadFailureCode = AdbPacketDispatcher.FailureCode.INVALID_PAYLOAD
@@ -2704,9 +2704,7 @@ class AdbProtocol(
         deviceFeatures.clear()
         remoteBanner = ""
         peerProtocolVersion = LOCAL_ADB_VERSION
-        pendingInboundChecksum = null
-        pendingInboundLength = 0
-        pendingInboundCommand = 0L
+        clearPendingInboundPayload()
         dispatcherTransportFailed = false
         directReadFailureCode = null
         directReadFailureMessage = null

@@ -6,6 +6,15 @@ cd "$ROOT_DIR"
 
 MODE="${1:-all}"
 EXPECTED_RELEASE_CERT_SHA256="b122576dcaa5b1ceebd977545314bd515432f9e3fa50733fa8153a1e48a6c19e"
+RELEASE_STORE_FILE="${NEKOFLASH_RELEASE_STORE_FILE:-${NEKOFLASH_KEYSTORE_PATH:-}}"
+RELEASE_STORE_PASSWORD="${NEKOFLASH_RELEASE_STORE_PASSWORD:-${NEKOFLASH_STORE_PASSWORD:-}}"
+RELEASE_KEY_ALIAS="${NEKOFLASH_RELEASE_KEY_ALIAS:-${NEKOFLASH_KEY_ALIAS:-}}"
+RELEASE_KEY_PASSWORD="${NEKOFLASH_RELEASE_KEY_PASSWORD:-${NEKOFLASH_KEY_PASSWORD:-}}"
+
+export NEKOFLASH_RELEASE_STORE_FILE="$RELEASE_STORE_FILE"
+export NEKOFLASH_RELEASE_STORE_PASSWORD="$RELEASE_STORE_PASSWORD"
+export NEKOFLASH_RELEASE_KEY_ALIAS="$RELEASE_KEY_ALIAS"
+export NEKOFLASH_RELEASE_KEY_PASSWORD="$RELEASE_KEY_PASSWORD"
 
 case "$MODE" in
   debug|release|all) ;;
@@ -13,9 +22,9 @@ case "$MODE" in
 esac
 
 release_signing_ready() {
-  [[ -n "${NEKOFLASH_KEYSTORE_PATH:-}" && -f "${NEKOFLASH_KEYSTORE_PATH}" && \
-     -n "${NEKOFLASH_STORE_PASSWORD:-}" && -n "${NEKOFLASH_KEY_ALIAS:-}" && \
-     -n "${NEKOFLASH_KEY_PASSWORD:-}" ]]
+  [[ -n "$RELEASE_STORE_FILE" && -f "$RELEASE_STORE_FILE" && \
+     -n "$RELEASE_STORE_PASSWORD" && -n "$RELEASE_KEY_ALIAS" && \
+     -n "$RELEASE_KEY_PASSWORD" ]]
 }
 
 normalize_sha256() {
@@ -31,9 +40,9 @@ verify_release_keystore_certificate() {
   local actual
   actual="$(
     keytool -list -v \
-      -keystore "$NEKOFLASH_KEYSTORE_PATH" \
-      -storepass "$NEKOFLASH_STORE_PASSWORD" \
-      -alias "$NEKOFLASH_KEY_ALIAS" 2>/dev/null | \
+      -keystore "$RELEASE_STORE_FILE" \
+      -storepass "$RELEASE_STORE_PASSWORD" \
+      -alias "$RELEASE_KEY_ALIAS" 2>/dev/null | \
     sed -nE 's/^[[:space:]]*SHA256:[[:space:]]*([0-9A-Fa-f:]+).*$/\1/p' | \
     head -n 1 | normalize_sha256
   )"
@@ -109,7 +118,7 @@ verify_release_apk_certificate() {
 if [[ "$MODE" == "release" || "$MODE" == "all" ]]; then
   if ! release_signing_ready; then
     echo "ERROR: release/all build requires the permanent NekoFlash signing key." >&2
-    echo "Set NEKOFLASH_KEYSTORE_PATH, NEKOFLASH_STORE_PASSWORD, NEKOFLASH_KEY_ALIAS and NEKOFLASH_KEY_PASSWORD, or run: $0 debug" >&2
+    echo "Set NEKOFLASH_RELEASE_STORE_FILE, NEKOFLASH_RELEASE_STORE_PASSWORD, NEKOFLASH_RELEASE_KEY_ALIAS and NEKOFLASH_RELEASE_KEY_PASSWORD, or run: $0 debug" >&2
     exit 1
   fi
   verify_release_keystore_certificate

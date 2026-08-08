@@ -1140,7 +1140,7 @@ class FastbootProtocol(
                     }
 
                     val now = System.currentTimeMillis()
-                    val progress = ((totalSent * 100L) / totalBytes).toInt().coerceIn(0, 100)
+                    val progress = dataProgressPercent(totalSent, totalBytes)
                     val elapsedMs = (now - startedMs).coerceAtLeast(1L)
                     val avgBytesPerSec = (totalSent * 1000.0) / elapsedMs.toDouble()
                     val remainingBytes = (totalBytes - totalSent).coerceAtLeast(0L)
@@ -1398,7 +1398,7 @@ class FastbootProtocol(
                     totalSent += read
 
                     val now = System.currentTimeMillis()
-                    val progress = ((totalSent * 100L) / totalBytes).toInt().coerceIn(0, 100)
+                    val progress = dataProgressPercent(totalSent, totalBytes)
                     val elapsedMs = (now - startedMs).coerceAtLeast(1L)
                     val avgBytesPerSec = (totalSent * 1000.0) / elapsedMs.toDouble()
                     val remainingBytes = (totalBytes - totalSent).coerceAtLeast(0L)
@@ -1560,6 +1560,11 @@ class FastbootProtocol(
         } ?: ""
         return "class=$className,message=$message$cause"
     }
+
+    private fun dataProgressPercent(bytesDone: Long, totalBytes: Long): Int =
+        if (totalBytes <= 0L) 0 else ((bytesDone.coerceAtLeast(0L).toDouble() / totalBytes.toDouble()) * 100.0)
+            .toInt()
+            .coerceIn(0, 100)
 
     private fun formatMicros(microseconds: Long): String = when {
         microseconds >= 1_000_000L -> String.format(Locale.US, "%.3fs", microseconds / 1_000_000.0)

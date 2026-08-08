@@ -1,3 +1,13 @@
+## 6.0.0-alpha9 build 223 - Architecture cleanup, public workflow retained
+
+- Bumped active source identifiers from `6.0.0-alpha8` / `222` to `6.0.0-alpha9` / `223`.
+- Reduced duplication in MainActivity terminal usage errors, DeviceViewModel persisted string normalization, AdbProtocol inbound payload resets and FastbootProtocol DATA progress calculation without changing protocol behavior or UX.
+- Kept the terminal inline-error hotfix from alpha7/alpha8: invalid Fastboot tokens and missing ADB/Fastboot connections stay in Console instead of opening the operation dialog.
+- Switched current local release-signing instructions to `NEKOFLASH_RELEASE_*` variables while retaining legacy env names as compatibility fallback.
+- Preserved the existing public `Ncorror/NekoFlash` workflow and did not import alternate private-repo defaults from the audited alpha9 archive.
+- Retained historical recovery/export docs and scripts until hardware validation is complete.
+- Exact Android CI and hardware smoke remain required before publishing a public alpha9 release.
+
 ## 6.0.0-alpha8 build 222 - Project audit cleanup
 
 - Synchronized active project version/build identifiers to `6.0.0-alpha8` / `222`.

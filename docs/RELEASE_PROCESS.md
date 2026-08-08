@@ -22,7 +22,7 @@ Release не должен возвращать test/mock/self-test/qualification
 
 ## 4. Signing
 
-Production release требует постоянный NekoFlash release keystore и проверки certificate continuity. `scripts/build-apk.sh release/all` сверяет SHA-256 сертификата keystore с закреплённым production fingerprint и после сборки проверяет APK через `apksigner`. Без полного `NEKOFLASH_*` набора, при другом keystore или несовпадении сертификата release завершается ошибкой; unsigned production APK не выпускается.
+Production release требует постоянный NekoFlash release keystore и проверки certificate continuity. `scripts/build-apk.sh release/all` сверяет SHA-256 сертификата keystore с закреплённым production fingerprint и после сборки проверяет APK через `apksigner`. Новые локальные инструкции используют `NEKOFLASH_RELEASE_STORE_FILE`, `NEKOFLASH_RELEASE_STORE_PASSWORD`, `NEKOFLASH_RELEASE_KEY_ALIAS`, `NEKOFLASH_RELEASE_KEY_PASSWORD`; legacy `NEKOFLASH_KEYSTORE_PATH`/`NEKOFLASH_STORE_PASSWORD`/`NEKOFLASH_KEY_ALIAS`/`NEKOFLASH_KEY_PASSWORD` остаются только fallback. Без полного signing-набора, при другом keystore или несовпадении сертификата release завершается ошибкой; unsigned production APK не выпускается.
 
 ## 5. Publication
 

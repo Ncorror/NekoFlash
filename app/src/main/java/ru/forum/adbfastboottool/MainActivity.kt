@@ -890,6 +890,11 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun invalidTerminalFormat(format: String): TerminalAction? {
+        viewModel.log("❌ Формат: $format")
+        return null
+    }
+
     private fun parseFastbootCommand(cmd: String): TerminalAction? {
         val clean = cmd.trim()
         if (clean.isBlank()) return null
@@ -906,20 +911,14 @@ class MainActivity : AppCompatActivity() {
             "-w", "--wipe" -> TerminalAction.RawFastboot("erase:userdata")
 
             "flash" -> {
-                if (tokens.size < 3) {
-                    viewModel.log("❌ Формат: fastboot flash <partition> <file.img>")
-                    return null
-                }
+                if (tokens.size < 3) return invalidTerminalFormat("fastboot flash <partition> <file.img>")
                 val partition = tokens[1]
                 val file = resolveTerminalFile(tokens[2]) ?: return null
                 TerminalAction.FastbootFlash(partition, file)
             }
 
             "boot" -> {
-                if (tokens.size < 2) {
-                    viewModel.log("❌ Формат: fastboot boot <file.img>")
-                    return null
-                }
+                if (tokens.size < 2) return invalidTerminalFormat("fastboot boot <file.img>")
                 val file = resolveTerminalFile(tokens[1]) ?: return null
                 TerminalAction.FastbootDownloadAndRun(file, "boot")
             }
@@ -930,18 +929,12 @@ class MainActivity : AppCompatActivity() {
             }
 
             "is-logical", "logical-info" -> {
-                if (tokens.size < 2) {
-                    viewModel.log("❌ Формат: fastboot $op <partition>")
-                    return null
-                }
+                if (tokens.size < 2) return invalidTerminalFormat("fastboot $op <partition>")
                 TerminalAction.FastbootLogicalInfo(tokens[1])
             }
 
             "create-logical-partition" -> {
-                if (tokens.size < 3) {
-                    viewModel.log("❌ Формат: fastboot create-logical-partition <partition> <size>")
-                    return null
-                }
+                if (tokens.size < 3) return invalidTerminalFormat("fastboot create-logical-partition <partition> <size>")
                 val partition = tokens[1]
                 val size = parseFastbootSizeArgument(tokens[2]) ?: return null
                 val wire = "create-logical-partition:$partition:$size"
@@ -949,20 +942,14 @@ class MainActivity : AppCompatActivity() {
             }
 
             "delete-logical-partition" -> {
-                if (tokens.size < 2) {
-                    viewModel.log("❌ Формат: fastboot delete-logical-partition <partition>")
-                    return null
-                }
+                if (tokens.size < 2) return invalidTerminalFormat("fastboot delete-logical-partition <partition>")
                 val partition = tokens[1]
                 val wire = "delete-logical-partition:$partition"
                 TerminalAction.RawFastboot(wire)
             }
 
             "resize-logical-partition" -> {
-                if (tokens.size < 3) {
-                    viewModel.log("❌ Формат: fastboot resize-logical-partition <partition> <size>")
-                    return null
-                }
+                if (tokens.size < 3) return invalidTerminalFormat("fastboot resize-logical-partition <partition> <size>")
                 val partition = tokens[1]
                 val size = parseFastbootSizeArgument(tokens[2]) ?: return null
                 val wire = "resize-logical-partition:$partition:$size"
@@ -970,10 +957,7 @@ class MainActivity : AppCompatActivity() {
             }
 
             "update-super" -> {
-                if (tokens.size < 2) {
-                    viewModel.log("❌ Формат: fastboot update-super <super.img> [wipe] [superPartition]")
-                    return null
-                }
+                if (tokens.size < 2) return invalidTerminalFormat("fastboot update-super <super.img> [wipe] [superPartition]")
                 val file = resolveTerminalFile(tokens[1]) ?: return null
                 val wipe = tokens.drop(2).any { it.equals("wipe", ignoreCase = true) || it.equals("--wipe", ignoreCase = true) }
                 val explicitSuper = tokens.drop(2).firstOrNull { !it.equals("wipe", ignoreCase = true) && !it.equals("--wipe", ignoreCase = true) }
@@ -987,10 +971,7 @@ class MainActivity : AppCompatActivity() {
                 when (sub) {
                     "status" -> TerminalAction.RawFastboot("gsi:status")
                     "wipe", "disable" -> TerminalAction.RawFastboot("gsi:$sub")
-                    else -> {
-                        viewModel.log("❌ Формат: fastboot gsi <wipe|disable|status>")
-                        null
-                    }
+                    else -> invalidTerminalFormat("fastboot gsi <wipe|disable|status>")
                 }
             }
 
@@ -1002,18 +983,12 @@ class MainActivity : AppCompatActivity() {
                     null -> TerminalAction.RawFastboot("snapshot-update")
                     "cancel" -> TerminalAction.RawFastboot("snapshot-update:cancel")
                     "merge" -> TerminalAction.RawFastboot("snapshot-update:merge")
-                    else -> {
-                        viewModel.log("❌ Формат: fastboot snapshot-update [cancel|merge]")
-                        null
-                    }
+                    else -> invalidTerminalFormat("fastboot snapshot-update [cancel|merge]")
                 }
             }
 
             "fetch" -> {
-                if (tokens.size < 2) {
-                    viewModel.log("❌ Формат: fastboot fetch <partition> [out.img]")
-                    return null
-                }
+                if (tokens.size < 2) return invalidTerminalFormat("fastboot fetch <partition> [out.img]")
                 val partition = tokens[1]
                 val defaultName = "$partition-fetch.img"
                 val output = resolveTerminalOutputFile(tokens.getOrNull(2).orEmpty(), defaultName) ?: return null
@@ -1021,26 +996,17 @@ class MainActivity : AppCompatActivity() {
             }
 
             "erase" -> {
-                if (tokens.size < 2) {
-                    viewModel.log("❌ Формат: fastboot erase <partition>")
-                    return null
-                }
+                if (tokens.size < 2) return invalidTerminalFormat("fastboot erase <partition>")
                 TerminalAction.RawFastboot("erase:${tokens[1]}")
             }
 
             "format" -> {
-                if (tokens.size < 2) {
-                    viewModel.log("❌ Формат: fastboot format <partition>")
-                    return null
-                }
+                if (tokens.size < 2) return invalidTerminalFormat("fastboot format <partition>")
                 TerminalAction.RawFastboot("format:${tokens[1]}")
             }
 
             "set_active" -> {
-                if (tokens.size < 2) {
-                    viewModel.log("❌ Формат: fastboot set_active <a|b>")
-                    return null
-                }
+                if (tokens.size < 2) return invalidTerminalFormat("fastboot set_active <a|b>")
                 TerminalAction.RawFastboot("set_active:${tokens[1].removePrefix("_")}")
             }
 
@@ -1057,10 +1023,7 @@ class MainActivity : AppCompatActivity() {
             }
 
             "flashing" -> {
-                if (tokens.size < 2) {
-                    viewModel.log("❌ Формат: fastboot flashing <unlock|lock|unlock_critical|lock_critical|get_unlock_ability>")
-                    return null
-                }
+                if (tokens.size < 2) return invalidTerminalFormat("fastboot flashing <unlock|lock|unlock_critical|lock_critical|get_unlock_ability>")
                 TerminalAction.RawFastboot(clean)
             }
 
@@ -1096,8 +1059,7 @@ class MainActivity : AppCompatActivity() {
             "exec" -> {
                 val execCommand = clean.substringAfterWord("exec").trim()
                 if (execCommand.isBlank()) {
-                    viewModel.log("❌ Формат: adb exec <command>")
-                    null
+                    invalidTerminalFormat("adb exec <command>")
                 } else {
                     TerminalAction.AdbService("exec:$execCommand")
                 }
@@ -1119,8 +1081,7 @@ class MainActivity : AppCompatActivity() {
             "raw", "service" -> {
                 val service = clean.substringAfterWord(op).trim()
                 if (service.isBlank()) {
-                    viewModel.log("❌ Формат: adb $op <service>, например adb raw shell:getprop")
-                    null
+                    invalidTerminalFormat("adb $op <service>, например adb raw shell:getprop")
                 } else {
                     TerminalAction.AdbService(service)
                 }
@@ -1132,8 +1093,7 @@ class MainActivity : AppCompatActivity() {
 
             "push" -> {
                 if (tokens.size < 3) {
-                    viewModel.log("❌ Формат: adb push <local-file> <remote-path>")
-                    null
+                    invalidTerminalFormat("adb push <local-file> <remote-path>")
                 } else {
                     val localPath = resolveTerminalInputPath(tokens[1]) ?: return null
                     val remoteArg = tokens[2]
@@ -1144,8 +1104,7 @@ class MainActivity : AppCompatActivity() {
 
             "pull" -> {
                 if (tokens.size < 2) {
-                    viewModel.log("❌ Формат: adb pull <remote-path> [local-file]")
-                    null
+                    invalidTerminalFormat("adb pull <remote-path> [local-file]")
                 } else {
                     val remotePath = tokens[1]
                     val defaultName = remotePath.substringAfterLast('/').ifBlank { "adb-pull.bin" }
@@ -1156,8 +1115,7 @@ class MainActivity : AppCompatActivity() {
 
             "install" -> {
                 if (tokens.size < 2) {
-                    viewModel.log("❌ Формат: adb install [-r] [-d] [-g] <local.apk|local.apks|local.xapk>")
-                    null
+                    invalidTerminalFormat("adb install [-r] [-d] [-g] <local.apk|local.apks|local.xapk>")
                 } else {
                     val packageToken = tokens.last()
                     val packageFile = resolveTerminalFile(packageToken) ?: return null
@@ -1188,10 +1146,7 @@ class MainActivity : AppCompatActivity() {
 
 
     private fun parseAdbInstallMultiple(tokens: List<String>): TerminalAction? {
-        if (tokens.size < 3) {
-            viewModel.log("❌ Формат: adb install-multiple [-r] [-d] [-g] <base.apk> <split1.apk> [split2.apk...]")
-            return null
-        }
+        if (tokens.size < 3) return invalidTerminalFormat("adb install-multiple [-r] [-d] [-g] <base.apk> <split1.apk> [split2.apk...]")
 
         val options = mutableListOf<String>()
         val files = mutableListOf<File>()

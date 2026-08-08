@@ -148,6 +148,8 @@ class DeviceViewModel(
     private fun text(resId: Int, vararg args: Any): String =
         getApplication<Application>().getString(resId, *args)
 
+    private fun String?.trimToNull(): String? = this?.trim()?.takeIf { it.isNotBlank() }
+
     private val initialLines = listOf(
         text(R.string.system_terminal_ready),
         text(R.string.security_full_terminal_active)
@@ -204,7 +206,6 @@ class DeviceViewModel(
     private var debugLoggingEnabled: Boolean = false
     private var operationWakeLock: PowerManager.WakeLock? = null
 
-    // FIX #9: AtomicLong вместо обычного Long — потокобезопасно
     private val operationGeneration = AtomicLong(0L)
     private val connectionGeneration = AtomicLong(0L)
     private val processSessionId: String = UUID.randomUUID().toString()
@@ -1328,14 +1329,12 @@ class DeviceViewModel(
 
     private fun readPendingUnlockVerification(): PendingUnlockVerification? {
         val prefs = unlockVerificationPrefs()
-        val product = prefs.getString(MI_UNLOCK_VERIFY_PRODUCT, null)?.trim()?.takeIf { it.isNotBlank() }
-            ?: return null
+        val product = prefs.getString(MI_UNLOCK_VERIFY_PRODUCT, null).trimToNull() ?: return null
         return PendingUnlockVerification(
             product = product,
-            serial = prefs.getString(MI_UNLOCK_VERIFY_SERIAL, null)?.trim()?.takeIf { it.isNotBlank() },
+            serial = prefs.getString(MI_UNLOCK_VERIFY_SERIAL, null).trimToNull(),
             expectedUnlocked = prefs.getBoolean(MI_UNLOCK_VERIFY_EXPECTED_UNLOCKED, true),
-            operationLabel = prefs.getString(MI_UNLOCK_VERIFY_OPERATION_LABEL, null)
-                ?.trim()?.takeIf { it.isNotBlank() } ?: "Mi Unlock",
+            operationLabel = prefs.getString(MI_UNLOCK_VERIFY_OPERATION_LABEL, null).trimToNull() ?: "Mi Unlock",
             createdAtMs = prefs.getLong(MI_UNLOCK_VERIFY_CREATED_AT, 0L)
         )
     }
@@ -1364,12 +1363,11 @@ class DeviceViewModel(
 
     private fun readPendingSideloadVerification(): PendingSideloadVerification? {
         val prefs = sideloadVerificationPrefs()
-        val packageName = prefs.getString(SIDELOAD_VERIFY_PACKAGE, null)?.trim()?.takeIf { it.isNotBlank() }
-            ?: return null
+        val packageName = prefs.getString(SIDELOAD_VERIFY_PACKAGE, null).trimToNull() ?: return null
         return PendingSideloadVerification(
             packageName = packageName,
             packageSize = prefs.getLong(SIDELOAD_VERIFY_PACKAGE_SIZE, -1L),
-            device = prefs.getString(SIDELOAD_VERIFY_DEVICE, null)?.trim()?.takeIf { it.isNotBlank() },
+            device = prefs.getString(SIDELOAD_VERIFY_DEVICE, null).trimToNull(),
             createdAtMs = prefs.getLong(SIDELOAD_VERIFY_CREATED_AT, 0L)
         )
     }
@@ -1384,8 +1382,7 @@ class DeviceViewModel(
         if (start < 0) return null
         return banner.substring(start + marker.length)
             .substringBefore(';')
-            .trim()
-            .takeIf { it.isNotBlank() }
+            .trimToNull()
     }
 
     private fun verifyPendingSideloadIfReady(proto: AdbProtocol) {
