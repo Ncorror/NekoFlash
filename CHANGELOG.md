@@ -1,3 +1,9 @@
+## 6.0.0-alpha10 build 232 - Quick Flash slot target selection
+
+- Direct Quick Flash now asks whether to flash the active slot or all slots when the selected partition reports has-slot=yes.
+- Legacy/no-slot partitions continue without a slot prompt.
+- Manual partition Quick Flash uses the same slot-target dialog unless the user already typed a concrete _a/_b partition name.
+
 ## 6.0.0-alpha10 build 231 - Sideload result classification
 
 - Treat near-complete ADB Sideload transport close before DONEDONE as VERIFY_PENDING instead of a hard failure.

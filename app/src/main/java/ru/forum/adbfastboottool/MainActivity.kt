@@ -2448,10 +2448,159 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
+    private data class QuickFlashSlotTargetInfo(
+        val hasSlots: Boolean?,
+        val currentSlot: String?,
+        val slotCount: Int
+    )
+
     private fun startDirectFlash(partition: String) {
-        showFileSelector { file ->
-            viewModel.runFlash(partition, file)
+        chooseQuickFlashSlotTarget(partition) { slot ->
+            showFileSelector { file ->
+                viewModel.runFlash(partition, file, slot)
+            }
         }
+    }
+
+    private fun chooseQuickFlashSlotTarget(partition: String, onSlotChosen: (String?) -> Unit) {
+        val normalized = partition.trim().lowercase(Locale.US)
+        if (normalized.isBlank() || quickFlashPartitionAlreadySuffixed(normalized)) {
+            onSlotChosen(null)
+            return
+        }
+
+        val proto = viewModel.fastbootProtocol
+        if (proto?.isConnected != true) {
+            // Keep the existing offline flow: allow file selection, then runFlash will
+            // report the real Fastboot connection error.
+            onSlotChosen(null)
+            return
+        }
+
+        val snapshotInfo = quickFlashSlotInfoFromSnapshot(normalized)
+        when (snapshotInfo.hasSlots) {
+            true -> showQuickFlashSlotDialog(normalized, snapshotInfo, onSlotChosen)
+            false -> onSlotChosen(null)
+            null -> probeQuickFlashSlotTarget(normalized, snapshotInfo, onSlotChosen)
+        }
+    }
+
+    private fun quickFlashPartitionAlreadySuffixed(partition: String): Boolean {
+        val name = partition.substringBefore(':').lowercase(Locale.US)
+        return name.endsWith("_a") || name.endsWith("_b")
+    }
+
+    private fun normalizeQuickFlashSlot(raw: String?): String? =
+        raw?.trim()
+            ?.removePrefix("_")
+            ?.lowercase(Locale.US)
+            ?.takeIf { it.length == 1 && it[0] in 'a'..'z' }
+
+    private fun quickFlashBaseName(partition: String): String =
+        FastbootPartitionInventory.baseName(partition.substringBefore(':').trim().lowercase(Locale.US))
+
+    private fun quickFlashSlotInfoFromSnapshot(partition: String): QuickFlashSlotTargetInfo {
+        val base = quickFlashBaseName(partition)
+        val inventory = viewModel.currentFastbootPartitionInventory()
+        val diagnostics = viewModel.currentFastbootDiagnostics()
+        val currentSlot = normalizeQuickFlashSlot(inventory?.currentSlot)
+            ?: normalizeQuickFlashSlot(diagnostics?.currentSlot)
+        val slotCount = diagnostics?.slotCount?.trim()?.toIntOrNull()
+            ?: inventory?.variables?.get("slot-count")?.trim()?.toIntOrNull()
+            ?: 0
+
+        if (inventory?.topology == FastbootPartitionInventory.SlotTopology.LEGACY_A_ONLY) {
+            return QuickFlashSlotTargetInfo(hasSlots = false, currentSlot = currentSlot, slotCount = slotCount)
+        }
+
+        val familyHasSlot = inventory?.slotFamilies
+            ?.entries
+            ?.firstOrNull { it.key.equals(base, ignoreCase = true) }
+            ?.value
+        val entryHasSlot = inventory?.entries
+            ?.firstOrNull {
+                it.name.equals(base, ignoreCase = true) ||
+                    it.baseName.equals(base, ignoreCase = true)
+            }
+            ?.hasSlot
+        val hasSlots = familyHasSlot ?: entryHasSlot
+        return QuickFlashSlotTargetInfo(
+            hasSlots = hasSlots,
+            currentSlot = currentSlot,
+            slotCount = slotCount
+        )
+    }
+
+    private fun probeQuickFlashSlotTarget(
+        partition: String,
+        snapshotInfo: QuickFlashSlotTargetInfo,
+        onSlotChosen: (String?) -> Unit
+    ) {
+        val base = quickFlashBaseName(partition)
+        lifecycleScope.launch(Dispatchers.IO) {
+            val proto = viewModel.fastbootProtocol
+            val probedHasSlots = proto
+                ?.takeIf { it.isConnected }
+                ?.let {
+                    runCatching {
+                        it.getVar("has-slot:$base")?.trim()?.equals("yes", ignoreCase = true)
+                    }.getOrNull()
+                }
+            val probedCurrentSlot = proto
+                ?.takeIf { it.isConnected }
+                ?.let { runCatching { normalizeQuickFlashSlot(it.getVar("current-slot")) }.getOrNull() }
+            val probedSlotCount = proto
+                ?.takeIf { it.isConnected }
+                ?.let { runCatching { it.getVar("slot-count")?.trim()?.toIntOrNull() }.getOrNull() }
+                ?: 0
+
+            withContext(Dispatchers.Main) {
+                val info = QuickFlashSlotTargetInfo(
+                    hasSlots = probedHasSlots,
+                    currentSlot = probedCurrentSlot ?: snapshotInfo.currentSlot,
+                    slotCount = if (probedSlotCount > 0) probedSlotCount else snapshotInfo.slotCount
+                )
+                if (info.hasSlots == true) {
+                    showQuickFlashSlotDialog(partition, info, onSlotChosen)
+                } else {
+                    onSlotChosen(null)
+                }
+            }
+        }
+    }
+
+    private fun showQuickFlashSlotDialog(
+        partition: String,
+        info: QuickFlashSlotTargetInfo,
+        onSlotChosen: (String?) -> Unit
+    ) {
+        val current = info.currentSlot
+        val currentTarget = current?.let { "${quickFlashBaseName(partition)}_$it" } ?: "${quickFlashBaseName(partition)}_<current>"
+        val lastSlot = if (info.slotCount > 0) {
+            ('a'.code + (info.slotCount - 1).coerceAtLeast(0)).toChar()
+        } else {
+            'b'
+        }
+        val allLabel = if (info.slotCount > 1) {
+            "Все слоты a..$lastSlot (--slot=all)"
+        } else {
+            "Все слоты (--slot=all)"
+        }
+        val labels = arrayOf(
+            "Активный слот ${current ?: "current"} → $currentTarget",
+            allLabel
+        )
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Куда прошить $partition")
+            .setMessage("Раздел сообщает has-slot=yes. Выберите цель прошивки перед выбором файла.")
+            .setNegativeButton(getString(R.string.cancel_upper), null)
+            .setItems(labels) { _, which ->
+                when (which) {
+                    0 -> onSlotChosen(current)
+                    1 -> onSlotChosen("all")
+                }
+            }
+            .show()
     }
 
     private fun showManualQuickFlashTargetDialog() {
@@ -2470,7 +2619,7 @@ class MainActivity : AppCompatActivity() {
                     viewModel.log("❌ Некорректное имя Fastboot-раздела: $partition")
                     return@setPositiveButton
                 }
-                showFileSelector { file -> viewModel.runFlash(partition, file) }
+                startDirectFlash(partition)
             }
             .show()
     }
