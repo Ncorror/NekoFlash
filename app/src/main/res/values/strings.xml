@@ -93,7 +93,7 @@ Not requested:
     <string name="wake_lock_released">✅ WakeLock released.</string>
     <string name="wake_lock_error">⚠️ WakeLock could not be acquired: %1$s</string>
     <string name="wake_lock_release_error">⚠️ WakeLock release error: %1$s</string>
-    <string name="log_init_v20">Alpha9 interface: ADB/Fastboot terminal ready. SYSTEM_ALERT_WINDOW is not requested.</string>
+    <string name="log_init_v20">Alpha10 interface: ADB/Fastboot terminal ready. SYSTEM_ALERT_WINDOW is not requested.</string>
 
     <!-- UX v3 full-window redesign -->
     <string name="flash_queue_empty">Queue is empty. Choose a partition below and select an .img file.</string>

@@ -2,9 +2,9 @@
 
 Дата: **2026-08-08**.
 
-## Current architecture cleanup — 6.0.0-alpha9 build 223
+## Current architecture cleanup — 6.0.0-alpha10 build 224
 
-- Version/build identifiers are synchronized to `6.0.0-alpha9` / `223`.
+- Version/build identifiers are synchronized to `6.0.0-alpha10` / `224`.
 - MainActivity terminal command parsing now has one shared usage-error path instead of duplicated inline format logging.
 - DeviceViewModel pending-verification readers use one trim-to-null helper for persisted string identity fields.
 - AdbProtocol inbound payload bookkeeping has one explicit reset helper for connect/read/disconnect boundaries.

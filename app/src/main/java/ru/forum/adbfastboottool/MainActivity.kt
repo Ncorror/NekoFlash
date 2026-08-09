@@ -167,10 +167,11 @@ class MainActivity : AppCompatActivity() {
         data object LocalStatus : TerminalAction()
         data object OpenReportsFolder : TerminalAction()
         data class RawFastboot(val command: String) : TerminalAction()
-        data class FastbootFlash(val partition: String, val file: File) : TerminalAction()
+        data class FastbootFlash(val partition: String, val file: File, val slot: String? = null) : TerminalAction()
+        data class FastbootPartitionCommand(val wirePrefix: String, val partition: String, val slot: String? = null) : TerminalAction()
         data class FastbootDownloadAndRun(val file: File, val commandAfterDownload: String) : TerminalAction()
         data class FastbootLogicalInfo(val partition: String) : TerminalAction()
-        data class FastbootFetch(val partition: String, val outputFile: File) : TerminalAction()
+        data class FastbootFetch(val partition: String, val outputFile: File, val slot: String? = null) : TerminalAction()
         data class AdbService(val service: String) : TerminalAction()
         data class AdbShell(val command: String) : TerminalAction()
         data class AdbPush(val localFile: File, val remotePath: String) : TerminalAction()
@@ -839,10 +840,11 @@ class MainActivity : AppCompatActivity() {
                     viewModel.runFastbootCommand(action.command, heavy = false)
                 }
             }
-            is TerminalAction.FastbootFlash -> viewModel.runFlash(action.partition, action.file)
+            is TerminalAction.FastbootFlash -> viewModel.runFlash(action.partition, action.file, action.slot)
+            is TerminalAction.FastbootPartitionCommand -> viewModel.runFastbootPartitionCommand(action.wirePrefix, action.partition, action.slot)
             is TerminalAction.FastbootDownloadAndRun -> viewModel.runFastbootDownloadAndRun(action.file, action.commandAfterDownload)
             is TerminalAction.FastbootLogicalInfo -> viewModel.inspectFastbootLogicalPartition(action.partition)
-            is TerminalAction.FastbootFetch -> viewModel.runFastbootFetch(action.partition, action.outputFile)
+            is TerminalAction.FastbootFetch -> viewModel.runFastbootFetch(action.partition, action.outputFile, action.slot)
             is TerminalAction.AdbService,
             is TerminalAction.AdbShell,
             is TerminalAction.AdbPush,
@@ -884,6 +886,7 @@ class MainActivity : AppCompatActivity() {
             is TerminalAction.AdbInstallMultiple -> viewModel.runAdbInstallMultiple(action.apkFiles, action.options)
             is TerminalAction.RawFastboot,
             is TerminalAction.FastbootFlash,
+            is TerminalAction.FastbootPartitionCommand,
             is TerminalAction.FastbootDownloadAndRun,
             is TerminalAction.FastbootLogicalInfo,
             is TerminalAction.FastbootFetch -> Unit
@@ -895,10 +898,104 @@ class MainActivity : AppCompatActivity() {
         return null
     }
 
+    private data class FastbootTerminalOptions(
+        val tokens: List<String>,
+        val slot: String? = null,
+        val setActive: String? = null
+    )
+
+    private fun normalizeFastbootSlot(raw: String): String? {
+        val slot = raw.trim().removePrefix("_").lowercase(Locale.US)
+        if (slot.isBlank()) {
+            viewModel.log("❌ Пустое значение --slot")
+            return null
+        }
+        if (slot == "all" || slot == "other" || (slot.length == 1 && slot[0] in 'a'..'z')) {
+            return slot
+        }
+        viewModel.log("❌ Некорректный slot: $raw. Используйте a, b, all или other.")
+        return null
+    }
+
+    private fun parseFastbootTerminalOptions(tokens: List<String>): FastbootTerminalOptions? {
+        val commandTokens = mutableListOf<String>()
+        var slot: String? = null
+        var setActive: String? = null
+        var i = 0
+
+        fun nextOptionValue(option: String): String? {
+            val value = tokens.getOrNull(i + 1)
+            if (value == null) {
+                viewModel.log("❌ $option требует значение")
+                return null
+            }
+            i += 1
+            return value
+        }
+
+        while (i < tokens.size) {
+            val token = tokens[i]
+            val lower = token.lowercase(Locale.US)
+            when {
+                lower == "--slot" -> {
+                    val value = nextOptionValue("--slot") ?: return null
+                    slot = normalizeFastbootSlot(value) ?: return null
+                }
+                lower.startsWith("--slot=") -> {
+                    slot = normalizeFastbootSlot(token.substringAfter('=')) ?: return null
+                }
+                lower == "--set-active" -> {
+                    val value = nextOptionValue("--set-active") ?: return null
+                    setActive = normalizeFastbootSlot(value)?.takeUnless { it == "all" || it == "other" } ?: return null
+                }
+                lower.startsWith("--set-active=") -> {
+                    setActive = normalizeFastbootSlot(token.substringAfter('='))?.takeUnless { it == "all" || it == "other" } ?: return null
+                }
+                lower == "-a" -> {
+                    val value = nextOptionValue("-a") ?: return null
+                    setActive = normalizeFastbootSlot(value)?.takeUnless { it == "all" || it == "other" } ?: return null
+                }
+                lower == "--disable-verity" || lower == "--disable-verification" -> {
+                    viewModel.log(
+                        "⚠️ $token — host-side правка vbmeta из desktop-fastboot. " +
+                            "NekoFlash не патчит vbmeta на лету; прошейте уже подготовленный образ."
+                    )
+                    return null
+                }
+                lower == "--skip-reboot" || lower == "--skip-secondary" || lower == "--force" || lower == "--verbose" || lower == "-v" -> {
+                    viewModel.log("ℹ️ Опция $token обработчиком терминала не используется для одиночной USB-команды.")
+                }
+                token == "-S" || lower == "--sparse-limit" -> {
+                    nextOptionValue(token) ?: return null
+                    viewModel.log("ℹ️ Sparse splitting (-S) не требуется: NekoFlash передаёт выбранный образ напрямую.")
+                }
+                token.startsWith("-S") && token.length > 2 -> {
+                    viewModel.log("ℹ️ Sparse splitting (-S) не требуется: NekoFlash передаёт выбранный образ напрямую.")
+                }
+                lower == "-s" -> {
+                    nextOptionValue("-s") ?: return null
+                    viewModel.log("ℹ️ -s SERIAL не используется: NekoFlash работает с выбранным OTG-устройством.")
+                }
+                else -> commandTokens += token
+            }
+            i += 1
+        }
+
+        return FastbootTerminalOptions(commandTokens, slot, setActive)
+    }
+
     private fun parseFastbootCommand(cmd: String): TerminalAction? {
         val clean = cmd.trim()
         if (clean.isBlank()) return null
-        val tokens = tokenizeCommandLine(clean)
+        val rawTokens = tokenizeCommandLine(clean)
+        if (rawTokens.isEmpty()) return null
+
+        val parsedOptions = parseFastbootTerminalOptions(rawTokens) ?: return null
+        if (parsedOptions.setActive != null && parsedOptions.tokens.isEmpty()) {
+            return TerminalAction.RawFastboot("set_active:${parsedOptions.setActive}")
+        }
+
+        val tokens = parsedOptions.tokens
         if (tokens.isEmpty()) return null
         val op = tokens[0].lowercase(Locale.US)
 
@@ -911,10 +1008,10 @@ class MainActivity : AppCompatActivity() {
             "-w", "--wipe" -> TerminalAction.RawFastboot("erase:userdata")
 
             "flash" -> {
-                if (tokens.size < 3) return invalidTerminalFormat("fastboot flash <partition> <file.img>")
+                if (tokens.size < 3) return invalidTerminalFormat("fastboot [--slot=<a|b|all|other>] flash <partition> <file.img>")
                 val partition = tokens[1]
                 val file = resolveTerminalFile(tokens[2]) ?: return null
-                TerminalAction.FastbootFlash(partition, file)
+                TerminalAction.FastbootFlash(partition, file, parsedOptions.slot)
             }
 
             "boot" -> {
@@ -988,26 +1085,36 @@ class MainActivity : AppCompatActivity() {
             }
 
             "fetch" -> {
-                if (tokens.size < 2) return invalidTerminalFormat("fastboot fetch <partition> [out.img]")
+                if (tokens.size < 2) return invalidTerminalFormat("fastboot [--slot=<a|b|other>] fetch <partition> [out.img]")
+                if (parsedOptions.slot == "all") {
+                    viewModel.log("⚠️ fastboot fetch --slot=all не используется: один output-файл не должен смешивать оба слота. Укажите --slot=a или --slot=b.")
+                    return null
+                }
                 val partition = tokens[1]
-                val defaultName = "$partition-fetch.img"
+                val defaultName = parsedOptions.slot?.let { "$partition-$it-fetch.img" } ?: "$partition-fetch.img"
                 val output = resolveTerminalOutputFile(tokens.getOrNull(2).orEmpty(), defaultName) ?: return null
-                TerminalAction.FastbootFetch(partition, output)
+                TerminalAction.FastbootFetch(partition, output, parsedOptions.slot)
             }
 
             "erase" -> {
-                if (tokens.size < 2) return invalidTerminalFormat("fastboot erase <partition>")
-                TerminalAction.RawFastboot("erase:${tokens[1]}")
+                if (tokens.size < 2) return invalidTerminalFormat("fastboot [--slot=<a|b|all|other>] erase <partition>")
+                TerminalAction.FastbootPartitionCommand("erase", tokens[1], parsedOptions.slot)
             }
 
             "format" -> {
-                if (tokens.size < 2) return invalidTerminalFormat("fastboot format <partition>")
-                TerminalAction.RawFastboot("format:${tokens[1]}")
+                if (tokens.size < 2) return invalidTerminalFormat("fastboot [--slot=<a|b|all|other>] format <partition>")
+                TerminalAction.FastbootPartitionCommand("format", tokens[1], parsedOptions.slot)
             }
 
-            "set_active" -> {
-                if (tokens.size < 2) return invalidTerminalFormat("fastboot set_active <a|b>")
-                TerminalAction.RawFastboot("set_active:${tokens[1].removePrefix("_")}")
+            "set_active", "set-active" -> {
+                val slot = tokens.getOrNull(1)?.let { normalizeFastbootSlot(it) }
+                    ?: parsedOptions.setActive
+                    ?: return invalidTerminalFormat("fastboot set_active <a|b>")
+                if (slot == "all" || slot == "other") {
+                    viewModel.log("❌ set_active принимает конкретный слот: a, b, ...")
+                    return null
+                }
+                TerminalAction.RawFastboot("set_active:$slot")
             }
 
             "reboot" -> {

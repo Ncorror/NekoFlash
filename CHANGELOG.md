@@ -1,12 +1,19 @@
-## 6.0.0-alpha9 build 223 - Architecture cleanup, public workflow retained
+## 6.0.0-alpha10 build 224 - Fastboot slot option compatibility
 
-- Bumped active source identifiers from `6.0.0-alpha8` / `222` to `6.0.0-alpha9` / `223`.
+- Added desktop-fastboot compatible `--slot` parsing for terminal and Quick Flash partition operations.
+- `flash`, `erase`, and `format` now resolve slotted partitions using `has-slot`, `current-slot`, and `slot-count`; `--slot=all` expands to every reported slot.
+- Supported common forms such as `fastboot flash vendor_boot --slot=all vendor_boot.img`, `fastboot flash --slot=all vendor_boot vendor_boot.img`, and `fastboot --slot=all flash vendor_boot vendor_boot.img`.
+- Added explicit terminal handling for host-side options such as `--set-active` and clear messages for vbmeta patching flags that require desktop-fastboot image rewriting.
+
+## 6.0.0-alpha10 build 224 - Architecture cleanup, public workflow retained
+
+- Bumped active source identifiers from `6.0.0-alpha8` / `222` to `6.0.0-alpha10` / `224`.
 - Reduced duplication in MainActivity terminal usage errors, DeviceViewModel persisted string normalization, AdbProtocol inbound payload resets and FastbootProtocol DATA progress calculation without changing protocol behavior or UX.
 - Kept the terminal inline-error hotfix from alpha7/alpha8: invalid Fastboot tokens and missing ADB/Fastboot connections stay in Console instead of opening the operation dialog.
 - Switched current local release-signing instructions to `NEKOFLASH_RELEASE_*` variables while retaining legacy env names as compatibility fallback.
 - Preserved the existing public `Ncorror/NekoFlash` workflow and did not import alternate private-repo defaults from the audited alpha9 archive.
 - Retained historical recovery/export docs and scripts until hardware validation is complete.
-- Exact Android CI and hardware smoke remain required before publishing a public alpha9 release.
+- Exact Android CI and hardware smoke remain required before publishing a public alpha10 release.
 
 ## 6.0.0-alpha8 build 222 - Project audit cleanup
 

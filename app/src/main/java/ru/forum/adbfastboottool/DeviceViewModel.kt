@@ -1048,10 +1048,28 @@ class DeviceViewModel(
         }
     }
 
-    fun runFastbootFetch(partition: String, outputFile: File) {
+    fun runFastbootFetch(partition: String, outputFile: File, slot: String? = null) {
         startOperation(text(R.string.notif_fastboot_command), text(R.string.notif_executing, "fetch $partition")) {
             val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
-            if (!proto.fetchPartition(partition, outputFile)) failOperation("Fastboot fetch завершился ошибкой: $partition")
+            val targets = proto.resolveSlotPartitionTargets(partition, slot)
+                ?: failOperation("Fastboot slot не удалось применить для $partition")
+            if (targets.size > 1) failOperation("Fastboot fetch для нескольких слотов требует отдельные output-файлы")
+            val target = targets.firstOrNull() ?: failOperation("Fastboot fetch: нет подходящего раздела для $partition")
+            if (!proto.fetchPartition(target, outputFile)) failOperation("Fastboot fetch завершился ошибкой: $target")
+        }
+    }
+
+    fun runFastbootPartitionCommand(wirePrefix: String, partition: String, slot: String? = null) {
+        val label = "$wirePrefix $partition" + slot?.let { " --slot=$it" }.orEmpty()
+        startOperation(text(R.string.notif_fastboot_command), text(R.string.notif_executing, label), heavy = false) {
+            val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
+            if (!proto.isConnected) failOperation(text(R.string.error_no_fastboot))
+            val targets = proto.resolveSlotPartitionTargets(partition, slot)
+                ?: failOperation("Fastboot slot не удалось применить для $partition")
+            targets.forEach { target ->
+                val wire = "$wirePrefix:$target"
+                if (!proto.sendCommand(wire)) failOperation("Fastboot $wirePrefix завершился ошибкой: $target")
+            }
         }
     }
 
@@ -1163,12 +1181,17 @@ class DeviceViewModel(
         }
     }
 
-    fun runFlash(partition: String, file: File) {
-        startOperation(text(R.string.notif_flash_img), text(R.string.notif_flashing_partition, file.name, partition)) {
+    fun runFlash(partition: String, file: File, slot: String? = null) {
+        val label = partition + slot?.let { " --slot=$it" }.orEmpty()
+        startOperation(text(R.string.notif_flash_img), text(R.string.notif_flashing_partition, file.name, label)) {
             val proto = fastbootProtocol ?: failOperation("Нет Fastboot-соединения")
             if (!proto.isConnected) failOperation("Нет Fastboot-соединения")
-            val result = proto.flashPartitionDetailed(partition, file)
-            if (!result.success) failOperation(formatFlashFailure(partition, result))
+            val targets = proto.resolveSlotPartitionTargets(partition, slot)
+                ?: failOperation("Fastboot slot не удалось применить для $partition")
+            targets.forEach { target ->
+                val result = proto.flashPartitionDetailed(target, file)
+                if (!result.success) failOperation(formatFlashFailure(target, result))
+            }
         }
     }
 

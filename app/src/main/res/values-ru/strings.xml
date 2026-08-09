@@ -93,7 +93,7 @@
     <string name="wake_lock_released">✅ WakeLock освобождён.</string>
     <string name="wake_lock_error">⚠️ Не удалось включить WakeLock: %1$s</string>
     <string name="wake_lock_release_error">⚠️ Ошибка освобождения WakeLock: %1$s</string>
-    <string name="log_init_v20">Интерфейс alpha9: ADB/Fastboot-терминал готов. SYSTEM_ALERT_WINDOW не запрашивается.</string>
+    <string name="log_init_v20">Интерфейс alpha10: ADB/Fastboot-терминал готов. SYSTEM_ALERT_WINDOW не запрашивается.</string>
 
     <!-- UX v3 full-window redesign -->
     <string name="flash_queue_empty">Очередь пуста. Выберите раздел ниже и укажите .img файл.</string>

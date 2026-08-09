@@ -654,6 +654,76 @@ class FastbootProtocol(
         }
     }
 
+    fun resolveSlotPartitionTargets(partition: String, slotOverride: String? = null): List<String>? = transactionLock.withLock {
+        val normalized = normalizePartitionName(partition) ?: return@withLock null
+        val slot = slotOverride?.trim()?.removePrefix("_")?.lowercase(Locale.US)?.takeIf { it.isNotBlank() }
+            ?: return@withLock resolveCurrentSlotPartitionTarget(normalized)?.let { listOf(it) }
+
+        if (slot != "all" && slot != "other" && !(slot.length == 1 && slot[0] in 'a'..'z')) {
+            onLog("❌ ОШИБКА: некорректный slot: $slotOverride")
+            return@withLock null
+        }
+
+        val base = normalized.substringBefore(':')
+        val hasSlot = getVar("has-slot:$base")?.equals("yes", ignoreCase = true) == true
+        if (!hasSlot) {
+            if (slotOverride != null) onLog("⚠️ Раздел $base не сообщает has-slot=yes; --slot=$slot будет проигнорирован.")
+            return@withLock listOf(normalized)
+        }
+
+        val count = fastbootSlotCount()
+        if (count <= 0) {
+            onLog("❌ ОШИБКА: устройство сообщает has-slot=yes для $base, но slot-count неизвестен")
+            return@withLock null
+        }
+
+        when (slot) {
+            "all" -> (0 until count).map { applySlotSuffix(normalized, ('a'.code + it).toChar().toString()) }
+            "other" -> {
+                val current = currentFastbootSlot() ?: return@withLock null
+                val other = ((current[0] - 'a' + 1) % count + 'a'.code).toChar().toString()
+                listOf(applySlotSuffix(normalized, other))
+            }
+            else -> {
+                val index = slot[0] - 'a'
+                if (index !in 0 until count) {
+                    onLog("❌ ОШИБКА: slot $slot не существует; slot-count=$count")
+                    return@withLock null
+                }
+                listOf(applySlotSuffix(normalized, slot))
+            }
+        }
+    }
+
+    private fun resolveCurrentSlotPartitionTarget(partition: String): String? {
+        val base = partition.substringBefore(':')
+        val hasSlot = getVar("has-slot:$base")?.equals("yes", ignoreCase = true) == true
+        if (!hasSlot) return partition
+        val current = currentFastbootSlot() ?: return null
+        return applySlotSuffix(partition, current)
+    }
+
+    private fun currentFastbootSlot(): String? {
+        val current = getVar("current-slot")
+            ?.trim()
+            ?.removePrefix("_")
+            ?.lowercase(Locale.US)
+            ?.takeIf { it.length == 1 && it[0] in 'a'..'z' }
+        if (current == null) onLog("❌ ОШИБКА: не удалось определить current-slot")
+        return current
+    }
+
+    private fun fastbootSlotCount(): Int {
+        val raw = getVar("slot-count")?.trim() ?: cachedDiagnostics?.slotCount?.trim()
+        return raw?.toIntOrNull()?.takeIf { it > 0 } ?: 0
+    }
+
+    private fun applySlotSuffix(partition: String, slot: String): String {
+        val pieces = partition.split(':', limit = 2)
+        val suffixed = pieces[0] + "_" + slot
+        return if (pieces.size == 2) "$suffixed:${pieces[1]}" else suffixed
+    }
+
     // ─── ПРОШИВКА РАЗДЕЛА ────────────────────────────────────────────────────
 
     fun flashPartition(partition: String, file: File): Boolean =
