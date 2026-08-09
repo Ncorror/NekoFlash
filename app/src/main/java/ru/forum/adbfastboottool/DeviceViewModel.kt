@@ -905,16 +905,13 @@ class DeviceViewModel(
             log("📱 product: $product")
 
             val serial = proto.currentDiagnostics()?.serialno?.trim()?.takeIf { it.isNotBlank() }
-            val deviceToken = (proto.getVar("token") ?: run {
-                proto.sendCommand("oem get_token")
-                proto.getVar("token")
-            })?.replace(Regex("\\s"), "")
+            val deviceToken = proto.readXiaomiUnlockToken()
             if (deviceToken.isNullOrEmpty()) {
                 val message = "Не удалось прочитать token устройства"
                 log("❌ $message")
                 failOperation(message)
             }
-            log("🔑 deviceToken получен")
+            log("🔑 deviceToken получен (${deviceToken.length} символов)")
 
             // Новая явная попытка отменяет только старый незавершённый verify-marker.
             clearPendingUnlockVerification()
@@ -1017,7 +1014,8 @@ class DeviceViewModel(
         ) {
             val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
             if (!proto.isConnected) failOperation(text(R.string.error_no_fastboot))
-            if (!proto.sendCommand(cmd)) failOperation("Fastboot-команда завершилась ошибкой: $cmd")
+            val ok = if (heavy) proto.sendCommand(cmd) else proto.runTerminalCommand(cmd)
+            if (!ok) failOperation("Fastboot-команда завершилась ошибкой: $cmd")
         }
     }
 

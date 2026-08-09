@@ -1,3 +1,9 @@
+## 6.0.0-alpha10 build 228 - Fastboot token and terminal output
+
+- Xiaomi unlock token reading now accepts multi-line `oem get_token` INFO token fragments when `getvar:token` is empty.
+- Terminal Fastboot commands now print visible OKAY/FAIL/INFO responses in Console instead of only raw trace.
+- `fastboot getvar ...` now shows the returned value in the terminal log.
+
 ## 6.0.0-alpha10 build 227 - Console overlay lint cleanup
 
 - Removed obsolete flash_progress_warning resource after replacing it with the live Console hint.

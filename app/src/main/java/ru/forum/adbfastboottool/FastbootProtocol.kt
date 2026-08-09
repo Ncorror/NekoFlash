@@ -369,6 +369,90 @@ class FastbootProtocol(
         true
     }
 
+    fun runTerminalCommand(command: String, timeout: Int = 5000): Boolean = transactionLock.withLock {
+        if (!ensureSessionReady("terminal command $command")) return@withLock false
+        val clean = command.trim()
+        if (clean.isBlank()) return@withLock false
+        val mutation = parseMutationRequest(clean)
+        if (!writeCommand(clean, timeout)) return@withLock false
+        sessionState = SessionState.AWAITING_COMMAND_FINAL
+
+        val startedMs = System.currentTimeMillis()
+        var infoLines = 0
+        var lastWaitLogSec = 0L
+
+        while (!cancelled) {
+            val elapsedMs = System.currentTimeMillis() - startedMs
+            if (elapsedMs >= 120_000L) {
+                val message = "Terminal Fastboot command timed out: $clean"
+                onLog("❌ $message")
+                markSessionBroken(message)
+                return@withLock false
+            }
+
+            val packet = readPacket(2000)
+            if (packet == null) {
+                val elapsedSec = elapsedMs / 1000
+                if (elapsedSec / 10 != lastWaitLogSec / 10) {
+                    onLog("⏳ Fastboot ждёт ответ... ${elapsedSec} сек")
+                    lastWaitLogSec = elapsedSec
+                }
+                continue
+            }
+
+            when (packet.type) {
+                "INFO", "TEXT" -> {
+                    infoLines += 1
+                    logTerminalInfo(packet.payload)
+                }
+                "OKAY" -> {
+                    sessionState = SessionState.IDLE
+                    logTerminalOkay(clean, packet.payload, infoLines)
+                    if (!verifyTerminalMutation(mutation)) return@withLock false
+                    return@withLock true
+                }
+                "FAIL" -> {
+                    sessionState = SessionState.IDLE
+                    val message = packet.payload.ifBlank { packet.raw }.trim()
+                    onLog("❌ Fastboot FAIL: $message")
+                    return@withLock false
+                }
+                "DATA" -> {
+                    val message = "Terminal Fastboot command entered DATA phase without a payload handler: $clean"
+                    onLog("❌ $message")
+                    markSessionBroken(message)
+                    return@withLock false
+                }
+                else -> onLog("⚠️ Неизвестный ответ Fastboot: ${packet.raw}")
+            }
+        }
+
+        onLog("⚠️ Операция отменена пользователем")
+        false
+    }
+
+    private fun verifyTerminalMutation(mutation: MutationRequest?): Boolean {
+        if (mutation?.kind == PostVerifyKind.SET_ACTIVE) {
+            val expected = mutation.slot?.trim()?.removePrefix("_")?.lowercase(Locale.US) ?: return false
+            val actual = getVar("current-slot")?.trim()?.removePrefix("_")?.lowercase(Locale.US)
+            if (actual != expected) {
+                onLog("⛔ set_active не подтверждён: requested=$expected, current-slot=${actual ?: "unknown"}")
+                return false
+            }
+            onLog("✅ set_active подтверждён: current-slot=$actual")
+        }
+
+        if (mutation?.kind == PostVerifyKind.SNAPSHOT_CONTROL) {
+            val actual = FastbootValueParser.parseSnapshotState(getVar("snapshot-update-status"))
+            if (actual != FastbootValueParser.SnapshotState.NONE) {
+                onLog("⛔ Snapshot control не подтверждён: после команды состояние=$actual, ожидалось NONE")
+                return false
+            }
+            onLog("✅ Snapshot control подтверждён: snapshot-update-status=NONE")
+        }
+        return true
+    }
+
     private fun executeRawCommand(command: String, timeout: Int): Boolean {
         if (!writeCommand(command, timeout)) return false
         sessionState = SessionState.AWAITING_COMMAND_FINAL
@@ -386,6 +470,73 @@ class FastbootProtocol(
         if (!writeCommand("getvar:$name", timeout)) return@withLock null
         val result = readGetVarResponse(name, timeout) ?: return@withLock null
         result.trim().ifEmpty { null }
+    }
+
+    fun readXiaomiUnlockToken(): String? = transactionLock.withLock {
+        val direct = getVar("token")?.let { normalizeUnlockTokenCandidate(it) }
+        if (!direct.isNullOrEmpty()) {
+            onLog("🔑 device token получен через getvar:token (${direct.length} символов)")
+            return@withLock direct
+        }
+
+        if (!ensureSessionReady("oem get_token")) return@withLock null
+        if (!writeCommand("oem get_token", 5000)) return@withLock null
+        sessionState = SessionState.AWAITING_COMMAND_FINAL
+
+        val parts = mutableListOf<String>()
+        val startedMs = System.currentTimeMillis()
+        var emptyReads = 0
+
+        while (!cancelled) {
+            val elapsedMs = System.currentTimeMillis() - startedMs
+            if (elapsedMs >= 30_000L) {
+                markSessionBroken("Таймаут ответа oem get_token после подтверждённой отправки команды")
+                return@withLock null
+            }
+
+            val packet = readPacket(GETVAR_READ_SLICE_MS)
+            if (packet == null) {
+                emptyReads += 1
+                if (emptyReads >= GETVAR_MAX_FAILED_READS && elapsedMs >= GETVAR_MIN_PATIENCE_MS) {
+                    markSessionBroken("Fastboot read failed $emptyReads раза для oem get_token")
+                    return@withLock null
+                }
+                if (GETVAR_READ_RETRY_DELAY_MS > 0L) {
+                    try {
+                        Thread.sleep(GETVAR_READ_RETRY_DELAY_MS)
+                    } catch (_: InterruptedException) {
+                        Thread.currentThread().interrupt()
+                        return@withLock null
+                    }
+                }
+                continue
+            }
+
+            emptyReads = 0
+            when (packet.type) {
+                "INFO", "TEXT" -> extractUnlockTokenPart(packet.payload)?.let { parts += it }
+                "OKAY" -> {
+                    sessionState = SessionState.IDLE
+                    extractUnlockTokenPart(packet.payload)?.let { parts += it }
+                    val token = parts.joinToString(separator = "").filterNot { it.isWhitespace() }
+                    if (token.isNotBlank()) {
+                        onLog("🔑 device token получен через oem get_token (${parts.size} фрагм., ${token.length} символов)")
+                        return@withLock token
+                    }
+                    onLog("⚠️ oem get_token завершён без token-фрагментов")
+                    return@withLock null
+                }
+                "FAIL" -> {
+                    sessionState = SessionState.IDLE
+                    onLog("⚠️ oem get_token не поддерживается: ${packet.payload.ifBlank { packet.raw }}")
+                    return@withLock null
+                }
+                else -> onLog("⚠️ Неизвестный ответ oem get_token: ${packet.raw}")
+            }
+        }
+
+        onLog("⚠️ Операция отменена пользователем")
+        null
     }
 
     /**
@@ -2084,6 +2235,49 @@ class FastbootProtocol(
             }
         }
         return null
+    }
+
+    private fun logTerminalInfo(payload: String) {
+        val clean = payload.trim().removePrefix("INFO").trim()
+        if (clean.isNotBlank()) onLog("↩ $clean")
+    }
+
+    private fun logTerminalOkay(command: String, payload: String, infoLines: Int) {
+        val cleanCommand = command.trim()
+        val cleanPayload = payload.trim()
+        if (cleanCommand.startsWith("getvar:", ignoreCase = true)) {
+            val name = cleanCommand.substringAfter(':').trim()
+            if (name.equals("all", ignoreCase = true)) {
+                val suffix = cleanPayload.ifBlank { "$infoLines строк" }
+                onLog("✅ getvar:all завершён: $suffix")
+                return
+            }
+            val value = normalizeGetVarValue(name, cleanPayload).orEmpty()
+            onLog("✅ $name: ${value.ifBlank { "<empty>" }}")
+            return
+        }
+        if (cleanPayload.isNotBlank()) {
+            onLog("✅ Fastboot OKAY: $cleanPayload")
+        } else {
+            onLog("✅ Fastboot OKAY")
+        }
+    }
+
+    private fun normalizeUnlockTokenCandidate(raw: String): String? =
+        extractUnlockTokenPart(raw)?.filterNot { it.isWhitespace() }?.takeIf { it.isNotBlank() }
+
+    private fun extractUnlockTokenPart(raw: String): String? {
+        val cleaned = raw.trim().removePrefix("INFO").trim()
+        if (cleaned.isBlank()) return null
+        val value = if (cleaned.startsWith("token:", ignoreCase = true)) {
+            cleaned.substringAfter(':')
+        } else {
+            cleaned
+        }.trim()
+        if (value.isBlank()) return null
+        return value.filterNot { it.isWhitespace() }.takeIf { token ->
+            token.length >= 8 && token.any { it.isLetterOrDigit() }
+        }
     }
 
     private fun normalizeGetVarValue(name: String, raw: String): String? {

@@ -5,7 +5,7 @@
 
 ## Current alpha10 validation boundary
 
-Current source state: `6.0.0-alpha10` / `versionCode 227`. This audit refreshed static/source evidence only. Full Android Lint/Debug/Signed Release verdict and physical USB/ADB/Fastboot evidence must be produced on an environment with Android SDK/Gradle cache and real devices.
+Current source state: `6.0.0-alpha10` / `versionCode 228`. This audit refreshed static/source evidence only. Full Android Lint/Debug/Signed Release verdict and physical USB/ADB/Fastboot evidence must be produced on an environment with Android SDK/Gradle cache and real devices.
 
 Do not treat archived CI runs below as proof for the current alpha10 exact source. They remain historical evidence for earlier heads only. Before APK publication, collect fresh exact-head `lintDebug`, `assembleDebug`, signed `assembleRelease`, certificate continuity and hardware smoke evidence.
 
