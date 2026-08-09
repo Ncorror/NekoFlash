@@ -29,7 +29,7 @@ android {
         applicationId = "ru.forum.adbfastboottool"
         minSdk = 26
         targetSdk = 34
-        versionCode = 226
+        versionCode = 227
         versionName = "6.0.0-alpha10"
         def buildCommit = (System.getenv("GITHUB_SHA") ?: System.getenv("NEKOFLASH_BUILD_COMMIT") ?: "local").trim()
         def buildRunId = (System.getenv("GITHUB_RUN_ID") ?: System.getenv("NEKOFLASH_BUILD_RUN_ID") ?: "local").trim()

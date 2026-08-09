@@ -246,7 +246,6 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="layout_flash_reboot_mode">Reboot</string>
 <string name="flash_progress_writing">Writing…</string>
     <string name="flash_progress_title">⚡ Flashing in progress</string>
-    <string name="flash_progress_warning">⚠️ Do not disconnect the cable or minimize the app</string>
     <string name="flash_progress_done_ok">✅ Operation completed</string>
     <string name="flash_progress_done_fail">❌ Operation failed</string>
     <string name="flash_progress_cancel">Cancel</string>

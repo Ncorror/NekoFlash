@@ -1,3 +1,9 @@
+## 6.0.0-alpha10 build 227 - Console overlay lint cleanup
+
+- Removed obsolete flash_progress_warning resource after replacing it with the live Console hint.
+- Marked the full-screen progress overlay/card hierarchy as intentional to keep Android Lint clean.
+- No runtime behavior change beyond the install-over versionCode bump.
+
 ## 6.0.0-alpha10 build 226 - Always-available terminal sheet
 
 - Replaced blocking flash progress dialog with a non-modal in-app operation panel below the global Console sheet.
