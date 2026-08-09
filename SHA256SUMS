@@ -5,7 +5,7 @@ a98c7dcb035715be328874a469d31dd3d553b58d065e5ee7746b810982c27a94  ./.github/work
 32e37d15a785075471889e8a040153264be6050c473b99b975244b8e5673a291  ./ACKNOWLEDGEMENTS.md
 00f54bad68f61dc121b3b6a2afcc6c29ee653cc25190a7a8a06282aecae96e8c  ./ASSETS_LICENSE.md
 0f331cb0e00007c0274925b29470aab5a0cb2544b4332d132f76a21077dd6fc5  ./BUILDING.md
-6aac61c436fa9e4c56233af487c4e88d5d29caa20f431805ba5ad465d709de48  ./CHANGELOG.md
+4a61ed1dc5a716c6af5e37154c930b5b0ef02de7ac7a52540f4e590eb50e8f34  ./CHANGELOG.md
 241f56a3546accc39b1d353ee044e9bdbb183dbe112a9107d383e13875a5e178  ./LAUNCHER_ARTWORK_SHA256.txt
 c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4  ./LICENSE
 6a8635c2d5fb8963cd90d9603f5b0a9f51c038ff5e551e25765e49c9c3b01d5e  ./NOTICE
@@ -14,7 +14,7 @@ dde875e7d4389fae0c29af0c7b5da94e39c54cf452b8c6b76a1bac78d84a95fe  ./PROJECT_MAST
 7422ff7deaab8beea22537c2b53118768408e91b99d180eab1b5774ef486e6e5  ./README.md
 dc0bedc78cfc6548f5fa4e3cb449c87cc3ad2faf4c5afd277b2e6c44bfc345f7  ./THIRD_PARTY_NOTICES.md
 f8998b5a3fc15bb4468dafb0cd5fec6313b978b949e13310a2795a048a8705de  ./WELCOME_ARTWORK_SHA256.txt
-f269e6fc679f2bafe29bf11ced8387a2ae253b800d8e9e19f69be159d1959b6f  ./app/build.gradle
+6c5cfb32db2eee909ea3496d2dcfa402973989d702d9e6278b3547b3ed10a069  ./app/build.gradle
 6e83455d7092b6fd29a6aac28433a8fc3cadc80aa86baa97529f289e9c6b35e0  ./app/proguard-rules.pro
 c4f2bc61940e9b228d5bea56a1c9636b37897dcab2fa913c15ac0a3714a08b32  ./app/src/main/AndroidManifest.xml
 e9c27e92fa6ccee517e65b8efe3b6624eafe6a13f45b688f2d70c2bc3d58f1f8  ./app/src/main/cpp/CMakeLists.txt
@@ -22,14 +22,14 @@ e9c27e92fa6ccee517e65b8efe3b6624eafe6a13f45b688f2d70c2bc3d58f1f8  ./app/src/main
 97ce14e2187d50fa79a0f5c91c56b2554dd95f2dab9550f8f691e86ce87d5afe  ./app/src/main/java/ru/forum/adbfastboottool/AdbKeyStore.kt
 0e54a4caaa263051857a176d44bbafed38322427d6036cf1cbde9a70a8c01709  ./app/src/main/java/ru/forum/adbfastboottool/AdbPacketChecksum.kt
 34d9c758fac86affcbff49108f1a18dbd558c714dd72070723e1e75a9331cccf  ./app/src/main/java/ru/forum/adbfastboottool/AdbPacketDispatcher.kt
-1a9f9e9fc90743af5be47cf074e61cb2b67953029428ac6e96f2e3bc026b7528  ./app/src/main/java/ru/forum/adbfastboottool/AdbProtocol.kt
+8a60ef893e80981d1138f3aefee4af6794bd8de46745a12c1ae82e51ef95c6df  ./app/src/main/java/ru/forum/adbfastboottool/AdbProtocol.kt
 7d8e6149c5650ea8721154c8179368c2dc5cf97a1ed612843fab394496646369  ./app/src/main/java/ru/forum/adbfastboottool/AdbServiceCompletionPolicy.kt
 3ba3d1ca27a27b97115dafd64a00baa9f59c1076f55d10715f1e5126b3548515  ./app/src/main/java/ru/forum/adbfastboottool/CompactLogRenderPolicy.kt
 17d6b13f68b029b275ef22bdbe1a995729b1d0d31430651f5a69ff4e1cc5a70c  ./app/src/main/java/ru/forum/adbfastboottool/ConnectionModeUiPolicy.kt
 d68598f117e78711721b28f21e78d0bce47c0d09553b5e26acd11a2b8fdef4b6  ./app/src/main/java/ru/forum/adbfastboottool/ConsoleDockController.kt
 62e4599c7ca1c448cfb66b590fe310d66a1b950b0cccfecaa75e9d9e8cb042a5  ./app/src/main/java/ru/forum/adbfastboottool/ConsoleLogAdapter.kt
 e3049c37bfb07062fab24367a1abfc5500f07b1690605503e1d0df3e81806936  ./app/src/main/java/ru/forum/adbfastboottool/ConsoleSheetPolicy.kt
-9b4d37f1ab2753053f9e719e772b97826906dbd285a8fa274b8d03d8ecd97a24  ./app/src/main/java/ru/forum/adbfastboottool/DeviceViewModel.kt
+d2be28c8a957aaaa0f63225d7cb529260147ca7f9239e9fa0efa7424ceedc88d  ./app/src/main/java/ru/forum/adbfastboottool/DeviceViewModel.kt
 fca8fe1ce826db1ffed77fdb37c6d0dbc6cbdf039c965c01306eb17dfb94d220  ./app/src/main/java/ru/forum/adbfastboottool/DiagnosticCrashMarker.kt
 8d9bfb769619237c0899546751c7acc7ec1ab6e8cdb88c5881b162b62dbcd56b  ./app/src/main/java/ru/forum/adbfastboottool/DiagnosticJson.kt
 ce1a0098a37d0b99a13d03b0ad454331f83335f30787a30a8f0fce7a504a5197  ./app/src/main/java/ru/forum/adbfastboottool/DiagnosticLogPolicy.kt
@@ -123,9 +123,9 @@ f83acac6ffd72ce5146dd1490816831ad62b0158123bd1893be9f388ca540869  ./docs/ALPHA6_
 57dc629ecabf9a2284fc8115e1cefe76b97d97238397c5400fb0d0adb49b871a  ./docs/ARCHITECTURE.md
 25ae71ce5a9f922d1818926774845c942360c96b9f97a3d75ee3b541c5997f7f  ./docs/BRANCH_CONSOLIDATION.md
 76f51f2c601f91c49b0b3b8f185e33635bfbccc725bb2a789ae26ab2cab543aa  ./docs/CODE_GUIDE.md
-ec98b82479af4de39942499239aa2c4deb8a553e9f7c00ed49f6786f84b8e582  ./docs/HARDWARE_VALIDATION.md
+9e119c53f25ac93a847ba86d0102e6ed9946a592997813a03ed2fe032bbd0d45  ./docs/HARDWARE_VALIDATION.md
 d68236fc0ee2408f87897979c4b3d77747f2f08e203421639e0408a978ec0031  ./docs/LAUNCHER_IDENTITY.md
-f7e96678f79ae330317341e0a5baf8e260147615532a1283414c8c0267e0fca1  ./docs/PROJECT_STATE.md
+a1fba4d7f90ea7d5534bfb052d4c3f1e8997ca0f9db043c7f843c2ffb43d710d  ./docs/PROJECT_STATE.md
 3fe14cdaaba40170188ec44784ee38409a5d6b522ab359a6d44a9f0e32a23130  ./docs/README.md
 88d2e681db304ce7fa068b91fc6a31bb9349501276d8953f98906de19dcb6a35  ./docs/RECOVERY_FIRST_PLAN.md
 ed10f7edb12b0d1276dcf5c9fddc96c44ab2f5e3e134b1237b6148eb2dc5298c  ./docs/RELEASE_PROCESS.md

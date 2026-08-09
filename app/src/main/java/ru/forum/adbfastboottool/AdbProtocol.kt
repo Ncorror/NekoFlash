@@ -99,6 +99,7 @@ class AdbProtocol(
     private val inboundHeaderBuffer = ByteArray(24)
 
     private val MAX_RECOVERY_INSTALL_LOG_CHARS = 512 * 1024
+    private val SIDELOAD_CLOSE_VERIFY_PENDING_PERCENT = 95
 
     private val RECOVERY_INSTALL_LOG_PATHS = listOf(
         "/cache/recovery/last_install",
@@ -119,6 +120,12 @@ class AdbProtocol(
 
     sealed class SideloadResult {
         object TransferComplete : SideloadResult()
+        data class TransferClosedBeforeDoneDone(
+            val servedBytes: Long,
+            val totalBytes: Long,
+            val percent: Int,
+            val message: String
+        ) : SideloadResult()
         object Cancelled : SideloadResult()
         data class NotInSideloadMode(val mode: PeerMode) : SideloadResult()
         data class Failed(val kind: SideloadFailureKind, val message: String) : SideloadResult()
@@ -480,15 +487,41 @@ class AdbProtocol(
                 return SideloadResult.Failed(kind, message)
             }
 
-            fun readStreamAck(): SideloadResult.Failed? {
+            fun servedPercent(): Int =
+                ((servedBytes * 100L) / fileSize).toInt().coerceIn(0, 100)
+
+            fun closeBeforeDoneDone(kind: SideloadFailureKind, message: String): SideloadResult {
+                val percent = servedPercent()
+                return if (percent >= SIDELOAD_CLOSE_VERIFY_PENDING_PERCENT) {
+                    val detail = "$message после ≈$percent% передачи. Recovery могла уже перейти к post-install/reboot flow; итог смотрите на экране Recovery."
+                    onProgress(100, "ADB Sideload · ожидает проверки Recovery")
+                    onLog("⚠️ ADB Sideload: $detail")
+                    SideloadResult.TransferClosedBeforeDoneDone(
+                        servedBytes = servedBytes,
+                        totalBytes = fileSize,
+                        percent = percent,
+                        message = detail
+                    )
+                } else {
+                    fail(kind, message)
+                }
+            }
+
+            fun readStreamAck(): SideloadResult? {
                 val ack = readHeader()
-                    ?: return fail(SideloadFailureKind.TRANSPORT, "ADB transport закрылся во время подтверждения блока")
+                    ?: return closeBeforeDoneDone(
+                        SideloadFailureKind.TRANSPORT,
+                        "ADB transport закрылся во время подтверждения блока"
+                    )
                 if (ack.dataLength > 0 && readData(ack.dataLength) == null) {
                     return fail(SideloadFailureKind.TRANSPORT, "Не удалось прочитать данные ответа ADB")
                 }
                 return when (ack.command) {
                     A_OKAY -> null
-                    A_CLSE -> fail(SideloadFailureKind.PROTOCOL, "Recovery закрыла sideload stream до DONEDONE")
+                    A_CLSE -> closeBeforeDoneDone(
+                        SideloadFailureKind.PROTOCOL,
+                        "Recovery закрыла sideload stream до DONEDONE"
+                    )
                     else -> fail(
                         SideloadFailureKind.PROTOCOL,
                         "Неожиданный ADB-ответ после блока: cmd=0x${ack.command.toString(16)}"
@@ -500,7 +533,7 @@ class AdbProtocol(
                 sideloadLoop@ while (!cancelled && result == null) {
                     val reqHeader = readHeader()
                     if (reqHeader == null) {
-                        result = fail(
+                        result = closeBeforeDoneDone(
                             SideloadFailureKind.TRANSPORT,
                             "ADB transport закрылся до подтверждения DONEDONE"
                         )
@@ -511,7 +544,7 @@ class AdbProtocol(
                         A_CLSE -> {
                             if (reqHeader.dataLength > 0) readData(reqHeader.dataLength)
                             runCatching { sendMessageInternal(A_CLSE, 1, remoteId, EMPTY_PAYLOAD) }
-                            result = fail(
+                            result = closeBeforeDoneDone(
                                 SideloadFailureKind.PROTOCOL,
                                 "Recovery закрыла sideload stream до DONEDONE"
                             )

@@ -1,3 +1,9 @@
+## 6.0.0-alpha10 build 231 - Sideload result classification
+
+- Treat near-complete ADB Sideload transport close before DONEDONE as VERIFY_PENDING instead of a hard failure.
+- Keep real early transport/protocol sideload failures red.
+- Preserve Recovery-result verification marker so the install result can still be checked after returning to Recovery.
+
 ## 6.0.0-alpha10 build 230 - Device status polish
 
 - Renamed the Home device status label from generic Bootloader to explicit bootloader-unlocked status.

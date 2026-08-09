@@ -1538,6 +1538,12 @@ class DeviceViewModel(
                         "Передача файла завершена. Recovery само определяет допустимость пакета; итог установки будет считан после возврата в Recovery, если лог доступен."
                     )
                 }
+                is AdbProtocol.SideloadResult.TransferClosedBeforeDoneDone -> {
+                    persistPendingSideloadVerification(file, proto)
+                    verificationPending(
+                        "Recovery закрыла ADB до DONEDONE после ≈${result.percent}% передачи. Это не считается ошибкой транспорта; проверьте итог установки на экране Recovery или после возврата в Recovery."
+                    )
+                }
                 AdbProtocol.SideloadResult.Cancelled -> {
                     throw OperationAbort(OperationOutcome.Cancelled("ADB Sideload отменён"))
                 }
