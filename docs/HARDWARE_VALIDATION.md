@@ -1,362 +1,242 @@
-# Аппаратная проверка NekoFlash V6
+# Physical-device validation
 
-Этот документ содержит только reviewed sanitised summary. Raw logs с serial, USB topology, пользовательскими путями, account ID, cookie values и tokens в Git не коммитятся. Исторический факт не является PASS для текущей сборки.
+This file records concrete physical-device evidence that is useful for release decisions. It intentionally excludes raw traces, account data, unique device identifiers, temporary test plans and internal workflow notes.
 
+## 2026-08-09 — alpha10 hardware validation
 
-## Current alpha10 validation boundary
+### Test configuration
 
-Current source state: `6.0.0-alpha10` / `versionCode 232`. This audit refreshed static/source evidence only. Full Android Lint/Debug/Signed Release verdict and physical USB/ADB/Fastboot evidence must be produced on an environment with Android SDK/Gradle cache and real devices.
+- Host: Xiaomi `25053PC47G` / `onyx`, Android 16 (SDK 36).
+- DUT: POCO X7 Pro / model `2412DPC0AG`, product `rodin`.
+- Connection: USB OTG, Type-C to Type-C.
+- Host root access: not required.
+- Tested application line: `6.0.0-alpha10`.
+- Release certificate SHA-256 used by CI: `b122576dcaa5b1ceebd977545314bd515432f9e3fa50733fa8153a1e48a6c19e`.
 
-Do not treat archived CI runs below as proof for the current alpha10 exact source. They remain historical evidence for earlier heads only. Before APK publication, collect fresh exact-head `lintDebug`, `assembleDebug`, signed `assembleRelease`, certificate continuity and hardware smoke evidence.
+The retained evidence package contains compact logs, sanitized protocol traces, USB-session summaries, screenshots/photographs and CI reports. Raw account credentials, Xiaomi/Fastboot token values, signing secrets and unique device serials are intentionally excluded from this repository summary.
 
-## Историческая база до V6
+### Build 227 — baseline and token-parser defect
 
-| Устройство/flow | Подтверждённый факт | Статус V6 |
-|---|---|---|
-| Xiaomi/POCO `onyx` | Ранее распознавались ADB Recovery и ADB Sideload | Полный V6 retest required |
-| Xiaomi/POCO `vayu` | Ранее выполнялись read-only Fastboot DATA diagnostics | Quick Flash mutation не подтверждена |
-| Xiaomi/POCO `marble` | Ранее выполнялись read-only Fastboot DATA diagnostics | Quick Flash mutation не подтверждена |
-| Mi Unlock | Владелец сообщал об успешной работе старого flow | Требуется отдельный V6 audit |
+Commit `24977be483735ca1b430a50e1d38a7d8ab95d802`.
 
-## Slice B.1 — logs menu/privacy Android CI PASS
+Physical evidence:
 
-Exact code head: `d90ff154820eb5878114b15dd2f685c0b34dd6ce`.  
-GitHub Actions run: `30397037090`, status **SUCCESS**, branch `feature/recovery-first-quick-flash`.
+- canonical ADB connection to `rodin` — **PASS**;
+- ADB authorization and `shell_v2` negotiation — **PASS**;
+- `adb reboot bootloader` — **PASS**;
+- canonical Fastboot handshake with `product=rodin` — **PASS**;
+- bootloader state before unlock: `unlocked=no`;
+- `oem get_token` returned two Fastboot `INFO` token fragments followed by `OKAY`;
+- the application failed to assemble those fragments and reported that the device token could not be read.
 
-Confirmed by CI:
+Conclusion: USB/Fastboot token delivery worked on hardware; the failure was in application-side response parsing. This defect led to P1.
 
-- static project, documentation, checksum, A/B, USB-connectivity, flash-safety and diagnostic-logging guards — **PASS**;
-- pure/JVM policy/protocol matrix — **26/26 PASS**, including `logs-menu` and `sanitized-log-share`;
-- Android `lintDebug` — **PASS**, `136` warnings and `0` errors;
-- Debug APK and unsigned Release APK — **BUILD SUCCESSFUL**;
-- CMake — **PASS** for `arm64-v8a`, `armeabi-v7a`, `x86`, `x86_64`;
-- APK/report artifacts were uploaded. Release signing was not configured.
-- Debug APK SHA-256: `847c8f3ef5e4c56a6a66948009613f848d1418bda8606ca3a3d89395105b83c9`.
-- Unsigned Release APK SHA-256: `7bf0a5a765899e0995dd6d24285c1e0544d792bd661dedabdac370383d9b1536`.
-- Report artifact digest: `a6f0553854aedf3bd33caa5f23c4ed072750406798b31a3076e9e965c8f9c3eb`; APK artifact digest: `3bdfd2018fc7c8d624a97fc5fb333ea1c5b0d37a63c8cdb040278db0a8e4f21f`.
+### Build 228 / P1 — real Xiaomi unlock flow
 
-This closes the compile/CI gate for the global logs menu and broader device-ID sanitisation. It does not replace device UI/share validation: the next safe evidence is a smoke test of all log-menu actions and a sanitized export containing no raw IMEI/ICCID/Android ID/CPUID/UFS/fingerprint UID.
+Commit `5b8ad38a8743138f035c2b8d17d7be5b536d4019`.
 
-## Alpha6 Slice B — CI PASS, guided DATA hardware PASS, Sideload preflight PASS
+Physical evidence:
 
-Build: `6.0.0-alpha6-dev-nekoflash+1c90383a73f8.30301994393`.  
-Exact head: `1c90383a73f8ec29ba19bf6a1a2f781d304118f5`.  
-GitHub Actions run: `30301994393`, status **SUCCESS**.  
-Device: `POCO X3 Pro / vayu`; host: Android 16.  
-Дата расширенной сессии: 2026-07-28.
+- empty `getvar:token` correctly fell back to `oem get_token`;
+- two token fragments were assembled into the expected 80-character value;
+- Xiaomi account authorization completed and the service returned unlock data;
+- the device accepted `download:00000100`;
+- Native USBFS transferred the 256-byte unlock payload successfully;
+- `fastboot oem unlock` returned final `OKAY`;
+- after wipe/reboot, the device returned to canonical ADB DEVICE mode.
 
-Reviewed evidence: compact log, protocol trace и `diagnostic-session.v3` summary. Raw-файлы остаются вне Git. Сводка сессии: `11` operations started, `8` succeeded, `3` failed, `0` cancelled, `0` verification-pending; `50` success messages, `8` warnings, `0` error messages и `0` safety blocks. Эти счётчики сохранены как факт сессии, но hardware verdict строится по явным protocol/result lines: часть non-success operation outcomes относится к разрыву долгоживущего interactive shell и пользовательским действиям, а не к ложному transport PASS.
+Independent Fastboot reconnect then confirmed:
 
-### ADB и переключения режимов
+- `product=rodin`;
+- `unlocked=yes` — **PASS**;
+- `secure=no`;
+- `current-slot=b`;
+- two slots reported.
 
-Подтверждено:
+The reconnect is the authoritative hardware proof that the bootloader actually remained unlocked after the unlock command.
 
-- первая ADB-сессия создала локальный RSA-ключ приложения; последующие подключения использовали сохранённый ключ и успешно авторизовались;
-- `shell_v2` обнаружен, single-reader dispatcher запускался после каждого ADB reconnect;
-- интерактивный shell работал; неизвестная команда вернула обычный shell exit `127`, не превращая ошибку команды в transport failure;
-- большой вывод `getprop` прошёл через interactive shell; физическое отключение кабеля закрыло shell и dispatcher fail-closed, без ложного reboot-success;
-- `adb reboot bootloader` принят и привёл к bootloader Fastboot;
-- `adb reboot fastboot` принят и привёл к userspace Fastboot (`fastbootd`);
-- legacy alias `adb reboot systems` нормализован в `reboot:` и вернул устройство из ADB Sideload в обычный Android;
-- после каждого ожидаемого one-way reboot WakeLock освобождался, а reconnect создавал новую transport generation.
+### Build 229 / P2 — post-unlock state and A/B inventory
 
-Открыто: malformed/partial ADB packet остаётся покрыт pure regression, но отдельного device/fault-injection evidence в этой сессии нет.
+Commit `53f392cab21037392f45985df0baafbc6b728c55`.
 
-### Bootloader Fastboot и guided DATA
+Physical evidence:
 
-Первая Fastboot-сессия была bootloader Fastboot (`is-userspace=no`):
+- bootloader remained `unlocked=yes`;
+- bootloader Fastboot reported `secure=no`;
+- terminal `getvar all` output was visible and usable;
+- slot count: 2, active slot: `b`;
+- slotted partitions included `boot`, `init_boot`, `vendor_boot`, `dtbo`, `vbmeta`, `vbmeta_system`, `vbmeta_vendor` and `lk`;
+- `super` and `userdata` were reported as non-slotted;
+- `boot_a/b` and `vendor_boot_a/b` were reported as 64 MiB partitions.
 
-- handshake: `product=vayu`;
-- загрузчик: `unlocked=no`, `secure=yes`; mutation оставалась заблокированной;
-- slot variables были unsupported/empty и трактовались как legacy A-only compatibility без создания `_a`/`_b`;
-- reported max download size: `768 MiB`.
+CI passed lint/debug/release and release-certificate verification. This build also exposed six unused-resource lint warnings; they were removed before build 230.
 
-Guided Slice B actions:
+### Build 230 — real `vendor_boot_b` flash
 
-1. Main recommended test, `32 MiB`, UsbRequest — **PASS**, финальный `OKAY`, средняя скорость около `23.34 MB/s`.
-2. Повтор main test, `32 MiB`, UsbRequest — **PASS**, финальный `OKAY`, средняя скорость около `23.29 MB/s`.
-3. Selected-image qualification: `recovery.img`, `128 MiB` — source/staged SHA-256 совпал, internal staging завершён, UsbRequest DATA — **PASS**, финальный `OKAY`, средняя скорость около `23.65 MB/s`.
-4. Guided comparison, одинаковый `32 MiB` payload:
-   - UsbRequest — **PASS**, около `23.17 MB/s`;
-   - synchronous `bulkTransfer` — **PASS**, около `3.65 MB/s`;
-   - итог: оба штатных транспорта получили финальный `OKAY`.
+Commit `5a8c7cd982d2b88056e8eafdbe1b009ece34e9c2`.
 
-Во всех четырёх действиях выполнялся только `download → DATA payload → final response`. Команды `flash`, `boot`, `stage`, `update-super` и `unlock` не отправлялись. При disconnect private staging cleanup сообщил `deleted=1`, `failed=0`. После новой Fastboot generation прошлые DATA results корректно отображались как history from another session и не считались current-generation authorization.
+Preflight on hardware:
 
-### Fastbootd и ADB Sideload preflight
+- Fastboot handshake: `product=rodin`;
+- active slot: `b`;
+- `unlocked=yes`;
+- `secure=no`;
+- `has-slot:vendor_boot=yes`;
+- `partition-size:vendor_boot_b=0x4000000` (64 MiB);
+- imported `vendor_boot.img`: 67,108,864 bytes.
 
-После `adb reboot fastboot` устройство было корректно определено как userspace Fastboot:
+Real mutation:
 
+- target: `vendor_boot_b`;
+- Fastboot download size: `0x04000000`;
+- transport: Native USBFS pipeline, depth 2, 256 KiB blocks;
+- 64 MiB DATA transfer reached 100%;
+- application-reported average payload speed: **42.13 MB/s**;
+- raw Fastboot evidence recorded DATA success and `flash:vendor_boot_b` final `OKAY`;
+- application reported successful completion of the flash.
+
+Post-check:
+
+- Fastboot reconnect again reported `product=rodin`, slot `b`, `unlocked=yes`, `secure=no`;
+- diagnostic session recorded **8 operations started / 8 succeeded / 0 failed**.
+
+Two ADB RSA timeout messages in the same wider session occurred during mode transitions and do not represent Fastboot flash failures.
+
+### Build 230 — Fastbootd, ROM/GApps sideload and final boot
+
+The same build was then exercised through recovery/fastbootd workflows.
+
+Fastbootd:
+
+- userspace Fastboot connection — **PASS**;
 - `is-userspace=yes`;
 - `super-partition-name=super`;
-- max download size: `256 MiB`;
-- текущая generation не наследовала size-aware authorization от предыдущей bootloader Fastboot-сессии;
-- пользовательское отключение завершило generation fail-closed.
+- snapshot status `none`;
+- max download/fetch reported as 256 MiB;
+- unlocked state remained `yes`.
 
-Recovery peer затем определился как `ADB SIDELOAD` по banner/mode. Это подтверждает transition и reconnect path, но реальная ZIP-передача в этой сессии не запускалась. Команда возврата `adb reboot systems` была принята и устройство снова подключилось как обычный ADB device.
+ROM sideload:
 
-### Sideload ZIP verification UI
+- package size: 2,620,082,319 bytes;
+- ADB peer mode: SIDELOAD;
+- transfer progress was recorded continuously from start through approximately 95%;
+- Recovery closed the ADB transport before `DONEDONE`;
+- build 230 classified that close as a hard failure;
+- physical Recovery evidence showed the device continuing into the post-install/recovery workflow rather than an obvious transport abort.
 
-Отдельным smoke в том же exact build подтверждено:
+This exposed a result-classification defect: a near-complete Recovery-side close could be reported as a false negative.
 
-- ZIP импортируется без transport session и проходит полный scan;
-- карточка показывает имя, размер, `VERIFIED` и число entries, а полный path/hash dump остаётся только в Details;
-- повторные проверки дают тот же package fingerprint и завершаются `SUCCESS`;
-- WakeLock освобождается после каждой проверки;
-- попытка отправки без ADB соединения fail-closed завершается явной ошибкой, а не ложным PASS.
+GApps sideload:
 
-Не подтверждено:
+- package size: 471,229,202 bytes;
+- ADB peer mode: SIDELOAD;
+- transfer progressed through approximately 95%;
+- Recovery returned `DONEDONE`;
+- NekoFlash correctly kept the result as `VERIFY_PENDING`, because `DONEDONE` proves stream completion but does not by itself prove package installation success.
 
-- persistence после полного process restart;
-- автоматический переход в `STALE` после изменения файла;
-- реальная Sideload transfer, cancel/reconnect во время transfer и Recovery `SUCCESS/FAILED/UNKNOWN`;
-- controlled Quick Flash mutation — загрузчик оставался locked, а `flash:*` отсутствует.
+Final device state:
 
-### Длина журналов и privacy finding
+- physical evidence shows the Android/crDroid setup welcome screen after the ROM/GApps sequence;
+- a later canonical ADB connection reported `device=rodin`;
+- ADB peer mode returned to normal `DEVICE`.
 
-Compact log вырос из-за полного stdout команды `getprop`; protocol trace вырос из-за per-block Fastboot timing. Это ожидаемые raw diagnostics, но такие файлы могут содержать IMEI-подобные и другие аппаратные идентификаторы из произвольного terminal output. Raw compact/trace нельзя коммитить или отправлять как публичный отчёт.
+Conclusion: the ADB Sideload transport was exercised with multi-gigabyte and hundreds-of-megabytes payloads on real hardware. The session also identified the close-before-`DONEDONE` classification problem later addressed by P3.
 
-`ReportSanitizer` при «Поделиться санитизированной копией» дополнительно маскирует IMEI/MEID/IMSI/ICCID, Android ID, CPUID/UFS ID и fingerprint UID в bracketed `getprop`, text key/value и JSON forms. `sanitized-log-share` и глобальное logs menu прошли exact-head Android CI run `30397037090`; остаётся device UI/share smoke.
+### Build 231 / P3 — sideload result-classification fix
 
-## Android smoke evidence alpha5
+Commit `8c051aba4536133a124a62abb39b081b55b8aaef`.
 
-### Smoke 1 — baseline UI без USB
+Change:
 
-Build: `6.0.0-alpha5-dev-nekoflash+6ef9da644a82.29860864789`.
+- a near-complete Recovery-side close before `DONEDONE` at or above the guarded completion threshold is classified as `VERIFY_PENDING`;
+- earlier transport/protocol failures remain `FAILED`.
 
-Подтверждено:
+Evidence level:
 
-- приложение запускается и создаёт compact log/trace/session summary;
-- transport session отсутствует, operation не стартует;
-- Recovery-first Quick Flash визуально принят maintainer и зафиксирован как защищённый экран.
+- lint — **PASS**;
+- debug build — **PASS**;
+- release build — **PASS**;
+- lint issue count — 0;
+- release certificate — **PASS**;
+- no separate post-P3 physical ROM sideload rerun is present in the retained 2026-08-09 evidence.
 
-Обнаружено:
+Therefore P3 is **CI/code validated, not independently hardware-rerun after the patch**.
 
-- перегруженные welcome/Sideload/Fastboot DATA panels;
-- диагностические taps без устройства не различались в compact log;
-- Mi Account completion возвращал общий cancellation result.
+### Build 232 / P4 — Quick Flash slot-target selection
 
-### Smoke 2 — hardware-polish без USB
+Commit `5714282cb75da22fa1a778f5946c23dca257fd48`.
 
-Build: `6.0.0-alpha5-dev-nekoflash+0747c4ec72e3.29866798716`.
+Change:
 
-Подтверждено:
+- when a selected partition reports `has-slot=yes`, Quick Flash can ask for the active slot or all reported slots;
+- non-slotted partitions do not require a slot dialog;
+- explicitly suffixed targets such as `_a` or `_b` remain explicit and do not require another slot choice.
 
-- Fastboot DATA main/advanced taps оставляют точный no-device отказ;
-- импорт и анализ ZIP работают без transport session;
-- интерактивный Xiaomi login доходит до получения account identity.
+Evidence level:
 
-Обнаружено:
+- lint — **PASS**;
+- debug build — **PASS**;
+- release build — **PASS**;
+- lint issue count — 0;
+- release certificate — **PASS**;
+- retained screenshot evidence is pre-P4 and demonstrates the missing slot choice that motivated the change;
+- no post-P4 hardware screenshot or physical flash rerun is present in the retained 2026-08-09 evidence.
 
-- background token exchange блокировал официальный `https://unlock.update.miui.com/sts`;
-- Sideload pre-verify note показывал misleading green success icon.
+Therefore build 232 is the current CI-clean alpha10 head, while its P4 UI change still lacks a separate post-patch hardware rerun in this evidence set.
 
-### Smoke 3 — `/sts` exchange
+## 2026-08-09 evidence matrix
 
-Build: `6.0.0-alpha5-dev-nekoflash+8d9923ec0878.29870485300`.
-
-Подтверждено:
-
-- Xiaomi login завершён;
-- unlockApi service session и ожидаемые service cookies получены;
-- следующий Mi Unlock action корректно остановлен из-за отсутствия Fastboot-устройства;
-- смена data-center preference журналируется без account secrets.
-
-Остаточный дефект:
-
-- на первом проходе UI иногда показывал stale blocked-host banner;
-- после restart сохранённая session использовалась успешно;
-- причина локализована: поздний `onPageFinished` повторно обрабатывал уже завершённый `/sts` callback.
-
-### Smoke 4 — first-pass login regression
-
-Build: `6.0.0-alpha5-dev-nekoflash+5f119c469430.29913150722`.
-
-Подтверждено:
-
-- fresh Xiaomi login завершился в одном запуске приложения без stale blocked-host banner;
-- unlockApi service session и ожидаемые cookie names получены;
-- ручная смена data-center preference работает;
-- следующий Mi Unlock action безопасно остановлен из-за отсутствия Fastboot-устройства;
-- transport session не создавалась, mutation не выполнялась.
-
-Обнаружено:
-
-- compact log всё ещё показывал raw account ID в сообщении об успешном login. Текущий source удаляет ID из log line; для этой sanitisation нужен regression smoke.
-
-First-pass callback race считается `DONE_DEVICE`. Полный Mi Unlock flow остаётся отдельным hardware gate.
-
-### Smoke 5 — Welcome fullscreen overlay
-
-Maintainer visual verdict: **PASS**. Полноэкранное artwork отображается одним viewport без вертикальной прокрутки; заголовок закреплён сверху, прозрачный контурный permission/risk gate — снизу поверх изображения. Расположение кнопок и читаемость приняты как эталонные. Exact build ID к скриншоту не приложен, поэтому для публикуемого head всё ещё требуется Android CI и короткая regression-проверка без изменения макета.
-
-### Smoke 6 — exact-head closure пяти UI/login пунктов
-
-Source/CI head: `b220d48b796d09b13974d8dc39d090efbc2afb55`.
-Device build: `6.0.0-alpha5-dev-nekoflash+b220d48b796d.30042304245`.
-
-CI evidence archive подтвердил:
-
-- canonical documentation/static/safety guards — PASS;
-- pure/JVM matrix — `23/23 PASS`;
-- `lintDebug`, `assembleDebug`, `assembleRelease` — `BUILD SUCCESSFUL`;
-- launcher identity и Welcome artwork locks — PASS.
-
-На устройстве закрыты пять smoke-пунктов:
-
-1. новый круглый launcher с котом отображается;
-2. fullscreen Welcome с прозрачным нижним overlay подтверждён как эталонный;
-3. ADB Sideload до реальной проверки ZIP не показывает ложную зелёную success-галочку;
-4. Mi Account login завершается в том же запуске приложения без stale blocked-host banner;
-5. compact log не содержит raw Mi Account ID, token/cookie values; выводятся только названия ожидаемых cookies.
-
-Последующее нажатие Mi Unlock корректно остановлено сообщением об отсутствии Fastboot-устройства. Это не является проверкой полного unlock flow. Серверный запрос с device token/product и передача `encryptData` в bootloader ещё не подтверждены.
-
-### Hardware 7 — `vayu` A-only, Fastboot DATA и Sideload preflight
-
-Build: `6.0.0-alpha5-dev-nekoflash+b220d48b796d.30042304245`.
-
-Подтверждено:
-
-- Fastboot handshake стабильно определяет `product=vayu`; устройство работает в bootloader fastboot, bootloader сообщает `unlocked=no`;
-- `current-slot`, `slot-count` и `slot-suffix` возвращают unsupported/variable-not-found. Для `vayu` это legacy A-only topology, а не разрешение синтетических `_a`/`_b` targets;
-- source policy уже фиксирует `vayu` как legacy A-only. При Quick Flash concrete unsuffixed `recovery` всё равно обязан подтверждаться read-only inventory/point-query;
-- шесть 100 MiB native DATA profiles получили финальный `OKAY`; 128 MiB выбранного `recovery.img` успешно прошли ASYNC и SYNC private-staged download-only qualification;
-- одна намеренная отмена native transfer корректно перевела текущую Fastboot session в BROKEN. Один ранний reconnect получил read timeout, следующий полный вход восстановил handshake и дальнейшие тесты;
-- отдельная terminal-команда `reboot-recovery` получила `OKAY`;
-- recovery ADB Sideload peer распознан, ZIP импортирован, SHA-256 рассчитан, структура recovery package подтверждена.
-
-Не подтверждено:
-
-- `getvar:all`/partition inventory в этой hardware session не запускались, поэтому concrete `recovery` candidate не был получен;
-- ни одной `flash:*` команды в trace нет; Quick Flash mutation не выполнялась и при `unlocked=no` должна оставаться заблокированной;
-- реальная ADB Sideload передача, cancel во время transfer и recovery result не запускались.
-
-Найденный source defect:
-
-- после успешной ASYNC/SYNC qualification запуск native diagnostic-only profile удалял тот же private staged artifact;
-- cleanup ошибочно журналировался как `qualification failed/cancelled`, попадал в `lastError` и инвалидировал ранее валидное artifact evidence;
-- локальный patch сохраняет staged artifact/evidence после diagnostic-only PASS, если для того же SHA-256 уже есть current-generation ASYNC/SYNC qualification; standalone diagnostic-only staging удаляется с нейтральной причиной и без mutation authorization;
-- patch требует canonical checks, Android CI и повторного device regression. Новый PASS пока не заявлен.
-
-### Hardware 8 — Alpha6 Slice A handoff, `vayu`
-
-Build: `6.0.0-alpha6-dev-nekoflash+9823538147e0.30170789394`.
-
-Handoff CI evidence:
-
-- `lintDebug`, `assembleDebug`, `assembleRelease` — PASS;
-- pure/JVM tests and safety guards — PASS;
-- lint warnings не блокировали release gate.
-
-Device evidence (`POCO X3 Pro / vayu`):
-
-- `adb reboot system` — PASS;
-- `adb reboot bootloader` — PASS;
-- Fastboot handshake — PASS;
-- DATA 32 MiB: UsbRequest, synchronous bulkTransfer и Native USBFS — PASS;
-- large DATA payloads и `recovery.img` 128 MiB — PASS;
-- detach/cancel during DATA — fail-closed, staging cleanup confirmed;
-- flash commands remain blocked at `unlocked=no`.
-
-Открытые проверки перед закрытием Slice A:
-
-- ADB detach во время ordinary shell operation;
-- malformed/partial ADB packet;
-- повторный Fastboot DATA test после восстановления transport.
-
-Найденный diagnostic defect: session-summary определял severity поиском слов внутри готового текста, поэтому `warnings=103` мог стать WARNING, а пояснение о safety block — ERROR. Slice A.1 устраняет lexical inference, вводит structured levels и отдельный `SAFETY_BLOCK`; это local code evidence до нового Android CI/device smoke.
-
-## Текущий аппаратный runbook после CI `30405691356`
-
-### Gate 0 — exact-head UI/transport smoke
-
-Использовать Debug APK exact head `a03d6257cad7bf5f0ca585a6a9abdc1f8b2410f1`, SHA-256 `5f412cb7b1555cfb9205bf8efbde27465185e649e06ccfed0dd1a229e03f89da`.
-
-| Проверка | Ожидаемый результат | Evidence |
+| Check | Result | Evidence level |
 |---|---|---|
-| Cold start и вкладки | Home открывается стабильно; protected Welcome/Recovery-first UI без regression | screenshot + compact summary |
-| Console drag | min/max bounds, tap collapse/expand, double-tap reset, persistence после process restart | portrait + landscape screenshots |
-| Logs menu | current summary/compact/trace/JSON/history доступны; active files не удаляются | screenshot + sanitised share |
-| Privacy share | нет raw IMEI/MEID/IMSI/ICCID/Android ID/serial/CPUID/UFS/fingerprint UID | просмотр экспортированной копии |
-| ADB reconnect | attach, RSA reuse, disconnect и повторный attach без stale session | compact log summary |
-| Fastboot read-only | product/mode handshake без `download`, `flash`, `boot`, `stage`, `unlock` | compact/trace summary |
+| Canonical ADB connection | **PASS** | hardware log + USB session |
+| ADB authorization / `shell_v2` | **PASS** | hardware log |
+| ADB reboot to bootloader | **PASS** | hardware log + trace |
+| Canonical Fastboot handshake | **PASS** | hardware log + trace |
+| `oem get_token` multi-fragment parsing after P1 | **PASS** | hardware log + sanitized trace |
+| Xiaomi unlock server flow | **PASS** | hardware log |
+| Native USBFS 256-byte unlock DATA | **PASS** | hardware log + trace |
+| `fastboot oem unlock` command | **PASS** | final Fastboot `OKAY` |
+| Persistent `unlocked=yes` after reconnect | **PASS** | independent hardware reconnect |
+| A/B partition discovery | **PASS** | hardware `getvar all` |
+| Native USBFS 64 MiB DATA transfer | **PASS** | hardware log + trace |
+| Real `flash:vendor_boot_b` | **PASS** | hardware log + final `OKAY` |
+| Post-flash Fastboot reconnect | **PASS** | hardware log |
+| Fastbootd/userspace detection | **PASS** | hardware log + getvar trace |
+| ROM ADB Sideload transport | **PASS with classification defect found** | long-transfer log + physical recovery/final-boot evidence |
+| GApps ADB Sideload stream | **PASS / VERIFY_PENDING** | hardware log + `DONEDONE` |
+| Final normal ADB DEVICE after ROM/GApps | **PASS** | hardware log + physical setup-screen evidence |
+| P3 close-before-`DONEDONE` fix | **CI PASS** | code/CI; no post-patch hardware rerun |
+| P4 Quick Flash slot selector | **CI PASS** | code/CI; no post-patch hardware rerun |
 
-Gate считается закрытым только после фактического PASS по всем строкам. Ошибка фиксируется отдельно и не маскируется общим «работает».
+## Release boundary
 
-### Gate 1 — real ADB Sideload
+The 2026-08-09 sessions provide strong real-device evidence for the alpha10 transport line through build 230, including an actual destructive bootloader unlock and a real 64 MiB partition flash.
 
-1. Подтвердить `VERIFIED` после полного process restart.
-2. Изменить отдельную копию ZIP и подтвердить `STALE` + blocked transfer.
-3. Перевести Recovery в `Apply update → Apply from ADB` и подтвердить Sideload peer.
-4. Передать проверенный ZIP, записать progress/WakeLock и итог transport operation.
-5. Повторить с cancel и отдельно с cable detach/reconnect во время transfer.
-6. Зафиксировать Recovery result `SUCCESS`, `FAILED` или `UNKNOWN` в persistent card.
+They do **not** justify claiming that every build-232 change has been physically rerun. In particular:
 
-Raw logs остаются вне Git. В этот документ переносится только sanitised build/head/device/expected/actual/result summary.
+- P3/build 231 has CI evidence but no post-fix ROM sideload rerun in the retained package;
+- P4/build 232 has CI evidence but no post-fix slot-dialog screenshot or physical Quick Flash rerun.
 
-## Открытые V6 gates
+A final release may reference the hardware evidence above, but an exact-head smoke on the merged release commit remains the strongest possible release qualification.
 
-### Sideload smoke
+## Earlier retained baseline — POCO X3 Pro (`vayu`)
 
-- защищённый Welcome не менять; на exact-head APK только подтвердить отсутствие регрессии;
-- Sideload: до verify нет зелёного success-status;
-- Import/Verify geometry и тексты остаются читаемыми на целевых размерах экрана.
+Earlier alpha5/alpha6 physical sessions remain useful as regression history:
 
-### Terminal
+- ADB reboot to system/bootloader — **PASS**;
+- Fastboot handshake — **PASS**;
+- 32 MiB Fastboot DATA through Android `UsbRequest`, synchronous `bulkTransfer` and Native USBFS — **PASS**;
+- larger payloads including 128 MiB `recovery.img` — **PASS**;
+- six 100 MiB Native USBFS DATA profiles — **PASS**;
+- detach/cancel behavior was fail-closed and required reconnect as designed;
+- legacy A-only topology was detected without inventing synthetic A/B targets;
+- Recovery ADB Sideload peer detection — **PASS**;
+- ZIP import, SHA-256 calculation and Recovery-package recognition — **PASS**.
 
-- ADB read-only shell;
-- Fastboot `getvar product`, `current-slot`, `unlocked`;
-- cancel/detach;
-- sanitised log export.
+Those sessions did not perform a real partition flash, final Mi Unlock mutation or full ADB Sideload package installation.
 
-### ADB Sideload
+## Repository privacy rule
 
-- recovery sideload mode;
-- выбор ZIP и integrity;
-- progress и cancel;
-- recovery result;
-- reconnect после завершения.
+Do not commit raw USB traces, account IDs, Xiaomi cookies/tokens, device-token values, unique device serials, IMEI/MEID/IMSI/ICCID, Android ID, signing keys or service credentials.
 
-### Recovery-first Quick Flash
-
-На восстанавливаемом устройстве:
-
-- inventory и slot resolution;
-- один concrete target;
-- файл, размер и SHA-256 до confirmation;
-- одна контролируемая flash operation;
-- отсутствие auto retry;
-- reboot только отдельным ручным действием.
-
-### Mi Unlock
-
-- login и log-sanitisation уже подтверждены exact-head smoke;
-- на реальном Fastboot-устройстве сначала выполнить только read-only/preflight: product, token availability, region/host selection и серверные ошибки без финального unlock;
-- отдельно проверить состав отправляемых полей и отсутствие `passToken` на unlock hosts;
-- подтвердить wipe warning и отдельное typed/manual confirmation перед финальным `ahaUnlock`/`oem unlock`;
-- исключить автоматический retry или автоматическую отправку unlock-команды.
-
-## Формат нового доказательства
-
-Для каждого теста сохраняется sanitised ZIP вне source tree и краткая запись: version/build ID, модель/codename без serial, режим, шаги, результат и SHA-256 проверяемого файла. Cookie values, tokens, account ID и raw USB identifiers не включаются.
-
-## Alpha6 defect input — maintainer screenshots, 2026-07-25
-
-Status: **DEFECT_CONFIRMED / FIX_PENDING_DEVICE**. Screenshots are UX evidence; they are not protocol PASS by themselves.
-
-Observed:
-
-- `adb reboot system` (and one input using legacy `systems`) rebooted the target into Android, while the result dialog reported `ADB service завершился ошибкой`. The likely cause is expected USB teardown after the one-way reboot service.
-- Native USBFS DATA self-test reached PASS, but the progress dialog remained `0 B / 100.00 MB`, `speed=N/A` and a stationary bar until final completion; final UI fields could contradict the successful trace result.
-- Fastboot DATA diagnostic menus expose too many sizes/transports; Sideload verification details are not retained as a visible card state; Home/Console/Unlock/nested dialogs need hierarchy reduction.
-- Cold start/restore can expose Terminal/expanded Console instead of a calm Home default.
-
-Planned evidence for alpha6 Slice A:
-
-1. Exact alpha6 build/head and successful Android CI.
-2. `adb reboot system`: command hand-off shown as success/transition and device reconnect confirmed.
-3. Negative control: ordinary ADB service with cable detach remains FAILED.
-4. Native DATA 32/100 MiB: live confirmed-byte progress, rate, elapsed/ETA and coherent final result.
-5. Native cancel/detach: DISCARDURB → REAP remains fail-closed.
-6. `vayu` A-only and DATA evidence-lifecycle regression from head `0495345…`.
+For public release evidence, retain only the application version/build or commit, non-unique device model/codename, connection mode, operation, result, and non-secret payload metadata required to understand the test.
