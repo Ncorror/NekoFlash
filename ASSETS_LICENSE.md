@@ -38,7 +38,6 @@ use is subject to the Android robot attribution stated in `NOTICE` and
 
 ## Integrity metadata
 
-`LAUNCHER_ARTWORK_SHA256.txt`, `WELCOME_ARTWORK_SHA256.txt`, and entries in
-`SHA256SUMS` are checksum metadata. They remain under the repository's
-Apache-2.0 source/documentation license and do not extend that license to the
-artwork they describe.
+`LAUNCHER_ARTWORK_SHA256.txt` and `WELCOME_ARTWORK_SHA256.txt` are checksum
+metadata. They remain under the repository's Apache-2.0 source/documentation
+license and do not extend that license to the artwork they describe.

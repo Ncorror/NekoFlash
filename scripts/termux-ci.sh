@@ -228,7 +228,7 @@ REPORT_ARTIFACTS="$(
 )"
 APK_ARTIFACTS="$(
   printf '%s' "$ARTIFACTS_JSON" | jq -r \
-    '.artifacts[]? | select(.expired == false) | .name | select(endswith("-apk"))'
+    '.artifacts[]? | select(.expired == false) | .name | select(endswith("-debug") or endswith("-release"))'
 )"
 
 {

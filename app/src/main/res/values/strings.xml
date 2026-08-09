@@ -69,14 +69,14 @@ Battery optimization exception: %3$s
 Overlay protection: %4$s
 
 Used permissions:
-• All files access — reads .img/.zip/.sha256/.md5 from /sdcard/Download/NekoFlash.
+• All files access — reads user-selected firmware, ZIP/APK and diagnostic files from /sdcard/Download/NekoFlash.
 • Notifications — shows a foreground operation notification.
 • Wake lock — keeps CPU awake only during flashing or sideload and is released after the operation.
 • Hide overlay windows — on Android 12+ blocks other apps from drawing over this app during sensitive actions.
+• Internet/network state — used only by the Mi Account / Mi Unlock flow to communicate with official Xiaomi HTTPS endpoints.
 
 Not requested:
 • Draw over other apps / SYSTEM_ALERT_WINDOW.
-• Internet access.
 • Contacts, SMS, microphone, camera, phone, or location.</string>
     <string name="permission_status_granted">granted</string>
     <string name="permission_status_not_granted">not granted</string>

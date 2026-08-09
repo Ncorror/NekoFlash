@@ -112,18 +112,12 @@ if [ -n "$SOURCE_ZIP" ]; then
   trap 'rm -rf "$TMP_DIR"' EXIT
   unzip -q "$SOURCE_ZIP" -d "$TMP_DIR/unpacked"
 
-  if [ -f "$TMP_DIR/unpacked/PROJECT_MASTER_TRACKER.md" ]; then
-    SOURCE_ROOT="$TMP_DIR/unpacked"
-  else
-    # Accept both a plain GitHub/source ZIP and the nested recovery bundle
-    # produced by export-recovery-bundle.sh. Sibling chat/evidence files are
-    # intentionally ignored and never imported into the repository.
-    TRACKER_PATHS="$(find "$TMP_DIR/unpacked" -mindepth 2 -maxdepth 5 -type f -name PROJECT_MASTER_TRACKER.md -print)"
-    TRACKER_COUNT="$(printf '%s\n' "$TRACKER_PATHS" | sed '/^$/d' | wc -l | tr -d ' ')"
-    [ "$TRACKER_COUNT" = "1" ] || fail "source ZIP must contain exactly one NekoFlash project root"
-    SOURCE_ROOT="$(dirname "$TRACKER_PATHS")"
-  fi
+  PROJECT_FILES="$(find "$TMP_DIR/unpacked" -mindepth 2 -maxdepth 7 -type f -path '*/app/build.gradle' -print)"
+  PROJECT_COUNT="$(printf '%s\n' "$PROJECT_FILES" | sed '/^$/d' | wc -l | tr -d ' ')"
+  [ "$PROJECT_COUNT" = "1" ] || fail "source ZIP must contain exactly one NekoFlash project root"
+  SOURCE_ROOT="$(dirname "$(dirname "$PROJECT_FILES")")"
 
+  [ -f "$SOURCE_ROOT/settings.gradle" ] || fail "invalid NekoFlash source ZIP: settings.gradle missing"
   [ -f "$SOURCE_ROOT/scripts/termux-publish.sh" ] || fail "invalid NekoFlash source ZIP"
   [ -s "$SOURCE_ROOT/gradle/wrapper/gradle-wrapper.jar" ] || \
     fail "source ZIP is missing gradle/wrapper/gradle-wrapper.jar"
