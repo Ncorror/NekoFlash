@@ -189,7 +189,7 @@ Sideload</string>
     <!-- 2.5.1 Classic Recovery UI -->
 
     <!-- 2.5.2 Operation Center UI -->
-    <string name="layout_operation_center_title">OPERATION CENTER</string>
+    <string name="layout_operation_center_title">СТАТУС ОПЕРАЦИИ</string>
     <string name="layout_operation_center_idle">ОЖИДАНИЕ — активной операции записи нет</string>
     <string name="layout_operation_center_running">ВЫПОЛНЯЕТСЯ — не отключайте USB/OTG и не сворачивайте приложение</string>
     <string name="layout_operation_center_completed">ЗАВЕРШЕНО — проверьте лог/отчёт перед перезагрузкой</string>

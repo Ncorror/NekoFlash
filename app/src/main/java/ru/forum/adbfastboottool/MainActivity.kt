@@ -240,6 +240,7 @@ class MainActivity : AppCompatActivity() {
         viewModel.connectionState.observe(this) {
             refreshConnectionStatusLabel()
             updateDeviceOverview()
+            if (selectedWindow == "unlock") buildUnlockPage()
         }
 
         viewModel.connectionInfo.observe(this) { updateDeviceOverview() }
@@ -247,6 +248,7 @@ class MainActivity : AppCompatActivity() {
             // Диагностика приходит после connectionState — переобновим точный режим.
             refreshConnectionStatusLabel()
             updateDeviceOverview()
+            if (selectedWindow == "unlock") buildUnlockPage()
         }
         viewModel.fastbootPartitionInventory.observe(this) {
             updateDeviceOverview()
@@ -2209,6 +2211,26 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
+    private fun isBootloaderUnlocked(): Boolean =
+        viewModel.fastbootDiagnostics.value?.unlocked?.trim()?.equals("yes", ignoreCase = true) == true
+
+    private fun isFastbootConnected(): Boolean =
+        viewModel.connectionState.value == DeviceViewModel.ConnectionState.FASTBOOT
+
+    private fun unlockStatusSummary(): String {
+        val d = viewModel.fastbootDiagnostics.value
+        return buildString {
+            append("product: ")
+            append(d?.product?.takeIf { it.isNotBlank() } ?: "unknown")
+            append(" • slot: ")
+            append(d?.currentSlot?.takeIf { it.isNotBlank() } ?: "unknown")
+            append(" • unlocked: ")
+            append(d?.unlocked?.takeIf { it.isNotBlank() } ?: "unknown")
+            append(" • secure: ")
+            append(d?.secure?.takeIf { it.isNotBlank() } ?: "unknown")
+        }
+    }
+
     private fun buildUnlockPage() {
         val container = findViewById<android.widget.LinearLayout>(R.id.unlockContainer)
         container.removeAllViews()
@@ -2237,6 +2259,10 @@ class MainActivity : AppCompatActivity() {
             typeface = android.graphics.Typeface.MONOSPACE
             setPadding(dp(2), dp(2), dp(2), dp(6))
         }
+
+        val unlocked = isBootloaderUnlocked()
+        val fastbootReady = isFastbootConnected()
+        val operationActive = viewModel.operationActive.value == true
 
         container.addView(title("🔓 РАЗБЛОКИРОВКА ЗАГРУЗЧИКА", "#E9782B"))
 
@@ -2303,17 +2329,33 @@ class MainActivity : AppCompatActivity() {
                 })
             })
 
-            container.addView(title("РАЗБЛОКИРОВКА", "#E9782B"))
+            container.addView(title("СТАТУС ЗАГРУЗЧИКА", if (unlocked) "#69C779" else "#E9782B"))
             container.addView(card().apply {
-                addView(body("Устройство должно быть в режиме Fastboot и подключено по OTG. Убедитесь, что аккаунт одобрен для разблокировки.", "#F3F6FA"))
-                addView(body("⚠️ Все данные устройства будут стёрты.", "#F2B766"))
-                addView(android.widget.Button(this@MainActivity).apply {
-                    text = "🔓 Разблокировать загрузчик"
-                    isAllCaps = false
-                    setTextColor("#080D13".toColorInt())
-                    setBackgroundColor("#E9782B".toColorInt())
-                    setOnClickListener { runMiUnlockFromUi(auth) }
-                })
+                if (unlocked) {
+                    addView(body("✅ Загрузчик разблокирован", "#69C779"))
+                    addView(body(unlockStatusSummary(), "#AEB8C5"))
+                    addView(body("Кнопка разблокировки скрыта: повторный unlock не требуется.", "#F3F6FA"))
+                } else {
+                    addView(body("Устройство должно быть в режиме Fastboot и подключено по OTG. Убедитесь, что аккаунт одобрен для разблокировки.", "#F3F6FA"))
+                    addView(body(unlockStatusSummary(), if (fastbootReady) "#AEB8C5" else "#F2B766"))
+                    addView(body("⚠️ Все данные устройства будут стёрты.", "#F2B766"))
+                    addView(android.widget.Button(this@MainActivity).apply {
+                        val canRunUnlock = fastbootReady && !operationActive
+                        text = when {
+                            operationActive -> "Операция выполняется…"
+                            !fastbootReady -> "Подключите устройство в Fastboot"
+                            else -> "🔓 Разблокировать загрузчик"
+                        }
+                        isAllCaps = false
+                        isEnabled = canRunUnlock
+                        alpha = if (canRunUnlock) 1.0f else 0.55f
+                        setTextColor("#080D13".toColorInt())
+                        setBackgroundColor(if (canRunUnlock) "#E9782B".toColorInt() else "#5D6570".toColorInt())
+                        setOnClickListener {
+                            if (canRunUnlock) runMiUnlockFromUi(auth)
+                        }
+                    })
+                }
             })
         }
     }
@@ -3228,67 +3270,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun renderFlashProgressDialog(progress: DeviceViewModel.OperationProgress?) {
-        val panel = flashProgressPanel ?: return
-        if (progress == null) {
-            panel.visibility = View.GONE
-            return
+        // Phase 2: Operation progress must not be drawn as a free-floating
+        // overlay above task screens. It caused Unlock cards, action buttons and
+        // Console to overlap. The operation state remains visible through
+        // Console logs and the Home Operation Center; this hook only keeps old
+        // references hidden and refreshes stateful pages.
+        flashProgressPanel?.visibility = View.GONE
+        if (progress?.finished == true && progress.outcome == DeviceViewModel.OperationOutcomeKind.FAILED) {
+            consoleDockController.showLiveLogPreview()
         }
-
-        panel.visibility = View.VISIBLE
-        flashProgressTitleTv?.text = progress.title
-        val pct = progress.percent
-        if (pct < 0) {
-            flashProgressBar?.isIndeterminate = true
-            flashProgressPercent?.text = ""
-        } else {
-            flashProgressBar?.isIndeterminate = false
-            flashProgressBar?.progress = pct
-            flashProgressPercent?.text = getString(R.string.flash_progress_percent, pct)
-        }
-        flashProgressDetail?.text = progress.detail
-
-        if (progress.finished) {
-            flashProgressBar?.isIndeterminate = false
-            val outcome = progress.outcome ?: if (progress.success) {
-                DeviceViewModel.OperationOutcomeKind.SUCCESS
-            } else {
-                DeviceViewModel.OperationOutcomeKind.FAILED
-            }
-            when (outcome) {
-                DeviceViewModel.OperationOutcomeKind.SUCCESS -> {
-                    flashProgressBar?.progress = 100
-                    flashProgressPercent?.text = getString(R.string.flash_progress_percent, 100)
-                    flashProgressTitleTv?.text = getString(R.string.flash_progress_done_ok)
-                    flashProgressTitleTv?.setTextColor("#69C779".toColorInt())
-                }
-                DeviceViewModel.OperationOutcomeKind.VERIFY_PENDING -> {
-                    flashProgressTitleTv?.text = getString(R.string.flash_progress_verify_pending)
-                    flashProgressTitleTv?.setTextColor("#F2B766".toColorInt())
-                }
-                DeviceViewModel.OperationOutcomeKind.CANCELLED -> {
-                    flashProgressTitleTv?.text = getString(R.string.flash_progress_cancelled)
-                    flashProgressTitleTv?.setTextColor("#E9782B".toColorInt())
-                }
-                DeviceViewModel.OperationOutcomeKind.FAILED -> {
-                    flashProgressTitleTv?.text = getString(R.string.flash_progress_done_fail)
-                    flashProgressTitleTv?.setTextColor("#E9782B".toColorInt())
-                    consoleDockController.showLiveLogPreview()
-                }
-            }
-            flashProgressWarning?.text = getString(R.string.flash_progress_overlay_hint)
-            flashProgressWarning?.visibility = View.VISIBLE
-            flashProgressButton?.text = getString(R.string.flash_progress_close)
-            flashProgressButton?.setOnClickListener {
-                panel.visibility = View.GONE
-                viewModel.postOperationProgress(null)
-            }
-        } else {
-            flashProgressTitleTv?.setTextColor("#F3F6FA".toColorInt())
-            flashProgressWarning?.text = getString(R.string.flash_progress_overlay_hint)
-            flashProgressWarning?.visibility = View.VISIBLE
-            flashProgressButton?.text = getString(R.string.flash_progress_cancel)
-            flashProgressButton?.setOnClickListener { confirmCancelFlashProgress() }
-        }
+        if (selectedWindow == "unlock") buildUnlockPage()
     }
 
     private fun confirmCancelFlashProgress() {
@@ -3391,18 +3382,26 @@ class MainActivity : AppCompatActivity() {
         cancelButton.isEnabled = active
         cancelButton.alpha = if (active) 1.0f else 0.45f
 
-        // Operation Center виден только во время операции или когда есть значимое
-        // событие (ошибка/успех/предупреждение). В простое — скрыт, чтобы не занимать
-        // место пустым «ОЖИДАНИЕ».
-        val hasSignificantEvent = recentText != null && (
+        // Operation Center is for real work state, not every read-only terminal
+        // command. Read-only Fastboot getvar results stay in Console only.
+        val progress = viewModel.operationProgress.value
+        val progressTitle = progress?.title.orEmpty()
+        val terminalReadOnlyProgress =
+            progressTitle.equals("Fastboot-команда", ignoreCase = true) &&
+                recentText?.startsWith("✅ getvar:", ignoreCase = true) == true
+
+        val hasErrorOrWarning = recentText != null && (
             recentText.contains("❌") || recentText.contains("ОШИБКА") ||
             recentText.contains("FAILED", ignoreCase = true) || recentText.contains("БЛОКИРОВКА") ||
-            recentText.contains("✅") || recentText.contains("COMPLETED", ignoreCase = true) ||
-            recentText.contains("ЗАВЕРШЕНА") ||
             recentText.contains("⚠") || recentText.contains("WARN", ignoreCase = true)
         )
+        val hasImportantFinishedOperation =
+            progress?.finished == true &&
+                !terminalReadOnlyProgress &&
+                !progressTitle.equals("Fastboot-команда", ignoreCase = true)
+
         findViewById<View>(R.id.cardOperationCenter).visibility =
-            if (active || hasSignificantEvent) View.VISIBLE else View.GONE
+            if (active || hasErrorOrWarning || hasImportantFinishedOperation) View.VISIBLE else View.GONE
     }
 
     // Console snapshots are coalesced for a short window so bursty USB output

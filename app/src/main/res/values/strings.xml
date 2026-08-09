@@ -189,7 +189,7 @@ Sideload</string>
     <!-- 2.5.1 Classic Recovery UI -->
 
     <!-- 2.5.2 Operation Center UI -->
-    <string name="layout_operation_center_title">OPERATION CENTER</string>
+    <string name="layout_operation_center_title">OPERATION STATUS</string>
     <string name="layout_operation_center_idle">IDLE — no active write operation</string>
     <string name="layout_operation_center_running">RUNNING — keep screen on and do not disconnect USB/OTG</string>
     <string name="layout_operation_center_completed">COMPLETED — review the log/report before rebooting</string>

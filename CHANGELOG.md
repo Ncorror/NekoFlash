@@ -1,3 +1,10 @@
+## 6.0.0-alpha10 build 229 - Unlock UI state cleanup
+
+- Removed the floating progress overlay from task screens to prevent overlap with Unlock cards and Console.
+- Unlock page now hides the unlock action when Fastboot reports unlocked=yes.
+- Unlock page refreshes on Fastboot diagnostics and operation state changes.
+- Operation Center no longer appears for read-only terminal getvar success messages.
+
 ## 6.0.0-alpha10 build 228 - Fastboot token and terminal output
 
 - Xiaomi unlock token reading now accepts multi-line `oem get_token` INFO token fragments when `getvar:token` is empty.
