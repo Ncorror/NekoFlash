@@ -2,7 +2,7 @@
 
 NekoFlash is an Android USB Host utility for working with a second Android device directly from a phone or tablet. The host connects over USB OTG (including Type-C to Type-C), uses Android USB Host APIs, and does not require root on the host.
 
-**Current source:** `6.0.0-alpha10` (`versionCode 232`). This is a pre-release build.
+**Current development source:** `6.0.0-alpha11-dev` (`versionCode 233`).
 
 ## Features
 
@@ -120,12 +120,7 @@ Before tagging a release candidate:
 4. verify the release version and signing identity;
 5. create and push the annotated tag matching `versionName`.
 
-For the current source, the tag format is:
-
-```bash
-git tag -a v6.0.0-alpha10 -m "NekoFlash 6.0.0-alpha10"
-git push origin v6.0.0-alpha10
-```
+Development versions containing `dev` are intentionally rejected by the release workflow. Before a future release, finalize `versionName` in a reviewed PR, then create and push an annotated `v${versionName}` tag only on the exact green, hardware-qualified merged commit.
 
 Physical-device evidence retained by the project is in [docs/HARDWARE_VALIDATION.md](docs/HARDWARE_VALIDATION.md).
 

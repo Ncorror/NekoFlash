@@ -2,7 +2,11 @@
 
 Release-level changes only. Commit-by-commit development notes, temporary plans and maintainer workflow history belong in Git history.
 
-## 6.0.0-alpha10 (232) — current release candidate
+## 6.0.0-alpha11 (233) — development
+
+- Development line opened after the `6.0.0-alpha10` release. User-facing alpha11 changes will be recorded here.
+
+## 6.0.0-alpha10 (232) — released 2026-08-09
 
 - Added Quick Flash slot-target selection: when a partition reports `has-slot=yes`, the user can choose the current slot or all reported slots; explicitly suffixed `_a` / `_b` targets remain concrete.
 - Added desktop-fastboot-compatible `--slot` parsing for terminal `flash`, `erase` and `format`, including `--slot=all` expansion from device-reported slot information.
