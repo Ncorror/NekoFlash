@@ -179,7 +179,7 @@ Sideload</string>
     <string name="layout_adb_sideload_title">ADB SIDELOAD</string>
     <string name="layout_sideload_recovery_hint">Recovery → Apply update → Apply from ADB</string>
     <string name="layout_choose_zip_sideload">▶  Choose .zip for Sideload</string>
-    <string name="layout_console_title">CONSOLE</string>
+    <string name="layout_console_title">TERMINAL &amp; LOGS</string>
     <string name="console_logs_button">Logs</string>
     <string name="layout_icon_up">▲</string>
     <string name="layout_icon_down">▼</string>
@@ -315,8 +315,10 @@ Unlock</string>
     <string name="flash_progress_percent">%1$d%%</string>
     <string name="flash_progress_verify_pending">Verification pending</string>
     <string name="flash_progress_cancelled">Operation cancelled</string>
-    <string name="console_resize_handle_desc">Drag up or down to resize Console. Double-tap to reset its height.</string>
+    <string name="console_resize_handle_desc">Drag up to open Terminal and logs, or drag down to collapse.</string>
 
     <string name="device_transport_placeholder">USB: —\nSession: —</string>
     <string name="device_transport_value">USB: %1$s\nSession: %2$s</string>
+    <string name="console_peek_hint">Drag up to open terminal and live logs</string>
+    <string name="flash_progress_overlay_hint">Terminal and logs stay available below — drag the bottom panel up.</string>
 </resources>

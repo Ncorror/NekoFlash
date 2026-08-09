@@ -1,3 +1,9 @@
+## 6.0.0-alpha10 build 226 - Always-available terminal sheet
+
+- Replaced blocking flash progress dialog with a non-modal in-app operation panel below the global Console sheet.
+- Console can be expanded/collapsed during long operations to inspect live logs and use the terminal when appropriate.
+- Collapsed Console now clearly advertises Terminal + logs and no longer shows the app version as its peek text.
+
 ## 6.0.0-alpha10 build 225 - Fastboot slot warning cleanup
 
 - Removed the redundant slotOverride null check after slot parsing.

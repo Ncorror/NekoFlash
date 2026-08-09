@@ -93,7 +93,16 @@ internal class ConsoleDockController(
     /** Updates the single-line preview shown while the Console is collapsed. */
     fun updatePeek(lastLine: String) {
         lastPeekLine = lastLine.trim()
-        if (!isExpanded) peek.text = lastPeekLine
+        if (!isExpanded) peek.text = compactPeekText()
+    }
+
+    /** Raises the Console enough to inspect live logs without opening the keyboard. */
+    fun showLiveLogPreview() {
+        focusCommandWhenExpanded = false
+        commandInput.clearFocus()
+        if (behavior.state == BottomSheetBehavior.STATE_COLLAPSED) {
+            behavior.state = BottomSheetBehavior.STATE_HALF_EXPANDED
+        }
     }
 
     /** Opens the unified Console and optionally focuses its embedded command input. */
@@ -161,6 +170,10 @@ internal class ConsoleDockController(
         }
     }
 
+    private fun compactPeekText(): String = lastPeekLine.ifBlank {
+        activity.getString(R.string.console_peek_hint)
+    }
+
     private fun toggleExpandedState() {
         when (behavior.state) {
             BottomSheetBehavior.STATE_EXPANDED,
@@ -179,7 +192,7 @@ internal class ConsoleDockController(
         historyUp.visibility = View.GONE
         historyDown.visibility = View.GONE
         peek.visibility = if (isExpanded) View.INVISIBLE else View.VISIBLE
-        if (!isExpanded) peek.text = lastPeekLine
+        if (!isExpanded) peek.text = compactPeekText()
 
         if (state == BottomSheetBehavior.STATE_EXPANDED) {
             scrollOutputToBottom()

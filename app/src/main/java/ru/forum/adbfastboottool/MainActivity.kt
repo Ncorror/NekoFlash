@@ -81,7 +81,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvOperationCenterStatus: TextView
     private lateinit var tvOperationCenterLastEvent: TextView
     private lateinit var tvOperationStepQueue: TextView
-    private var flashProgressDialog: android.app.Dialog? = null
+    private var flashProgressPanel: View? = null
     private var flashProgressBar: android.widget.ProgressBar? = null
     private var flashProgressPercent: TextView? = null
     private var flashProgressDetail: TextView? = null
@@ -213,6 +213,13 @@ class MainActivity : AppCompatActivity() {
         }
         etCommand = findViewById(R.id.etCommand)
         consoleDockController = ConsoleDockController(this, rvConsoleOutput).also { it.initialize() }
+        flashProgressPanel = findViewById(R.id.flashProgressPanel)
+        flashProgressTitleTv = findViewById(R.id.flashProgressTitle)
+        flashProgressPercent = findViewById(R.id.flashProgressPercent)
+        flashProgressBar = findViewById(R.id.flashProgressBar)
+        flashProgressDetail = findViewById(R.id.flashProgressDetail)
+        flashProgressWarning = findViewById(R.id.flashProgressWarning)
+        flashProgressButton = findViewById(R.id.flashProgressAction)
         findViewById<View>(R.id.btnConsoleLogs).setOnClickListener { showLogsMenu() }
         tvStatus = findViewById(R.id.tvStatus)
         tvOtgStatus = findViewById(R.id.tvOtgStatus)
@@ -280,7 +287,6 @@ class MainActivity : AppCompatActivity() {
         checkPermissions()
         logBatteryOptimizationState()
         viewModel.log(getString(R.string.log_init_v20))
-        viewModel.log("Версия приложения: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
         val scanAfterWelcome = intent.getBooleanExtra(
             WelcomeActivity.EXTRA_STARTUP_SCAN_AFTER_WELCOME,
             false
@@ -3222,16 +3228,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun renderFlashProgressDialog(progress: DeviceViewModel.OperationProgress?) {
+        val panel = flashProgressPanel ?: return
         if (progress == null) {
-            flashProgressDialog?.dismiss()
-            flashProgressDialog = null
+            panel.visibility = View.GONE
             return
         }
 
-        if (flashProgressDialog == null) {
-            buildFlashProgressDialog()
-        }
-
+        panel.visibility = View.VISIBLE
         flashProgressTitleTv?.text = progress.title
         val pct = progress.percent
         if (pct < 0) {
@@ -3245,7 +3248,6 @@ class MainActivity : AppCompatActivity() {
         flashProgressDetail?.text = progress.detail
 
         if (progress.finished) {
-            // Финальное состояние зависит от явного outcome, а не от отсутствия исключения.
             flashProgressBar?.isIndeterminate = false
             val outcome = progress.outcome ?: if (progress.success) {
                 DeviceViewModel.OperationOutcomeKind.SUCCESS
@@ -3270,24 +3272,22 @@ class MainActivity : AppCompatActivity() {
                 DeviceViewModel.OperationOutcomeKind.FAILED -> {
                     flashProgressTitleTv?.text = getString(R.string.flash_progress_done_fail)
                     flashProgressTitleTv?.setTextColor("#E9782B".toColorInt())
+                    consoleDockController.showLiveLogPreview()
                 }
             }
-            flashProgressWarning?.visibility = View.GONE
+            flashProgressWarning?.text = getString(R.string.flash_progress_overlay_hint)
+            flashProgressWarning?.visibility = View.VISIBLE
             flashProgressButton?.text = getString(R.string.flash_progress_close)
             flashProgressButton?.setOnClickListener {
-                flashProgressDialog?.dismiss()
-                flashProgressDialog = null
+                panel.visibility = View.GONE
                 viewModel.postOperationProgress(null)
             }
         } else {
             flashProgressTitleTv?.setTextColor("#F3F6FA".toColorInt())
+            flashProgressWarning?.text = getString(R.string.flash_progress_overlay_hint)
             flashProgressWarning?.visibility = View.VISIBLE
             flashProgressButton?.text = getString(R.string.flash_progress_cancel)
             flashProgressButton?.setOnClickListener { confirmCancelFlashProgress() }
-        }
-
-        if (flashProgressDialog?.isShowing != true) {
-            flashProgressDialog?.show()
         }
     }
 
@@ -3300,80 +3300,6 @@ class MainActivity : AppCompatActivity() {
                 viewModel.cancelActiveOperation()
             }
             .show()
-    }
-
-    @android.annotation.SuppressLint("UseKtx")
-    private fun buildFlashProgressDialog() {
-        val dp = { v: Int -> (v * resources.displayMetrics.density).toInt() }
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(28), dp(32), dp(28), dp(24))
-            setBackgroundColor("#121A24".toColorInt())
-        }
-        flashProgressTitleTv = TextView(this).apply {
-            text = getString(R.string.flash_progress_title)
-            textSize = 18f
-            setTextColor("#F3F6FA".toColorInt())
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
-            gravity = android.view.Gravity.CENTER
-        }
-        root.addView(flashProgressTitleTv)
-
-        flashProgressPercent = TextView(this).apply {
-            textSize = 40f
-            setTextColor("#E9782B".toColorInt())
-            typeface = android.graphics.Typeface.MONOSPACE
-            gravity = android.view.Gravity.CENTER
-            setPadding(0, dp(20), 0, dp(12))
-        }
-        root.addView(flashProgressPercent)
-
-        flashProgressBar = android.widget.ProgressBar(
-            this, null, android.R.attr.progressBarStyleHorizontal
-        ).apply {
-            max = 100
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, dp(10)
-            ).apply { topMargin = dp(4); bottomMargin = dp(16) }
-        }
-        root.addView(flashProgressBar)
-
-        flashProgressDetail = TextView(this).apply {
-            textSize = 13f
-            setTextColor("#AEB8C5".toColorInt())
-            typeface = android.graphics.Typeface.MONOSPACE
-            gravity = android.view.Gravity.CENTER
-        }
-        root.addView(flashProgressDetail)
-
-        flashProgressWarning = TextView(this).apply {
-            text = getString(R.string.flash_progress_warning)
-            textSize = 13f
-            setTextColor("#E9782B".toColorInt())
-            gravity = android.view.Gravity.CENTER
-            setPadding(0, dp(24), 0, dp(20))
-        }
-        root.addView(flashProgressWarning)
-
-        flashProgressButton = Button(this).apply {
-            text = getString(R.string.flash_progress_cancel)
-            setTextColor("#F3F6FA".toColorInt())
-            setBackgroundColor("#192431".toColorInt())
-            isAllCaps = false
-        }
-        root.addView(flashProgressButton)
-
-        flashProgressDialog = android.app.Dialog(this).apply {
-            setContentView(root)
-            setCancelable(false)
-            window?.setBackgroundDrawable(
-                android.graphics.drawable.ColorDrawable("#080D13".toColorInt())
-            )
-            window?.setLayout(
-                (resources.displayMetrics.widthPixels * 0.88).toInt(),
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-        }
     }
 
     private fun renderOperationSteps(steps: List<DeviceViewModel.OperationStep>) {
@@ -3601,8 +3527,7 @@ class MainActivity : AppCompatActivity() {
 
         miAuthExchangeJob?.cancel()
         miAuthExchangeJob = null
-        flashProgressDialog?.dismiss()
-        flashProgressDialog = null
+        flashProgressPanel?.visibility = View.GONE
         usbPermissionTimeouts.values.forEach(usbPermissionHandler::removeCallbacks)
         usbPermissionTimeouts.clear()
         modeSwitchHandler.removeCallbacksAndMessages(null)

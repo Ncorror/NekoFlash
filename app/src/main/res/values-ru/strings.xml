@@ -179,7 +179,7 @@ Sideload</string>
     <string name="layout_adb_sideload_title">ADB SIDELOAD</string>
     <string name="layout_sideload_recovery_hint">Recovery → Apply update → Apply from ADB</string>
     <string name="layout_choose_zip_sideload">Выбрать файл для Sideload</string>
-    <string name="layout_console_title">CONSOLE</string>
+    <string name="layout_console_title">ТЕРМИНАЛ И ЛОГИ</string>
     <string name="console_logs_button">Логи</string>
     <string name="layout_icon_up">▲</string>
     <string name="layout_icon_down">▼</string>
@@ -319,8 +319,10 @@ Unlock</string>
     <string name="flash_progress_percent">%1$d%%</string>
     <string name="flash_progress_verify_pending">Ожидается проверка</string>
     <string name="flash_progress_cancelled">Операция отменена</string>
-    <string name="console_resize_handle_desc">Потяните вверх или вниз, чтобы изменить высоту Console. Двойное нажатие сбрасывает высоту.</string>
+    <string name="console_resize_handle_desc">Потяните вверх, чтобы открыть терминал и логи, или вниз, чтобы свернуть.</string>
 
     <string name="device_transport_placeholder">USB: —\nСессия: —</string>
     <string name="device_transport_value">USB: %1$s\nСессия: %2$s</string>
+    <string name="console_peek_hint">Потяните вверх, чтобы открыть терминал и живые логи</string>
+    <string name="flash_progress_overlay_hint">Терминал и логи доступны снизу — потяните нижнюю панель вверх.</string>
 </resources>
