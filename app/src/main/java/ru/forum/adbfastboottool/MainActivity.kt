@@ -2851,6 +2851,13 @@ class MainActivity : AppCompatActivity() {
     // ─── UI ──────────────────────────────────────────────────────────────────
 
 
+    private fun formatDeviceBoolean(value: String): String = when (value.trim().lowercase(Locale.US)) {
+        "yes", "true", "1" -> getString(R.string.device_bool_yes)
+        "no", "false", "0" -> getString(R.string.device_bool_no)
+        "", "unknown" -> getString(R.string.device_bool_unknown)
+        else -> value
+    }
+
     @Suppress("SdCardPath")
     private fun updateDeviceOverview() {
         val diagnostics = viewModel.currentFastbootDiagnostics()
@@ -2867,7 +2874,7 @@ class MainActivity : AppCompatActivity() {
             FastbootPartitionInventory.SlotTopology.A_B -> diagnostics?.currentSlot ?: "A/B, текущий не определён"
             FastbootPartitionInventory.SlotTopology.UNKNOWN, null -> diagnostics?.currentSlot ?: "—"
         }
-        val unlocked = diagnostics?.unlocked ?: "—"
+        val unlocked = diagnostics?.unlocked?.let(::formatDeviceBoolean) ?: "—"
         val maxDownload = diagnostics?.maxDownloadSizeRaw?.let { raw ->
             val bytes = diagnostics.maxDownloadSizeBytes
             if (bytes != null && bytes > 0L) "$raw / ${formatFileSize(bytes)}" else raw

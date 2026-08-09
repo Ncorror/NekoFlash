@@ -250,10 +250,7 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="layout_flash_reboot_mode">Reboot</string>
 <string name="flash_progress_writing">Запись…</string>
     <string name="flash_progress_title">⚡ Идёт прошивка</string>
-    <string name="flash_progress_done_ok">✅ Операция завершена</string>
-    <string name="flash_progress_done_fail">❌ Операция не удалась</string>
     <string name="flash_progress_cancel">Отмена</string>
-    <string name="flash_progress_close">Закрыть</string>
     <string name="flash_progress_cancel_confirm_title">Отменить операцию?</string>
     <string name="flash_progress_cancel_confirm_body">Прерывание записи может оставить раздел в повреждённом состоянии. Всё равно отменить?</string>
     <string name="status_fastbootd">● FASTBOOT • FASTBOOTD</string>
@@ -313,15 +310,15 @@ Unlock</string>
     <string name="device_mode_value">Режим: %1$s</string>
     <string name="device_product_value">Модель/product: %1$s%2$s%3$s</string>
     <string name="device_slot_value">Слот: %1$s</string>
-    <string name="device_bootloader_value">Bootloader: %1$s</string>
+    <string name="device_bootloader_value">Загрузчик разблокирован: %1$s</string>
     <string name="device_max_download_value">Max download: %1$s%2$s%3$s%4$s</string>
-    <string name="flash_progress_percent">%1$d%%</string>
-    <string name="flash_progress_verify_pending">Ожидается проверка</string>
-    <string name="flash_progress_cancelled">Операция отменена</string>
     <string name="console_resize_handle_desc">Потяните вверх, чтобы открыть терминал и логи, или вниз, чтобы свернуть.</string>
 
     <string name="device_transport_placeholder">USB: —\nСессия: —</string>
     <string name="device_transport_value">USB: %1$s\nСессия: %2$s</string>
     <string name="console_peek_hint">Потяните вверх, чтобы открыть терминал и живые логи</string>
     <string name="flash_progress_overlay_hint">Терминал и логи доступны снизу — потяните нижнюю панель вверх.</string>
+    <string name="device_bool_yes">да</string>
+    <string name="device_bool_no">нет</string>
+    <string name="device_bool_unknown">неизвестно</string>
 </resources>

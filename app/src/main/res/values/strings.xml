@@ -246,10 +246,7 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="layout_flash_reboot_mode">Reboot</string>
 <string name="flash_progress_writing">Writing…</string>
     <string name="flash_progress_title">⚡ Flashing in progress</string>
-    <string name="flash_progress_done_ok">✅ Operation completed</string>
-    <string name="flash_progress_done_fail">❌ Operation failed</string>
     <string name="flash_progress_cancel">Cancel</string>
-    <string name="flash_progress_close">Close</string>
     <string name="flash_progress_cancel_confirm_title">Cancel operation?</string>
     <string name="flash_progress_cancel_confirm_body">Interrupting a flash mid-write can leave the partition in a broken state. Cancel anyway?</string>
     <string name="status_fastbootd">● FASTBOOT • FASTBOOTD</string>
@@ -309,15 +306,15 @@ Unlock</string>
     <string name="device_mode_value">Mode: %1$s</string>
     <string name="device_product_value">Model/product: %1$s%2$s%3$s</string>
     <string name="device_slot_value">Slot: %1$s</string>
-    <string name="device_bootloader_value">Bootloader: %1$s</string>
+    <string name="device_bootloader_value">Bootloader unlocked: %1$s</string>
     <string name="device_max_download_value">Max download: %1$s%2$s%3$s%4$s</string>
-    <string name="flash_progress_percent">%1$d%%</string>
-    <string name="flash_progress_verify_pending">Verification pending</string>
-    <string name="flash_progress_cancelled">Operation cancelled</string>
     <string name="console_resize_handle_desc">Drag up to open Terminal and logs, or drag down to collapse.</string>
 
     <string name="device_transport_placeholder">USB: —\nSession: —</string>
     <string name="device_transport_value">USB: %1$s\nSession: %2$s</string>
     <string name="console_peek_hint">Drag up to open terminal and live logs</string>
     <string name="flash_progress_overlay_hint">Terminal and logs stay available below — drag the bottom panel up.</string>
+    <string name="device_bool_yes">yes</string>
+    <string name="device_bool_no">no</string>
+    <string name="device_bool_unknown">unknown</string>
 </resources>

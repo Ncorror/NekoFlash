@@ -2,9 +2,9 @@
 
 Дата: **2026-08-08**.
 
-## Current alpha10 slot baseline — 6.0.0-alpha10 build 229
+## Current alpha10 slot baseline — 6.0.0-alpha10 build 230
 
-- Version/build identifiers are synchronized to `6.0.0-alpha10` / `229`.
+- Version/build identifiers are synchronized to `6.0.0-alpha10` / `230`.
 - MainActivity terminal command parsing now has one shared usage-error path instead of duplicated inline format logging.
 - DeviceViewModel pending-verification readers use one trim-to-null helper for persisted string identity fields.
 - AdbProtocol inbound payload bookkeeping has one explicit reset helper for connect/read/disconnect boundaries.

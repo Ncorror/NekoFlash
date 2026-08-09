@@ -1,3 +1,9 @@
+## 6.0.0-alpha10 build 230 - Device status polish
+
+- Renamed the Home device status label from generic Bootloader to explicit bootloader-unlocked status.
+- Localized yes/no values in the Home bootloader status line.
+- Removed obsolete flash progress strings left after replacing the floating progress overlay.
+
 ## 6.0.0-alpha10 build 229 - Unlock UI state cleanup
 
 - Removed the floating progress overlay from task screens to prevent overlap with Unlock cards and Console.
