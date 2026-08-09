@@ -667,7 +667,7 @@ class FastbootProtocol(
         val base = normalized.substringBefore(':')
         val hasSlot = getVar("has-slot:$base")?.equals("yes", ignoreCase = true) == true
         if (!hasSlot) {
-            if (slotOverride != null) onLog("⚠️ Раздел $base не сообщает has-slot=yes; --slot=$slot будет проигнорирован.")
+            onLog("⚠️ Раздел $base не сообщает has-slot=yes; --slot=$slot будет проигнорирован.")
             return@withLock listOf(normalized)
         }
 

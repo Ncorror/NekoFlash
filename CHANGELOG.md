@@ -1,3 +1,8 @@
+## 6.0.0-alpha10 build 225 - Fastboot slot warning cleanup
+
+- Removed the redundant slotOverride null check after slot parsing.
+- Keeps alpha10 Fastboot slot behavior unchanged while making Kotlin compile warning-free.
+
 ## 6.0.0-alpha10 build 224 - Fastboot slot option compatibility
 
 - Added desktop-fastboot compatible `--slot` parsing for terminal and Quick Flash partition operations.

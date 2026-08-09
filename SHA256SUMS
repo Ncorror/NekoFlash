@@ -5,7 +5,7 @@ a98c7dcb035715be328874a469d31dd3d553b58d065e5ee7746b810982c27a94  ./.github/work
 32e37d15a785075471889e8a040153264be6050c473b99b975244b8e5673a291  ./ACKNOWLEDGEMENTS.md
 00f54bad68f61dc121b3b6a2afcc6c29ee653cc25190a7a8a06282aecae96e8c  ./ASSETS_LICENSE.md
 0f331cb0e00007c0274925b29470aab5a0cb2544b4332d132f76a21077dd6fc5  ./BUILDING.md
-45f64d8b4ba7e7c98f3adfb6f99d5b91bfcaa2fc46092b7292fef8fa2e5cd93a  ./CHANGELOG.md
+2668620722ca9e97b672a107bd4713e27d902baaba614228644df376018845d8  ./CHANGELOG.md
 241f56a3546accc39b1d353ee044e9bdbb183dbe112a9107d383e13875a5e178  ./LAUNCHER_ARTWORK_SHA256.txt
 c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4  ./LICENSE
 6a8635c2d5fb8963cd90d9603f5b0a9f51c038ff5e551e25765e49c9c3b01d5e  ./NOTICE
@@ -14,7 +14,7 @@ dde875e7d4389fae0c29af0c7b5da94e39c54cf452b8c6b76a1bac78d84a95fe  ./PROJECT_MAST
 7422ff7deaab8beea22537c2b53118768408e91b99d180eab1b5774ef486e6e5  ./README.md
 dc0bedc78cfc6548f5fa4e3cb449c87cc3ad2faf4c5afd277b2e6c44bfc345f7  ./THIRD_PARTY_NOTICES.md
 f8998b5a3fc15bb4468dafb0cd5fec6313b978b949e13310a2795a048a8705de  ./WELCOME_ARTWORK_SHA256.txt
-197b5f03101867274747ff3bd27e29c6331c08ea564e59e4de5f67d12f008926  ./app/build.gradle
+ef8f97dc14e1738895643ddcbeb8cb67cb1515c41874b79106c978df92ce4db3  ./app/build.gradle
 6e83455d7092b6fd29a6aac28433a8fc3cadc80aa86baa97529f289e9c6b35e0  ./app/proguard-rules.pro
 c4f2bc61940e9b228d5bea56a1c9636b37897dcab2fa913c15ac0a3714a08b32  ./app/src/main/AndroidManifest.xml
 e9c27e92fa6ccee517e65b8efe3b6624eafe6a13f45b688f2d70c2bc3d58f1f8  ./app/src/main/cpp/CMakeLists.txt
@@ -38,7 +38,7 @@ a2235c51c1785b28cd7e0c4ed4e97e29f21aedb84cd25288062b97274d1f9c5f  ./app/src/main
 4ebd0ba6027b7627048b242b84c102eb96786bb140959ec5505f7b14c35735e2  ./app/src/main/java/ru/forum/adbfastboottool/FastbootGetVarAllParser.kt
 bf6adc1ed7920a92453b67cc633554032920d55e38698c65c2ee95f1d00efe7f  ./app/src/main/java/ru/forum/adbfastboottool/FastbootPartitionInventory.kt
 5f2df376ca1e7df06c3335f78b8789b460f25d3429c70f7da9e03fd0f09a472a  ./app/src/main/java/ru/forum/adbfastboottool/FastbootPartitionProbePlanner.kt
-88caea4738810920d7817ffbd829f52e498f978d5802531f4cbdab62d1eb54c4  ./app/src/main/java/ru/forum/adbfastboottool/FastbootProtocol.kt
+2a5d143e9eb12cd0aff7c620e4a0f7bf0293b029a3b2c90f1e2dfe051f6fbfa0  ./app/src/main/java/ru/forum/adbfastboottool/FastbootProtocol.kt
 a1dbb1d2016e00fc2d980b2f1f3bd94f3cdf5b5b86caa8a1183755dace58b26a  ./app/src/main/java/ru/forum/adbfastboottool/FastbootValueParser.kt
 589b59ea5aebd4aee9aa3404741fdb882910a2f2bf8a2ca554d45ad078646ee4  ./app/src/main/java/ru/forum/adbfastboottool/FlashOperationDraft.kt
 d3ac310a4fb3333ec2160ae60565cd1379153fcc2ff5f3112778c45e02681b0f  ./app/src/main/java/ru/forum/adbfastboottool/FlashOperationService.kt
@@ -123,9 +123,9 @@ f83acac6ffd72ce5146dd1490816831ad62b0158123bd1893be9f388ca540869  ./docs/ALPHA6_
 57dc629ecabf9a2284fc8115e1cefe76b97d97238397c5400fb0d0adb49b871a  ./docs/ARCHITECTURE.md
 25ae71ce5a9f922d1818926774845c942360c96b9f97a3d75ee3b541c5997f7f  ./docs/BRANCH_CONSOLIDATION.md
 76f51f2c601f91c49b0b3b8f185e33635bfbccc725bb2a789ae26ab2cab543aa  ./docs/CODE_GUIDE.md
-bfa56593bced7d310d69900e9f74e0fde80b45966e04829a3f6c658372f983a7  ./docs/HARDWARE_VALIDATION.md
+97dbc03c6ae998cf1db8878d30d7b3fb544d11842205f86b224e80de43c5e457  ./docs/HARDWARE_VALIDATION.md
 d68236fc0ee2408f87897979c4b3d77747f2f08e203421639e0408a978ec0031  ./docs/LAUNCHER_IDENTITY.md
-110e4b7ce01ce415a8c3f42f88d64e297578dd78b84b477c898c052a94bcff17  ./docs/PROJECT_STATE.md
+365f9443b1ca58aa99e7186233a973f80967ce94e1fe130c552b8acb96d7ca36  ./docs/PROJECT_STATE.md
 3fe14cdaaba40170188ec44784ee38409a5d6b522ab359a6d44a9f0e32a23130  ./docs/README.md
 88d2e681db304ce7fa068b91fc6a31bb9349501276d8953f98906de19dcb6a35  ./docs/RECOVERY_FIRST_PLAN.md
 ed10f7edb12b0d1276dcf5c9fddc96c44ab2f5e3e134b1237b6148eb2dc5298c  ./docs/RELEASE_PROCESS.md
