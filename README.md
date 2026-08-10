@@ -1,5 +1,25 @@
 # NekoFlash
 
+<!-- NEKOFLASH_OVERVIEW_START -->
+**NekoFlash** is an Android USB OTG flashing tool for controlling, servicing, and flashing another Android device directly from a phone or tablet — **without a PC** and without root on the host device.
+
+It implements **ADB and Fastboot directly over Android USB Host** and supports recovery/boot image flashing, ADB Sideload, device diagnostics, and Xiaomi Mi Unlock workflows.
+
+### What you can do
+
+- Connect **Android-to-Android over USB OTG / USB-C**.
+- Use **ADB** shell, push/pull, APK installation, reboot commands, and ADB Sideload.
+- Use **Fastboot** for device diagnostics, partition discovery, flashing, booting, erasing, formatting, slot switching, and supported OEM commands.
+- Flash `recovery`, `boot`, `init_boot`, `vendor_boot`, `dtbo`, `vbmeta`, or another selected partition with **Quick Flash**.
+- Flash compatible custom recovery images such as **TWRP** directly from an Android phone.
+- Perform supported **Xiaomi Mi Unlock** workflows using Fastboot over USB.
+- Work without desktop `adb`, desktop `fastboot`, or a Windows/Linux/macOS computer.
+
+> [!WARNING]
+> Flashing, erasing, formatting, changing slots, or unlocking a bootloader can cause data loss or make a device unbootable. Always verify the target device, image, partition, and slot before writing.
+<!-- NEKOFLASH_OVERVIEW_END -->
+
+
 <!-- NEKOFLASH_DOWNLOAD_START -->
 ## Download
 
@@ -10,6 +30,19 @@ Latest release:
 
 The APK is distributed through GitHub Releases assets, not GitHub Packages.
 <!-- NEKOFLASH_DOWNLOAD_END -->
+
+<!-- NEKOFLASH_INSTALL_START -->
+## Installation
+
+1. Download the latest NekoFlash APK from the **Download** section above.
+2. Optionally download the published SHA-256 checksum and verify the APK before installation.
+3. Allow your browser or file manager to install apps from unknown sources when Android asks.
+4. Install the APK on the Android phone or tablet that will act as the USB host.
+5. Connect the target Android device using a data-capable USB OTG / USB-C cable.
+6. Select the required mode in NekoFlash: **ADB**, **Recovery / ADB Sideload**, or **Fastboot**.
+
+No PC is required for the documented USB flashing workflows.
+<!-- NEKOFLASH_INSTALL_END -->
 <!-- NEKOFLASH_USB_NOTE_START -->
 ## USB-C / ADB connection note
 
@@ -51,7 +84,6 @@ See also:
 - [Third-party notices](THIRD_PARTY_NOTICES.md)
 <!-- NEKOFLASH_LEGAL_SUMMARY_END -->
 
-NekoFlash is an Android USB Host utility for working with a second Android device directly from a phone or tablet. The host connects over USB OTG (including Type-C to Type-C), uses Android USB Host APIs, and does not require root on the host.
 
 **Current source version:** `6.0.0-alpha10` (`versionCode 232`). The published GitHub hotfix release is `v6.0.0-alpha10.1`; its APK still reports the embedded `versionName` `6.0.0-alpha10`. The `.1` suffix identifies the published hotfix release, not a different embedded app version.
 
