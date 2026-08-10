@@ -1,242 +1,79 @@
 # Physical-device validation
 
-This file records concrete physical-device evidence that is useful for release decisions. It intentionally excludes raw traces, account data, unique device identifiers, temporary test plans and internal workflow notes.
+This document is the public index of NekoFlash physical-device testing. It contains only hardware-validation facts that are useful for release qualification. Raw diagnostic logs, USB traces, account data, device serials, private photographs, chat/continuation notes, recovery archives, temporary plans and operator-state files are intentionally not part of the public repository.
 
-## 2026-08-09 — alpha10 hardware validation
+## Test host
 
-### Test configuration
+The 2026-08-10 qualification sessions used a POCO F7 as the Android USB host. NekoFlash reported the host platform as Xiaomi `25053PC47G` / `onyx`, Android 16 (SDK 36).
 
-- Host: Xiaomi `25053PC47G` / `onyx`, Android 16 (SDK 36).
-- DUT: POCO X7 Pro / model `2412DPC0AG`, product `rodin`.
-- Connection: USB OTG, Type-C to Type-C.
-- Host root access: not required.
-- Tested application line: `6.0.0-alpha10`.
-- Release certificate SHA-256 used by CI: `b122576dcaa5b1ceebd977545314bd515432f9e3fa50733fa8153a1e48a6c19e`.
+## Qualification summary
 
-The retained evidence package contains compact logs, sanitized protocol traces, USB-session summaries, screenshots/photographs and CI reports. Raw account credentials, Xiaomi/Fastboot token values, signing secrets and unique device serials are intentionally excluded from this repository summary.
+| Target | Product | Evidence scope | Result |
+|---|---|---|---|
+| POCO X7 Pro | `rodin` / model `2412DPC0AG` | ADB, Fastboot, unlock history, A/B inventory, real `vendor_boot` flashing, Quick Flash slot selector, Recovery/Sideload classification, final boot, post-fix ADB shell lifecycle | **PASS** |
+| POCO X3 Pro | `vayu` | exact release-base regression: repeated ADB shell/reconnect, bootloader Fastboot, real `recovery` flash, Recovery/Sideload, Fastbootd, final boot | **PASS with reporting note** |
 
-### Build 227 — baseline and token-parser defect
+Detailed evidence:
 
-Commit `24977be483735ca1b430a50e1d38a7d8ab95d802`.
+- [POCO X7 Pro (`rodin`) hardware validation](evidence/POCO_X7_PRO_ALPHA10.md)
+- [POCO X3 Pro (`vayu`) release-base hardware validation](evidence/POCO_X3_PRO_ALPHA10_1.md)
 
-Physical evidence:
+## POCO X7 Pro release evidence
 
-- canonical ADB connection to `rodin` — **PASS**;
-- ADB authorization and `shell_v2` negotiation — **PASS**;
-- `adb reboot bootloader` — **PASS**;
-- canonical Fastboot handshake with `product=rodin` — **PASS**;
-- bootloader state before unlock: `unlocked=no`;
-- `oem get_token` returned two Fastboot `INFO` token fragments followed by `OKAY`;
-- the application failed to assemble those fragments and reported that the device token could not be read.
+The `rodin` campaign contains both the earlier alpha10 baseline and the final hotfix qualification.
 
-Conclusion: USB/Fastboot token delivery worked on hardware; the failure was in application-side response parsing. This defect led to P1.
+Hardware-confirmed items include:
 
-### Build 228 / P1 — real Xiaomi unlock flow
+- canonical ADB and Fastboot connectivity;
+- real Xiaomi unlock flow and persistent unlocked state after reconnect;
+- A/B partition discovery;
+- real 64 MiB `vendor_boot` payload transfer and flash;
+- Fastbootd/userspace detection;
+- ROM/GApps/Recovery Sideload transport;
+- post-P4 Quick Flash slot selector UI;
+- real all-slot `vendor_boot_a` + `vendor_boot_b` flash;
+- P3 close-before-`DONEDONE` classification as `VERIFY_PENDING` instead of transport failure;
+- final Android/Evolution X boot;
+- reproduction of the one-shot ADB shell stream lifecycle regression;
+- post-fix H13 with repeated shell commands and `NEKOFLASH_ALPHA10_FINAL_OK`, all exit code 0.
 
-Commit `5b8ad38a8743138f035c2b8d17d7be5b536d4019`.
+The final H13 verification used build `6.0.0-alpha10+3d3e85e5fce1.31369769922`. Five ADB operations started, five succeeded, zero failed, and no warning/error remained in the session summary.
 
-Physical evidence:
+## POCO X3 Pro release-base regression
 
-- empty `getvar:token` correctly fell back to `oem get_token`;
-- two token fragments were assembled into the expected 80-character value;
-- Xiaomi account authorization completed and the service returned unlock data;
-- the device accepted `download:00000100`;
-- Native USBFS transferred the 256-byte unlock payload successfully;
-- `fastboot oem unlock` returned final `OKAY`;
-- after wipe/reboot, the device returned to canonical ADB DEVICE mode.
+The `vayu` campaign used build `6.0.0-alpha10+de1225b9cd5b.31373308470`, which corresponds to the merged release-base commit `de1225b9cd5be110c72c6f130320b2d62d927cc0`.
 
-Independent Fastboot reconnect then confirmed:
+Hardware-confirmed items include:
 
-- `product=rodin`;
-- `unlocked=yes` — **PASS**;
-- `secure=no`;
-- `current-slot=b`;
-- two slots reported.
+- repeated `shell_v2` commands and reconnects after the ADB CLSE fix;
+- final marker `NEKOFLASH_ALPHA10_FINAL_OK` with exit code 0;
+- ADB-to-bootloader transition and Fastboot handshake;
+- real 128 MiB `recovery.img` flash through Native USBFS;
+- ADB Recovery and ADB Sideload mode detection;
+- three real sideload workflows with Recovery-side success evidence;
+- ADB-to-Fastbootd transition and userspace Fastboot detection;
+- final boot into Evolution X / Android 14.
 
-The reconnect is the authoritative hardware proof that the bootloader actually remained unlocked after the unlock command.
+The session summary recorded zero failed operations. Three sideload operations remained counted as `verificationPending` even after Recovery-side success evidence was collected. This is retained as a reporting/bookkeeping cleanup item, not a demonstrated installation failure.
 
-### Build 229 / P2 — post-unlock state and A/B inventory
+## Release qualification boundary
 
-Commit `53f392cab21037392f45985df0baafbc6b728c55`.
+The evidence has two complementary levels:
 
-Physical evidence:
+1. **Hotfix-path hardware qualification on POCO X7 Pro (`rodin`).** The P4 slot-selector path and P3 Sideload classification were exercised on build `34ca8302...`; the ADB shell lifecycle fix was then validated on build `3d3e85e...`. Those fixes were subsequently merged into the release-base history.
+2. **Exact merged release-base regression on POCO X3 Pro (`vayu`).** Build `de1225b9cd5b...` exercised the merged transport line across ADB, Fastboot, Recovery, Sideload and Fastbootd.
 
-- bootloader remained `unlocked=yes`;
-- bootloader Fastboot reported `secure=no`;
-- terminal `getvar all` output was visible and usable;
-- slot count: 2, active slot: `b`;
-- slotted partitions included `boot`, `init_boot`, `vendor_boot`, `dtbo`, `vbmeta`, `vbmeta_system`, `vbmeta_vendor` and `lk`;
-- `super` and `userdata` were reported as non-slotted;
-- `boot_a/b` and `vendor_boot_a/b` were reported as 64 MiB partitions.
+This distinction is intentional: a component-level hotfix test must not be represented as if it were an exact-head run, and an exact-head run on another device must not be represented as a replacement for device-specific `rodin` evidence.
 
-CI passed lint/debug/release and release-certificate verification. This build also exposed six unused-resource lint warnings; they were removed before build 230.
+## Public evidence policy
 
-### Build 230 — real `vendor_boot_b` flash
+Only sanitized conclusions and non-unique device metadata belong in GitHub documentation. Do not commit:
 
-Commit `5a8c7cd982d2b88056e8eafdbe1b009ece34e9c2`.
+- raw USB/Fastboot traces;
+- device serials or unique identifiers;
+- account names, phone numbers, cookies, tokens or RSA material;
+- private screenshots/photos containing account information;
+- chat/continuation/recovery-context documents;
+- backup archives or temporary operator-state reports.
 
-Preflight on hardware:
-
-- Fastboot handshake: `product=rodin`;
-- active slot: `b`;
-- `unlocked=yes`;
-- `secure=no`;
-- `has-slot:vendor_boot=yes`;
-- `partition-size:vendor_boot_b=0x4000000` (64 MiB);
-- imported `vendor_boot.img`: 67,108,864 bytes.
-
-Real mutation:
-
-- target: `vendor_boot_b`;
-- Fastboot download size: `0x04000000`;
-- transport: Native USBFS pipeline, depth 2, 256 KiB blocks;
-- 64 MiB DATA transfer reached 100%;
-- application-reported average payload speed: **42.13 MB/s**;
-- raw Fastboot evidence recorded DATA success and `flash:vendor_boot_b` final `OKAY`;
-- application reported successful completion of the flash.
-
-Post-check:
-
-- Fastboot reconnect again reported `product=rodin`, slot `b`, `unlocked=yes`, `secure=no`;
-- diagnostic session recorded **8 operations started / 8 succeeded / 0 failed**.
-
-Two ADB RSA timeout messages in the same wider session occurred during mode transitions and do not represent Fastboot flash failures.
-
-### Build 230 — Fastbootd, ROM/GApps sideload and final boot
-
-The same build was then exercised through recovery/fastbootd workflows.
-
-Fastbootd:
-
-- userspace Fastboot connection — **PASS**;
-- `is-userspace=yes`;
-- `super-partition-name=super`;
-- snapshot status `none`;
-- max download/fetch reported as 256 MiB;
-- unlocked state remained `yes`.
-
-ROM sideload:
-
-- package size: 2,620,082,319 bytes;
-- ADB peer mode: SIDELOAD;
-- transfer progress was recorded continuously from start through approximately 95%;
-- Recovery closed the ADB transport before `DONEDONE`;
-- build 230 classified that close as a hard failure;
-- physical Recovery evidence showed the device continuing into the post-install/recovery workflow rather than an obvious transport abort.
-
-This exposed a result-classification defect: a near-complete Recovery-side close could be reported as a false negative.
-
-GApps sideload:
-
-- package size: 471,229,202 bytes;
-- ADB peer mode: SIDELOAD;
-- transfer progressed through approximately 95%;
-- Recovery returned `DONEDONE`;
-- NekoFlash correctly kept the result as `VERIFY_PENDING`, because `DONEDONE` proves stream completion but does not by itself prove package installation success.
-
-Final device state:
-
-- physical evidence shows the Android/crDroid setup welcome screen after the ROM/GApps sequence;
-- a later canonical ADB connection reported `device=rodin`;
-- ADB peer mode returned to normal `DEVICE`.
-
-Conclusion: the ADB Sideload transport was exercised with multi-gigabyte and hundreds-of-megabytes payloads on real hardware. The session also identified the close-before-`DONEDONE` classification problem later addressed by P3.
-
-### Build 231 / P3 — sideload result-classification fix
-
-Commit `8c051aba4536133a124a62abb39b081b55b8aaef`.
-
-Change:
-
-- a near-complete Recovery-side close before `DONEDONE` at or above the guarded completion threshold is classified as `VERIFY_PENDING`;
-- earlier transport/protocol failures remain `FAILED`.
-
-Evidence level:
-
-- lint — **PASS**;
-- debug build — **PASS**;
-- release build — **PASS**;
-- lint issue count — 0;
-- release certificate — **PASS**;
-- no separate post-P3 physical ROM sideload rerun is present in the retained 2026-08-09 evidence.
-
-Therefore P3 is **CI/code validated, not independently hardware-rerun after the patch**.
-
-### Build 232 / P4 — Quick Flash slot-target selection
-
-Commit `5714282cb75da22fa1a778f5946c23dca257fd48`.
-
-Change:
-
-- when a selected partition reports `has-slot=yes`, Quick Flash can ask for the active slot or all reported slots;
-- non-slotted partitions do not require a slot dialog;
-- explicitly suffixed targets such as `_a` or `_b` remain explicit and do not require another slot choice.
-
-Evidence level:
-
-- lint — **PASS**;
-- debug build — **PASS**;
-- release build — **PASS**;
-- lint issue count — 0;
-- release certificate — **PASS**;
-- retained screenshot evidence is pre-P4 and demonstrates the missing slot choice that motivated the change;
-- no post-P4 hardware screenshot or physical flash rerun is present in the retained 2026-08-09 evidence.
-
-Therefore build 232 is the current CI-clean alpha10 head, while its P4 UI change still lacks a separate post-patch hardware rerun in this evidence set.
-
-## 2026-08-09 evidence matrix
-
-| Check | Result | Evidence level |
-|---|---|---|
-| Canonical ADB connection | **PASS** | hardware log + USB session |
-| ADB authorization / `shell_v2` | **PASS** | hardware log |
-| ADB reboot to bootloader | **PASS** | hardware log + trace |
-| Canonical Fastboot handshake | **PASS** | hardware log + trace |
-| `oem get_token` multi-fragment parsing after P1 | **PASS** | hardware log + sanitized trace |
-| Xiaomi unlock server flow | **PASS** | hardware log |
-| Native USBFS 256-byte unlock DATA | **PASS** | hardware log + trace |
-| `fastboot oem unlock` command | **PASS** | final Fastboot `OKAY` |
-| Persistent `unlocked=yes` after reconnect | **PASS** | independent hardware reconnect |
-| A/B partition discovery | **PASS** | hardware `getvar all` |
-| Native USBFS 64 MiB DATA transfer | **PASS** | hardware log + trace |
-| Real `flash:vendor_boot_b` | **PASS** | hardware log + final `OKAY` |
-| Post-flash Fastboot reconnect | **PASS** | hardware log |
-| Fastbootd/userspace detection | **PASS** | hardware log + getvar trace |
-| ROM ADB Sideload transport | **PASS with classification defect found** | long-transfer log + physical recovery/final-boot evidence |
-| GApps ADB Sideload stream | **PASS / VERIFY_PENDING** | hardware log + `DONEDONE` |
-| Final normal ADB DEVICE after ROM/GApps | **PASS** | hardware log + physical setup-screen evidence |
-| P3 close-before-`DONEDONE` fix | **CI PASS** | code/CI; no post-patch hardware rerun |
-| P4 Quick Flash slot selector | **CI PASS** | code/CI; no post-patch hardware rerun |
-
-## Release boundary
-
-The 2026-08-09 sessions provide strong real-device evidence for the alpha10 transport line through build 230, including an actual destructive bootloader unlock and a real 64 MiB partition flash.
-
-They do **not** justify claiming that every build-232 change has been physically rerun. In particular:
-
-- P3/build 231 has CI evidence but no post-fix ROM sideload rerun in the retained package;
-- P4/build 232 has CI evidence but no post-fix slot-dialog screenshot or physical Quick Flash rerun.
-
-A final release may reference the hardware evidence above, but an exact-head smoke on the merged release commit remains the strongest possible release qualification.
-
-## Earlier retained baseline — POCO X3 Pro (`vayu`)
-
-Earlier alpha5/alpha6 physical sessions remain useful as regression history:
-
-- ADB reboot to system/bootloader — **PASS**;
-- Fastboot handshake — **PASS**;
-- 32 MiB Fastboot DATA through Android `UsbRequest`, synchronous `bulkTransfer` and Native USBFS — **PASS**;
-- larger payloads including 128 MiB `recovery.img` — **PASS**;
-- six 100 MiB Native USBFS DATA profiles — **PASS**;
-- detach/cancel behavior was fail-closed and required reconnect as designed;
-- legacy A-only topology was detected without inventing synthetic A/B targets;
-- Recovery ADB Sideload peer detection — **PASS**;
-- ZIP import, SHA-256 calculation and Recovery-package recognition — **PASS**.
-
-Those sessions did not perform a real partition flash, final Mi Unlock mutation or full ADB Sideload package installation.
-
-## Repository privacy rule
-
-Do not commit raw USB traces, account IDs, Xiaomi cookies/tokens, device-token values, unique device serials, IMEI/MEID/IMSI/ICCID, Android ID, signing keys or service credentials.
-
-For public release evidence, retain only the application version/build or commit, non-unique device model/codename, connection mode, operation, result, and non-secret payload metadata required to understand the test.
+The private validation archive may retain those materials for local audit and recovery, but it is not a public repository artifact.
