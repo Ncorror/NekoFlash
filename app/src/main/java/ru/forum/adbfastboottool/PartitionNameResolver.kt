@@ -59,7 +59,7 @@ object PartitionNameResolver {
             return Suggestion(
                 kind = Kind.ARCHIVE,
                 partition = null,
-                note = "Это архив (.zip) — устанавливается через ADB sideload / recovery, а не fastboot flash.",
+                note = "This is an archive (.zip) — install it through ADB sideload / recovery, not fastboot flash.",
             )
         }
 
@@ -69,9 +69,9 @@ object PartitionNameResolver {
                 kind = Kind.RECOVERY_IMAGE,
                 partition = null,
                 candidates = RECOVERY_CANDIDATES,
-                note = "Похоже на recovery-образ. Целевой раздел зависит от устройства: " +
-                    "на A/B отдельного recovery часто нет — цель обычно boot или vendor_boot. " +
-                    "Выберите нужный раздел по данным устройства.",
+                note = "Looks like a recovery image. The target partition depends on the device: " +
+                    "on A/B devices there is often no separate recovery partition — the target is usually boot or vendor_boot. " +
+                    "Choose the correct partition according to the device data.",
             )
         }
 

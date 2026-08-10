@@ -189,8 +189,8 @@ object FastbootPartitionInventory {
             } else if (!existing.equals(value, ignoreCase = true)) {
                 warnings += Warning(
                     code = "VARIABLE_CONFLICT",
-                    message = "$key отличается между getvar:all ($existing) и точечной диагностикой ($value). " +
-                        "Для отображения сохранено значение getvar:all.",
+                    message = "$key differs between getvar:all ($existing) and point diagnostics ($value). " +
+                        "The getvar:all value was kept for display.",
                     severity = WarningSeverity.WARNING
                 )
             }
@@ -228,8 +228,8 @@ object FastbootPartitionInventory {
             if (existing != incoming) {
                 entry.warnings += Warning(
                     code = "PARTITION_METADATA_CONFLICT",
-                    message = "Поле $fieldName раздела ${entry.name} отличается в источнике $sourceName: " +
-                        "$existing против $incoming. Использовано более позднее точечное значение.",
+                    message = "Field $fieldName for partition ${entry.name} differs in source $sourceName: " +
+                        "$existing versus $incoming. The newer point value was used.",
                     severity = WarningSeverity.WARNING,
                     partitionName = entry.name
                 )
@@ -288,14 +288,14 @@ object FastbootPartitionInventory {
         if (!source.complete) {
             warnings += Warning(
                 code = "PARTIAL_GETVAR_ALL",
-                message = "getvar:all завершён частично; список может быть неполным.",
+                message = "getvar:all completed partially; the list may be incomplete.",
                 severity = WarningSeverity.WARNING
             )
         }
         if (!source.finalStatus.equals("OKAY", ignoreCase = true)) {
             warnings += Warning(
                 code = "GETVAR_ALL_FINAL_STATUS",
-                message = "Финальный статус getvar:all: ${source.finalStatus}" +
+                message = "Final getvar:all status: ${source.finalStatus}" +
                     source.finalMessage?.let { " ($it)" }.orEmpty(),
                 severity = WarningSeverity.WARNING
             )
@@ -304,9 +304,9 @@ object FastbootPartitionInventory {
             warnings += Warning(
                 code = if (duplicate.conflicting) "CONFLICTING_DUPLICATE" else "DUPLICATE_METADATA",
                 message = if (duplicate.conflicting) {
-                    "Переменная ${duplicate.name} повторилась с разными значениями: ${duplicate.values.joinToString()}"
+                    "Variable ${duplicate.name} was repeated with different values: ${duplicate.values.joinToString()}"
                 } else {
-                    "Переменная ${duplicate.name} повторилась ${duplicate.values.size} раза."
+                    "Variable ${duplicate.name} was repeated ${duplicate.values.size} times."
                 },
                 severity = if (duplicate.conflicting) WarningSeverity.WARNING else WarningSeverity.INFO
             )
@@ -317,29 +317,29 @@ object FastbootPartitionInventory {
         if (topology == SlotTopology.LEGACY_A_ONLY && (hasSlottedConcreteNames || hasPositiveFamily)) {
             warnings += Warning(
                 code = "LEGACY_SLOT_CONTRADICTION",
-                message = "Устройство определено как legacy A-only, но загрузчик сообщил противоречивые A/B-данные. " +
-                    "Суффиксы автоматически не создаются и не выбираются.",
+                message = "Device is detected as legacy A-only, but the bootloader reported conflicting A/B data. " +
+                    "Suffixes are not created or selected automatically.",
                 severity = WarningSeverity.CRITICAL
             )
         }
         if (topology == SlotTopology.A_B && currentSlot == null) {
             warnings += Warning(
                 code = "CURRENT_SLOT_UNKNOWN",
-                message = "A/B-разметка подтверждена, но текущий слот не определён.",
+                message = "A/B layout is confirmed, but the current slot is not detected.",
                 severity = WarningSeverity.WARNING
             )
         }
         if (topology == SlotTopology.UNKNOWN) {
             warnings += Warning(
                 code = "SLOT_TOPOLOGY_UNKNOWN",
-                message = "Топология слотов не подтверждена. Инвентаризация остаётся только справочной.",
+                message = "Slot topology is not confirmed. Inventory remains informational only.",
                 severity = WarningSeverity.WARNING
             )
         }
         if (mutableEntries.isEmpty()) {
             warnings += Warning(
                 code = "NO_CONCRETE_PARTITIONS",
-                message = "Загрузчик не подтвердил ни одного раздела через size/type/is-logical.",
+                message = "Bootloader did not confirm any partition through size/type/is-logical.",
                 severity = WarningSeverity.WARNING
             )
         }
@@ -360,7 +360,7 @@ object FastbootPartitionInventory {
             if (missing.isNotEmpty()) {
                 entryWarnings += Warning(
                     code = "PARTITION_METADATA_INCOMPLETE",
-                    message = "Не заполнены поля: ${missing.joinToString { it.name.lowercase(Locale.US) }}.",
+                    message = "Missing fields: ${missing.joinToString { it.name.lowercase(Locale.US) }}.",
                     severity = WarningSeverity.INFO,
                     partitionName = mutable.name
                 )

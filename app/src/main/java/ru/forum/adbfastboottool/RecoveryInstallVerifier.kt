@@ -32,7 +32,7 @@ object RecoveryInstallVerifier {
         if (sources.isEmpty()) {
             return Result(
                 verdict = Verdict.UNKNOWN,
-                message = "Recovery-лог недоступен: результат установки не подтверждён"
+                message = "Recovery log is unavailable: install result is not confirmed"
             )
         }
 
@@ -45,7 +45,7 @@ object RecoveryInstallVerifier {
 
         return Result(
             verdict = Verdict.UNKNOWN,
-            message = "Recovery-лог получен, но явный итог последней установки не найден",
+            message = "Recovery log received, but no explicit result for the last install was found",
             source = ordered.firstOrNull()?.path
         )
     }
@@ -63,9 +63,9 @@ object RecoveryInstallVerifier {
                 index = match.range.first,
                 verdict = verdict,
                 message = if (status == 0) {
-                    "Recovery подтвердило успешную установку: status=0"
+                    "Recovery confirmed successful installation: status=0"
                 } else {
-                    "Recovery завершило установку с ошибкой: status=$status"
+                    "Recovery finished installation with an error: status=$status"
                 },
                 evidence = lineAt(text, match.range.first)
             )
@@ -77,7 +77,7 @@ object RecoveryInstallVerifier {
                 events += Event(
                     index = match.range.first,
                     verdict = Verdict.FAILED,
-                    message = "Updater завершился с ERROR: $code",
+                    message = "Updater finished with ERROR: $code",
                     evidence = contextualEvidence(text, match.range.first)
                 )
             }
@@ -90,7 +90,7 @@ object RecoveryInstallVerifier {
                 events += Event(
                     index = match.range.first,
                     verdict = Verdict.SUCCESS,
-                    message = "Recovery сообщает об успешной установке OrangeFox",
+                    message = "Recovery reports successful OrangeFox installation",
                     evidence = lineAt(text, match.range.first)
                 )
             }
@@ -103,9 +103,9 @@ object RecoveryInstallVerifier {
                         index = match.range.first,
                         verdict = if (status == 0) Verdict.SUCCESS else Verdict.FAILED,
                         message = if (status == 0) {
-                            "Recovery подтвердило успешное завершение Sideload: operation_end status=0"
+                            "Recovery confirmed successful Sideload completion: operation_end status=0"
                         } else {
-                            "Recovery завершило Sideload с ошибкой: operation_end status=$status"
+                            "Recovery finished Sideload with an error: operation_end status=$status"
                         },
                         evidence = contextualEvidence(text, match.range.first)
                     )
@@ -128,7 +128,7 @@ object RecoveryInstallVerifier {
                 events += Event(
                     index = match.range.first,
                     verdict = Verdict.SUCCESS,
-                    message = "Recovery сообщает об успешной установке",
+                    message = "Recovery reports successful installation",
                     evidence = lineAt(text, match.range.first)
                 )
             }
@@ -169,10 +169,10 @@ object RecoveryInstallVerifier {
     private fun failureMessage(value: String): String {
         val normalized = value.lowercase()
         return when {
-            "product.img" in normalized -> "Recovery сообщает об ошибке записи product.img"
-            "installation aborted" in normalized -> "Recovery прервало установку"
-            "error installing zip" in normalized -> "Recovery не смогло установить ZIP"
-            else -> "Recovery сообщает об ошибке установки"
+            "product.img" in normalized -> "Recovery reports a product.img write error"
+            "installation aborted" in normalized -> "Recovery aborted installation"
+            "error installing zip" in normalized -> "Recovery could not install ZIP"
+            else -> "Recovery reports an install error"
         }
     }
 
@@ -205,9 +205,9 @@ object RecoveryInstallVerifier {
         Regex("""(?im)^\s*Starting ADB sideload"""),
         Regex("""(?im)^\s*Starting sideload"""),
         Regex("""(?im)^\s*I:operation_start:\s*['"]Sideload['"]\s*$"""),
-        Regex("""(?im)^\s*Запуск ADB Sideload"""),
+        Regex("""(?im)^\s*Starting ADB Sideload"""),
         Regex("""(?im)^\s*Installing zip file"""),
-        Regex("""(?im)^\s*Установка ZIP файла""")
+        Regex("""(?im)^\s*Installing ZIP file""")
     )
 
     private val sessionStartPatterns = sideloadSessionPatterns + listOf(

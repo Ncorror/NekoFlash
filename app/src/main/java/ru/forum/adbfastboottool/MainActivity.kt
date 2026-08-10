@@ -146,7 +146,7 @@ class MainActivity : AppCompatActivity() {
                 modeSwitchAttemptsRemaining = 0
                 // selectModeSwitchCandidate уже гарантировал другой логический профиль.
                 viewModel.log(
-                    "USB re-enumeration: найден новый режим ${candidate.mode.label} " +
+                    "USB re-enumeration: found new mode ${candidate.mode.label} " +
                         "(interface=${candidate.interfaceIndex})"
                 )
                 requestUsbAccess(candidate, automatic = true)
@@ -297,7 +297,7 @@ class MainActivity : AppCompatActivity() {
         if (!attachHandled) {
             if (scanAfterWelcome) {
                 intent.removeExtra(WelcomeActivity.EXTRA_STARTUP_SCAN_AFTER_WELCOME)
-                viewModel.log("USB attach продолжен после обязательного welcome-gate; выполняется безопасный startup-scan.")
+                viewModel.log("USB attach continued after the required welcome gate; running a safe startup scan.")
             }
             scheduleStartupUsbDiscovery()
         }
@@ -328,7 +328,7 @@ class MainActivity : AppCompatActivity() {
         val attachHandled = handleAutoUsbIntent(intent)
         if (!attachHandled && scanAfterWelcome) {
             intent.removeExtra(WelcomeActivity.EXTRA_STARTUP_SCAN_AFTER_WELCOME)
-            viewModel.log("USB attach продолжен после обязательного welcome-gate; выполняется безопасный startup-scan.")
+            viewModel.log("USB attach continued after the required welcome gate; running a safe startup scan.")
             scheduleStartupUsbDiscovery()
         }
     }
@@ -453,15 +453,15 @@ class MainActivity : AppCompatActivity() {
 
             if (!intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
                 device?.let { takePendingUsbConnect(it) }
-                viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ОШИБКА: Доступ к USB отклонён пользователем")
+                viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ERROR: USB access denied by user")
                 return
             }
             if (device == null) {
-                viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ОШИБКА: USB-устройство не передано системой")
+                viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ERROR: USB device was not provided by the system")
                 return
             }
 
-            viewModel.log("Доступ к USB разрешён. Анализ интерфейсов...")
+            viewModel.log("USB access granted. Analyzing interfaces...")
             val pending = takePendingUsbConnect(device)
             analyzeAndConnectDevice(device, pending)
         }
@@ -470,7 +470,7 @@ class MainActivity : AppCompatActivity() {
     private fun handleUsbDetached(intent: Intent) {
         val device = intent.parcelableExtra<UsbDevice>(UsbManager.EXTRA_DEVICE)
         if (device == null) {
-            viewModel.log("USB-устройство отключено: неизвестно")
+            viewModel.log("USB device disconnected: unknown")
             updateOtgStatus()
             return
         }
@@ -485,11 +485,11 @@ class MainActivity : AppCompatActivity() {
             if (wasFastboot) {
                 viewModel.log(
                     DiagnosticLogPolicy.Level.INFO,
-                    "ℹ️ Fastboot detach подтверждён: текущая USB generation закрывается fail-closed. " +
-                        "Перед следующей командой подключите устройство заново."
+                    "ℹ️ Fastboot detach confirmed: current USB generation is closed fail-closed. " +
+                        "Reconnect the device before the next command."
                 )
             } else {
-                viewModel.log("USB-устройство отключено: ${device.productName ?: device.deviceName}")
+                viewModel.log("USB device disconnected: ${device.productName ?: device.deviceName}")
             }
             viewModel.disconnectCurrent()
             startModeSwitchWatch(previousSignature, previousVendorId)
@@ -515,7 +515,7 @@ class MainActivity : AppCompatActivity() {
         intent.putExtra(EXTRA_USB_INTENT_CONSUMED, true)
 
         if (device == null) {
-            viewModel.log("⚠️ USB attach: система не передала устройство")
+            viewModel.log("⚠️ USB attach: system did not provide a device")
             return true
         }
 
@@ -523,7 +523,7 @@ class MainActivity : AppCompatActivity() {
         stopModeSwitchWatch()
         val candidate = UsbDeviceInspector.selectPrimaryCandidate(device, allowGenericFastboot = true)
         if (candidate == null) {
-            viewModel.log("⚠️ USB-устройство подключено, но bulk-интерфейс ADB/Fastboot не найден")
+            viewModel.log("⚠️ USB device connected, but no ADB/Fastboot bulk interface was found")
             viewModel.logFileOnly(UsbDeviceInspector.summarizeDevice(device))
             return true
         }
@@ -539,13 +539,13 @@ class MainActivity : AppCompatActivity() {
         val device = candidate.device
         pendingUsbCandidates[device.deviceId] = PendingUsbConnect(candidate, automatic)
         viewModel.log(
-            "Запрос доступа к устройству: ${device.productName ?: "Неизвестно"} " +
+            "Requesting device access: ${device.productName ?: "Unknown"} " +
                 "(VID=${device.vendorId}, PID=${device.productId}, mode=${candidate.mode.label}, " +
                 "interface=${candidate.interfaceIndex}, match=${candidate.matchKind.label})"
         )
 
         if (usbManager.hasPermission(device)) {
-            viewModel.log("USB-доступ уже разрешён")
+            viewModel.log("USB access already granted")
             pendingUsbCandidates.remove(device.deviceId)
             connectCandidate(candidate, automatic)
             return
@@ -571,7 +571,7 @@ class MainActivity : AppCompatActivity() {
             ?: UsbDeviceInspector.selectPrimaryCandidate(device, allowGenericFastboot = true)
 
         if (candidate == null) {
-            viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ОШИБКА: Устройство не распознано как ADB/Fastboot")
+            viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ERROR: Device was not recognized as ADB/Fastboot")
             viewModel.logFileOnly(UsbDeviceInspector.summarizeDevice(device))
             return
         }
@@ -583,12 +583,12 @@ class MainActivity : AppCompatActivity() {
         automatic: Boolean
     ) {
         when (candidate.mode) {
-            UsbDeviceInspector.Mode.ADB -> viewModel.log("Режим: ADB")
-            UsbDeviceInspector.Mode.FASTBOOT -> viewModel.log("Режим: FASTBOOT")
+            UsbDeviceInspector.Mode.ADB -> viewModel.log("Mode: ADB")
+            UsbDeviceInspector.Mode.FASTBOOT -> viewModel.log("Mode: FASTBOOT")
         }
         if (candidate.matchKind != UsbDeviceInspector.MatchKind.CANONICAL) {
             viewModel.log(
-                "ℹ️ Используется ${candidate.matchKind.label} USB-интерфейс: " +
+                "ℹ️ Using ${candidate.matchKind.label} USB interface: " +
                     "class=${candidate.interfaceClass}, subclass=${candidate.interfaceSubclass}, " +
                     "protocol=${candidate.interfaceProtocol}, interface=${candidate.interfaceIndex}"
             )
@@ -602,7 +602,7 @@ class MainActivity : AppCompatActivity() {
             usbPermissionTimeouts.remove(device.deviceId)
             pendingUsbCandidates.remove(device.deviceId)
             if (!usbManager.hasPermission(device)) {
-                viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ОШИБКА: нет ответа на запрос USB-доступа за 30 секунд. Переподключите OTG-кабель и нажмите «Поиск» ещё раз.")
+                viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ERROR: no response to the USB permission request within 30 seconds. Reconnect the OTG cable and tap Search again.")
             }
         }
         usbPermissionTimeouts[device.deviceId] = timeout
@@ -640,7 +640,7 @@ class MainActivity : AppCompatActivity() {
         val candidates = UsbDeviceInspector.findAutoConnectCandidates(usbManager.deviceList.values)
         val candidate = candidates.singleOrNull() ?: return
         viewModel.log(
-            "USB startup-scan: найдено ${candidate.mode.label} устройство " +
+            "USB startup-scan: found ${candidate.mode.label} device " +
                 "(interface=${candidate.interfaceIndex})"
         )
         requestUsbAccess(candidate, automatic = true)
@@ -671,12 +671,12 @@ class MainActivity : AppCompatActivity() {
         )
         when {
             candidates.isEmpty() -> {
-                viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ОШИБКА: совместимые ADB/Fastboot USB-устройства не найдены")
+                viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ERROR: no compatible ADB/Fastboot USB devices found")
                 logUsbInventoryForTroubleshooting()
             }
             candidates.size == 1 -> {
                 val candidate = candidates.first()
-                viewModel.log("Найдено устройство: ${candidate.displayTitle()} | ${candidate.displaySubtitle()}")
+                viewModel.log("Found device: ${candidate.displayTitle()} | ${candidate.displaySubtitle()}")
                 connectManualCandidate(candidate)
             }
             else -> showUsbDeviceChooser(candidates)
@@ -691,7 +691,7 @@ class MainActivity : AppCompatActivity() {
             .setTitle(getString(R.string.dialog_usb_choose_title))
             .setItems(items) { _, which ->
                 val selected = candidates[which]
-                viewModel.log("Выбрано: ${selected.displayTitle()} | ${selected.displaySubtitle()}")
+                viewModel.log("Selected: ${selected.displayTitle()} | ${selected.displaySubtitle()}")
                 connectManualCandidate(selected)
             }
             .setNegativeButton(getString(R.string.cancel_upper), null)
@@ -714,7 +714,7 @@ class MainActivity : AppCompatActivity() {
                 )
             )
             .setPositiveButton(getString(R.string.continue_upper)) { _, _ ->
-                viewModel.log("⚠️ Generic Fastboot-кандидат выбран пользователем вручную")
+                viewModel.log("⚠️ Generic Fastboot candidate was selected manually by the user")
                 requestUsbAccess(candidate, automatic = false)
             }
             .setNegativeButton(getString(R.string.cancel_upper), null)
@@ -724,11 +724,11 @@ class MainActivity : AppCompatActivity() {
     private fun logUsbInventoryForTroubleshooting() {
         val devices = usbManager.deviceList.values
         if (devices.isEmpty()) {
-            viewModel.log("USB-инвентарь: Android не видит ни одного USB-устройства. Проверьте OTG и data-кабель.")
+            viewModel.log("USB inventory: Android does not see any USB devices. Check OTG and the data cable.")
             return
         }
         devices.forEach { device ->
-            viewModel.log("USB найден, но не ADB/Fastboot: ${device.productName ?: device.deviceName} VID=${device.vendorId} PID=${device.productId} interfaces=${device.interfaceCount}")
+            viewModel.log("USB found, but not ADB/Fastboot: ${device.productName ?: device.deviceName} VID=${device.vendorId} PID=${device.productId} interfaces=${device.interfaceCount}")
             viewModel.logFileOnly(UsbDeviceInspector.summarizeDevice(device))
         }
     }
@@ -764,7 +764,7 @@ class MainActivity : AppCompatActivity() {
             "adb" -> handleAdbTerminalCommand(cmd)
             else -> {
                 viewModel.log("> $raw")
-                viewModel.log("⚠️ Не выбран контекст ADB/Fastboot. Введите префикс adb или fastboot.")
+                viewModel.log("⚠️ No ADB/Fastboot context selected. Enter the adb or fastboot prefix.")
             }
         }
     }
@@ -820,7 +820,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         if (shellLine.isBlank()) {
-            viewModel.log("ℹ️ Интерактивный adb shell уже открыт. Введите команду или adb shell-stop для выхода.")
+            viewModel.log("ℹ️ Interactive adb shell is already open. Enter a command or adb shell-stop to exit.")
             return
         }
 
@@ -836,11 +836,11 @@ class MainActivity : AppCompatActivity() {
             is TerminalAction.RawFastboot -> {
                 val hostOp = action.command.substringBefore(' ').substringBefore(':')
                 if (!hostOp.matches(Regex("^-{0,2}[A-Za-z0-9][A-Za-z0-9._-]*$"))) {
-                    viewModel.log("❌ Некорректная Fastboot-команда: $hostOp")
+                    viewModel.log("❌ Invalid Fastboot command: $hostOp")
                 } else if (viewModel.fastbootProtocol?.isConnected != true) {
                     viewModel.log(
                         DiagnosticLogPolicy.Level.ERROR,
-                        "ОШИБКА: Fastboot-устройство не подключено. Команда не отправлена."
+                        "ERROR: Fastboot device is not connected. Command was not sent."
                     )
                 } else {
                     // Raw/OEM passthrough остаётся разрешённым; terminal FAIL/OKAY
@@ -872,7 +872,7 @@ class MainActivity : AppCompatActivity() {
                 if (viewModel.adbProtocol?.isConnected != true) {
                     viewModel.log(
                         DiagnosticLogPolicy.Level.ERROR,
-                        "ОШИБКА: ADB-устройство не подключено. Команда не отправлена."
+                        "ERROR: ADB device is not connected. Command was not sent."
                     )
                 } else {
                     viewModel.runAdbService(action.service)
@@ -882,7 +882,7 @@ class MainActivity : AppCompatActivity() {
                 if (viewModel.adbProtocol?.isConnected != true) {
                     viewModel.log(
                         DiagnosticLogPolicy.Level.ERROR,
-                        "ОШИБКА: ADB-устройство не подключено. Команда не отправлена."
+                        "ERROR: ADB device is not connected. Command was not sent."
                     )
                 } else {
                     viewModel.runAdbShell(action.command)
@@ -902,7 +902,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun invalidTerminalFormat(format: String): TerminalAction? {
-        viewModel.log("❌ Формат: $format")
+        viewModel.log("❌ Format: $format")
         return null
     }
 
@@ -915,13 +915,13 @@ class MainActivity : AppCompatActivity() {
     private fun normalizeFastbootSlot(raw: String): String? {
         val slot = raw.trim().removePrefix("_").lowercase(Locale.US)
         if (slot.isBlank()) {
-            viewModel.log("❌ Пустое значение --slot")
+            viewModel.log("❌ Empty --slot value")
             return null
         }
         if (slot == "all" || slot == "other" || (slot.length == 1 && slot[0] in 'a'..'z')) {
             return slot
         }
-        viewModel.log("❌ Некорректный slot: $raw. Используйте a, b, all или other.")
+        viewModel.log("❌ Invalid slot: $raw. Use a, b, all or other.")
         return null
     }
 
@@ -934,7 +934,7 @@ class MainActivity : AppCompatActivity() {
         fun nextOptionValue(option: String): String? {
             val value = tokens.getOrNull(i + 1)
             if (value == null) {
-                viewModel.log("❌ $option требует значение")
+                viewModel.log("❌ $option requires a value")
                 return null
             }
             i += 1
@@ -965,24 +965,24 @@ class MainActivity : AppCompatActivity() {
                 }
                 lower == "--disable-verity" || lower == "--disable-verification" -> {
                     viewModel.log(
-                        "⚠️ $token — host-side правка vbmeta из desktop-fastboot. " +
-                            "NekoFlash не патчит vbmeta на лету; прошейте уже подготовленный образ."
+                        "⚠️ $token — host-side vbmeta patching from desktop fastboot. " +
+                            "NekoFlash does not patch vbmeta on the fly; flash an already prepared image."
                     )
                     return null
                 }
                 lower == "--skip-reboot" || lower == "--skip-secondary" || lower == "--force" || lower == "--verbose" || lower == "-v" -> {
-                    viewModel.log("ℹ️ Опция $token обработчиком терминала не используется для одиночной USB-команды.")
+                    viewModel.log("ℹ️ Option $token is not used by the terminal handler for a single USB command.")
                 }
                 token == "-S" || lower == "--sparse-limit" -> {
                     nextOptionValue(token) ?: return null
-                    viewModel.log("ℹ️ Sparse splitting (-S) не требуется: NekoFlash передаёт выбранный образ напрямую.")
+                    viewModel.log("ℹ️ Sparse splitting (-S) is not required: NekoFlash sends the selected image directly.")
                 }
                 token.startsWith("-S") && token.length > 2 -> {
-                    viewModel.log("ℹ️ Sparse splitting (-S) не требуется: NekoFlash передаёт выбранный образ напрямую.")
+                    viewModel.log("ℹ️ Sparse splitting (-S) is not required: NekoFlash sends the selected image directly.")
                 }
                 lower == "-s" -> {
                     nextOptionValue("-s") ?: return null
-                    viewModel.log("ℹ️ -s SERIAL не используется: NekoFlash работает с выбранным OTG-устройством.")
+                    viewModel.log("ℹ️ -s SERIAL is not used: NekoFlash works with the selected OTG device.")
                 }
                 else -> commandTokens += token
             }
@@ -1095,7 +1095,7 @@ class MainActivity : AppCompatActivity() {
             "fetch" -> {
                 if (tokens.size < 2) return invalidTerminalFormat("fastboot [--slot=<a|b|other>] fetch <partition> [out.img]")
                 if (parsedOptions.slot == "all") {
-                    viewModel.log("⚠️ fastboot fetch --slot=all не используется: один output-файл не должен смешивать оба слота. Укажите --slot=a или --slot=b.")
+                    viewModel.log("⚠️ fastboot fetch --slot=all is not used: one output file must not mix both slots. Specify --slot=a or --slot=b.")
                     return null
                 }
                 val partition = tokens[1]
@@ -1119,7 +1119,7 @@ class MainActivity : AppCompatActivity() {
                     ?: parsedOptions.setActive
                     ?: return invalidTerminalFormat("fastboot set_active <a|b>")
                 if (slot == "all" || slot == "other") {
-                    viewModel.log("❌ set_active принимает конкретный слот: a, b, ...")
+                    viewModel.log("❌ set_active requires a concrete slot: a, b, ...")
                     return null
                 }
                 TerminalAction.RawFastboot("set_active:$slot")
@@ -1145,7 +1145,7 @@ class MainActivity : AppCompatActivity() {
             "oem" -> TerminalAction.RawFastboot(clean)
 
             "update", "flashall" -> {
-                viewModel.log("⚠️ fastboot $op требует пакетной логики desktop-fastboot и здесь не эмулируется. Используйте отдельные flash-команды или ADB Sideload.")
+                viewModel.log("⚠️ fastboot $op requires desktop-fastboot batch logic and is not emulated here. Use separate flash commands or ADB Sideload.")
                 null
             }
 
@@ -1196,7 +1196,7 @@ class MainActivity : AppCompatActivity() {
             "raw", "service" -> {
                 val service = clean.substringAfterWord(op).trim()
                 if (service.isBlank()) {
-                    invalidTerminalFormat("adb $op <service>, например adb raw shell:getprop")
+                    invalidTerminalFormat("adb $op <service>, for example adb raw shell:getprop")
                 } else {
                     TerminalAction.AdbService(service)
                 }
@@ -1236,7 +1236,7 @@ class MainActivity : AppCompatActivity() {
                     val packageFile = resolveTerminalFile(packageToken) ?: return null
                     val lowerName = packageFile.name.lowercase(Locale.US)
                     if (!(lowerName.endsWith(".apk") || lowerName.endsWith(".apks") || lowerName.endsWith(".xapk"))) {
-                        viewModel.log("⚠️ Файл не похож на APK/APKS/XAPK: ${packageFile.name}")
+                        viewModel.log("⚠️ File does not look like APK/APKS/XAPK: ${packageFile.name}")
                     }
                     val options = tokens.drop(1).dropLast(1)
                     TerminalAction.AdbInstall(packageFile, options)
@@ -1246,12 +1246,12 @@ class MainActivity : AppCompatActivity() {
             "install-multiple" -> parseAdbInstallMultiple(tokens)
 
             "sync" -> {
-                viewModel.log("ℹ️ adb sync каталогов пока не реализован. Используйте adb push/adb pull для отдельных файлов.")
+                viewModel.log("ℹ️ adb sync for directories is not implemented yet. Use adb push/adb pull for individual files.")
                 null
             }
 
             "sideload" -> {
-                viewModel.log("ℹ️ Для sideload используйте кнопку ADB Sideload: она передаёт ZIP через sideload-host с прогрессом.")
+                viewModel.log("ℹ️ For sideload, use the ADB Sideload button: it sends the ZIP via sideload-host with progress.")
                 null
             }
 
@@ -1275,14 +1275,14 @@ class MainActivity : AppCompatActivity() {
         }
 
         if (files.size < 2) {
-            viewModel.log("❌ install-multiple требует минимум 2 APK: base.apk и один или несколько split/config APK")
-            viewModel.log("💡 Пример: adb install-multiple -r base.apk split_config.arm64_v8a.apk split_config.xxhdpi.apk")
+            viewModel.log("❌ install-multiple requires at least 2 APKs: base.apk and one or more split/config APKs")
+            viewModel.log("💡 Example: adb install-multiple -r base.apk split_config.arm64_v8a.apk split_config.xxhdpi.apk")
             return null
         }
 
         val hasBaseLikeFile = files.any { it.name.equals("base.apk", ignoreCase = true) || it.name.startsWith("base-", ignoreCase = true) }
         if (!hasBaseLikeFile) {
-            viewModel.log("⚠️ Среди файлов не видно base.apk. Если base APK отсутствует, установка split APK обычно завершится ошибкой.")
+            viewModel.log("⚠️ base.apk was not found among the files. If the base APK is missing, split APK installation usually fails.")
         }
 
         return TerminalAction.AdbInstallMultiple(files, options)
@@ -1300,7 +1300,7 @@ class MainActivity : AppCompatActivity() {
      */
     private fun warnIfBatchOrShellSyntax(op: String, clean: String, isAdbTab: Boolean = false): Boolean {
         val isBatchOrShell = op == "@echo" || op == "echo" ||
-            op.startsWith(":") || // метка батника, например :label
+            op.startsWith(":") || // метка батника, for example :label
             op == "rem" || clean.startsWith("::") || clean.startsWith("#") ||
             op == "pause" || op == "cls" || op == "goto" ||
             op == "if" || op == "for" || op == "exit" || op == "set" ||
@@ -1316,7 +1316,7 @@ class MainActivity : AppCompatActivity() {
     private fun parseFastbootSizeArgument(raw: String): Long? {
         val token = raw.trim().lowercase(Locale.US)
         if (token.isBlank()) {
-            viewModel.log("❌ Не указан размер")
+            viewModel.log("❌ Size is not specified")
             return null
         }
         val multiplier = when {
@@ -1329,17 +1329,17 @@ class MainActivity : AppCompatActivity() {
         val value = try {
             if (numberPart.startsWith("0x")) numberPart.removePrefix("0x").toLong(16) else numberPart.toLong()
         } catch (_: NumberFormatException) {
-            viewModel.log("❌ Некорректный размер: $raw. Используйте байты, 512M, 2G или 0x...")
+            viewModel.log("❌ Invalid size: $raw. Use bytes, 512M, 2G or 0x...")
             return null
         }
         val bytes = try {
             Math.multiplyExact(value, multiplier)
         } catch (_: ArithmeticException) {
-            viewModel.log("❌ Размер слишком большой: $raw")
+            viewModel.log("❌ Size is too large: $raw")
             return null
         }
         if (bytes <= 0L) {
-            viewModel.log("❌ Размер должен быть больше нуля")
+            viewModel.log("❌ Size must be greater than zero")
             return null
         }
         return bytes
@@ -1348,7 +1348,7 @@ class MainActivity : AppCompatActivity() {
     private fun resolveTerminalInputPath(pathText: String): File? {
         val rawPath = pathText.trim().trim('"', '\'')
         if (rawPath.isBlank()) {
-            viewModel.log("❌ Не указан локальный путь")
+            viewModel.log("❌ Local path is not specified")
             return null
         }
 
@@ -1364,8 +1364,8 @@ class MainActivity : AppCompatActivity() {
         return if (file.exists() && file.canRead()) {
             file
         } else {
-            viewModel.log("❌ Локальный путь не найден или недоступен: ${file.absolutePath}")
-            viewModel.log("💡 Для относительного пути положите файл/папку в /sdcard/Download/$folderName или импортируйте файл кнопкой «Импорт».")
+            viewModel.log("❌ Local path was not found or is unavailable: ${file.absolutePath}")
+            viewModel.log("💡 For a relative path, put the file/folder in /sdcard/Download/$folderName or import a file with the Import button.")
             null
         }
     }
@@ -1375,7 +1375,7 @@ class MainActivity : AppCompatActivity() {
         return if (file.isFile) {
             file
         } else {
-            viewModel.log("❌ Ожидался файл, но указан каталог: ${file.absolutePath}")
+            viewModel.log("❌ Expected a file, but a directory was specified: ${file.absolutePath}")
             null
         }
     }
@@ -1397,7 +1397,7 @@ class MainActivity : AppCompatActivity() {
 
         val parent = candidate.parentFile
         if (parent != null && !parent.exists() && !parent.mkdirs()) {
-            viewModel.log("❌ Не удалось создать папку для файла: ${parent.absolutePath}")
+            viewModel.log("❌ Could not create folder for the file: ${parent.absolutePath}")
             return null
         }
         return candidate
@@ -1458,12 +1458,12 @@ class MainActivity : AppCompatActivity() {
     private fun registerImportLauncher() {
         importFileLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             if (result.resultCode != Activity.RESULT_OK) {
-                viewModel.log("Импорт файла отменён")
+                viewModel.log("File import cancelled")
                 return@registerForActivityResult
             }
             val uri = result.data?.data
             if (uri == null) {
-                viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ОШИБКА: системный выбор файла не вернул URI")
+                viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ERROR: system file picker did not return a URI")
                 return@registerForActivityResult
             }
             runCatching {
@@ -1487,9 +1487,9 @@ class MainActivity : AppCompatActivity() {
             if (activityResult.resultCode != Activity.RESULT_OK) {
                 val reason = activityResult.data?.getStringExtra(MiLoginActivity.EXTRA_LOGIN_ERROR)?.trim().orEmpty()
                 if (reason.isBlank()) {
-                    viewModel.log("Вход в Mi-аккаунт отменён пользователем")
+                    viewModel.log("Mi Account sign-in cancelled by user")
                 } else {
-                    viewModel.log("❌ Вход в Mi-аккаунт не завершён: $reason")
+                    viewModel.log("❌ Mi Account sign-in did not complete: $reason")
                 }
                 return@registerForActivityResult
             }
@@ -1497,10 +1497,10 @@ class MainActivity : AppCompatActivity() {
             val deviceId = activityResult.data?.getStringExtra(MiLoginActivity.EXTRA_DEVICE_ID)
             val userId = activityResult.data?.getStringExtra(MiLoginActivity.EXTRA_USER_ID)
             if (passToken.isNullOrEmpty() || deviceId.isNullOrEmpty() || userId.isNullOrEmpty()) {
-                viewModel.log("❌ Вход в Mi-аккаунт: не получены данные авторизации")
+                viewModel.log("❌ Mi Account sign-in: authorization data was not received")
                 return@registerForActivityResult
             }
-            viewModel.log("🔑 Вход выполнен. Получение unlockApi-сессии...")
+            viewModel.log("🔑 Signed in. Getting unlockApi session...")
             miAuthExchangeJob?.cancel()
             miAuthExchangeState = MiAuthExchangeState.LOADING
             miAuthExchangeJob = lifecycleScope.launch {
@@ -1511,21 +1511,21 @@ class MainActivity : AppCompatActivity() {
                     if (isFinishing || isDestroyed) return@onSuccess
                     miAuth = auth
                     miAuthExchangeState = MiAuthExchangeState.SUCCESS
-                    viewModel.log("✅ Mi-аккаунт авторизован. Регион: ${auth.region}, dataCenterZone: ${auth.dataCenterZone} (${auth.zoneSource})")
+                    viewModel.log("✅ Mi Account authorized. Region: ${auth.region}, dataCenterZone: ${auth.dataCenterZone} (${auth.zoneSource})")
                     viewModel.log("🔐 unlockApi cookies: ${auth.serviceCookieNames.joinToString(", ")}")
                     buildUnlockPage()
                 }.onFailure { error ->
                     if (isFinishing || isDestroyed) return@onFailure
                     miAuthExchangeState = MiAuthExchangeState.ERROR
-                    viewModel.log("❌ Ошибка получения токена: ${error.message ?: error.javaClass.simpleName}")
-                    viewModel.log("💡 Если используете VPN — отключите его и попробуйте снова.")
+                    viewModel.log("❌ Token retrieval error: ${error.message ?: error.javaClass.simpleName}")
+                    viewModel.log("💡 If you use a VPN, disable it and try again.")
                 }
             }
         }
     }
 
     private fun startMiLogin() {
-        viewModel.log("🔑 Открыта официальная страница входа Xiaomi для unlockApi")
+        viewModel.log("🔑 Opened the official Xiaomi sign-in page for unlockApi")
         miLoginLauncher.launch(Intent(this, MiLoginActivity::class.java))
     }
 
@@ -1545,13 +1545,13 @@ class MainActivity : AppCompatActivity() {
         try {
             importFileLauncher.launch(intent)
         } catch (e: Exception) {
-            viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ОШИБКА: не удалось открыть системный выбор файла: ${e.message}")
+            viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ERROR: could not open the system file picker: ${e.message}")
         }
     }
 
     private fun ensureWorkspaceReady(): Boolean {
         if (::workspacePath.isInitialized && workspacePath.exists()) return true
-        viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ОШИБКА: рабочая папка ещё не готова. Выдайте доступ ко всем файлам и повторите.")
+        viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ERROR: workspace folder is not ready yet. Grant access to all files and try again.")
         checkPermissions()
         return false
     }
@@ -1562,8 +1562,8 @@ class MainActivity : AppCompatActivity() {
         val displayName = sanitizeImportedFileName(queryDisplayName(uri) ?: "imported-${System.currentTimeMillis()}")
         val target = uniqueTargetFile(displayName)
         val expectedSize = queryFileSize(uri)
-        viewModel.log("Импорт файла: $displayName → /sdcard/Download/$folderName/${target.name}")
-        expectedSize?.let { viewModel.log("Ожидаемый размер источника: $it байт") }
+        viewModel.log("File import: $displayName → /sdcard/Download/$folderName/${target.name}")
+        expectedSize?.let { viewModel.log("Expected source size: $it bytes") }
 
         lifecycleScope.launch(Dispatchers.IO) {
             target.parentFile?.listFiles()
@@ -1575,24 +1575,24 @@ class MainActivity : AppCompatActivity() {
                     temp.outputStream().buffered(1024 * 1024).use { output ->
                         input.buffered(1024 * 1024).copyTo(output, 1024 * 1024)
                     }
-                } ?: throw IllegalStateException("не удалось открыть входной поток")
+                } ?: throw IllegalStateException("could not open input stream")
                 if (expectedSize != null && expectedSize >= 0L && copied != expectedSize) {
-                    throw IllegalStateException("размер источника изменился: ожидалось $expectedSize, скопировано $copied")
+                    throw IllegalStateException("source size changed: expected $expectedSize, copied $copied")
                 }
                 if (copied <= 0L || temp.length() != copied) {
-                    throw IllegalStateException("импортирован пустой или неполный файл")
+                    throw IllegalStateException("imported file is empty or incomplete")
                 }
                 if (target.exists() && !target.delete()) {
-                    throw IllegalStateException("не удалось подготовить конечный путь")
+                    throw IllegalStateException("could not prepare the destination path")
                 }
                 if (!temp.renameTo(target)) {
-                    throw IllegalStateException("не удалось атомарно завершить импорт")
+                    throw IllegalStateException("could not finish the import atomically")
                 }
-                viewModel.log("✅ Файл импортирован: /sdcard/Download/$folderName/${target.name} (${formatFileSize(target.length())})")
+                viewModel.log("✅ File imported: /sdcard/Download/$folderName/${target.name} (${formatFileSize(target.length())})")
             } catch (e: Exception) {
                 temp.delete()
                 target.delete()
-                viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ОШИБКА: не удалось импортировать файл: ${e.message ?: e.javaClass.simpleName}")
+                viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ERROR: could not import file: ${e.message ?: e.javaClass.simpleName}")
             }
         }
     }
@@ -1645,7 +1645,7 @@ class MainActivity : AppCompatActivity() {
     private fun checkPermissions() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             if (!Environment.isExternalStorageManager()) {
-                viewModel.log("⚠️ Требуется доступ ко всем файлам для чтения /sdcard/Download/$folderName.")
+                viewModel.log("⚠️ All-files access is required to read /sdcard/Download/$folderName.")
                 try {
                     startActivity(Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
                         data = "package:$packageName".toUri()
@@ -1693,14 +1693,14 @@ class MainActivity : AppCompatActivity() {
                 if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     initWorkspace()
                 } else {
-                    viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ОШИБКА: Нет прав на чтение памяти")
+                    viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ERROR: No storage read permission")
                 }
             }
             101 -> {
                 if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    viewModel.log("Разрешение на уведомления выдано")
+                    viewModel.log("Notification permission granted")
                 } else {
-                    viewModel.log("⚠️ Уведомления отключены. ForegroundService всё равно будет запущен, но Android может скрыть уведомление.")
+                    viewModel.log("⚠️ Notifications are disabled. ForegroundService will still start, but Android may hide the notification.")
                 }
             }
         }
@@ -1726,10 +1726,10 @@ class MainActivity : AppCompatActivity() {
         val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
         workspacePath = File(downloadsDir, folderName)
         if (!workspacePath.exists() && !workspacePath.mkdirs()) {
-            viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ОШИБКА: Не удалось создать папку ${workspaceDisplayPath()}")
+            viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ERROR: Could not create folder ${workspaceDisplayPath()}")
             return
         }
-        viewModel.log("Рабочая папка: ${workspaceDisplayPath()}")
+        viewModel.log("Workspace folder: ${workspaceDisplayPath()}")
         viewModel.configureLogDirectory(workspacePath)
         updateDeviceOverview()
     }
@@ -1740,7 +1740,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun showFileSelector(onFileSelected: (File) -> Unit) {
         if (!::workspacePath.isInitialized || !workspacePath.exists()) {
-            viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ОШИБКА: Папка не инициализирована. Выдайте разрешения.")
+            viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ERROR: Folder is not initialized. Grant permissions.")
             return
         }
         val files = workspacePath
@@ -1750,7 +1750,7 @@ class MainActivity : AppCompatActivity() {
             ?.toTypedArray()
 
         if (files.isNullOrEmpty()) {
-            viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ОШИБКА: Нет читаемых файлов в папке $folderName. Нажмите «Импорт», чтобы добавить файл через системный выбор.")
+            viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ERROR: No readable files in the $folderName folder. Tap Import to add a file through the system picker.")
             return
         }
         runOnUiThread {
@@ -1772,7 +1772,7 @@ class MainActivity : AppCompatActivity() {
      */
     private fun showRebootMenu() {
         if (viewModel.fastbootProtocol?.isConnected != true) {
-            viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ОШИБКА: Нет Fastboot-соединения для перезагрузки")
+            viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ERROR: No Fastboot connection for reboot")
             return
         }
         val dialog = com.google.android.material.bottomsheet.BottomSheetDialog(this)
@@ -1821,7 +1821,7 @@ class MainActivity : AppCompatActivity() {
     private fun showReportsMenu() {
         val dialog = com.google.android.material.bottomsheet.BottomSheetDialog(this)
         val items = listOf(
-            "СКОПИРОВАТЬ КРАТКИЙ ИТОГ" to { copyDiagnosticSummary() },
+            "COPY SHORT SUMMARY" to { copyDiagnosticSummary() },
             getString(R.string.reports_open_folder) to { openReportsFolder() },
             getString(R.string.reports_log_actions) to { showLogsMenu() }
         )
@@ -1882,12 +1882,12 @@ class MainActivity : AppCompatActivity() {
         root.addView(TextView(this).apply {
             text = buildString {
                 append("Build: ").append(viewModel.currentBuildId()).append('\n')
-                append("Операции: ").append(snapshot.operationsSucceeded).append('/')
+                append("Operations: ").append(snapshot.operationsSucceeded).append('/')
                     .append(snapshot.operationsStarted)
                 append("  •  ⚠ ").append(snapshot.warningCount)
                 append("  •  ✕ ").append(snapshot.errorCount)
-                append("Файлы: ").append(entries.size)
-                append("  •  старые: ").append(oldCount)
+                append("Files: ").append(entries.size)
+                append("  •  old: ").append(oldCount)
             }
             setTextColor("#AAB6C5".toColorInt())
             textSize = 11.5f
@@ -1958,7 +1958,7 @@ class MainActivity : AppCompatActivity() {
             .setTitle(getString(R.string.logs_current_summary))
             .setMessage(text)
             .setPositiveButton(getString(R.string.copy_upper)) { _, _ ->
-                copyTextToClipboard("NekoFlash session summary", text, "Итог сессии скопирован")
+                copyTextToClipboard("NekoFlash session summary", text, "Session summary copied")
             }
             .setNeutralButton(getString(R.string.logs_current_json)) { _, _ ->
                 viewModel.currentSessionSummaryFile()?.let {
@@ -2076,7 +2076,7 @@ class MainActivity : AppCompatActivity() {
     private fun showLogPreview(file: File) {
         lifecycleScope.launch {
             val body = withContext(Dispatchers.IO) {
-                runCatching { readLogTail(file) }.getOrElse { "Ошибка чтения: ${it.message ?: it.javaClass.simpleName}" }
+                runCatching { readLogTail(file) }.getOrElse { "Read error: ${it.message ?: it.javaClass.simpleName}" }
             }
             val textView = TextView(this@MainActivity).apply {
                 text = getString(
@@ -2117,7 +2117,7 @@ class MainActivity : AppCompatActivity() {
         if (!ensureWorkspaceReady()) return
         val logsDir = File(workspacePath, "logs")
         if (!logsDir.exists() && !logsDir.mkdirs()) {
-            viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ОШИБКА: не удалось создать папку logs: ${logsDir.absolutePath}")
+            viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ERROR: could not create folder logs: ${logsDir.absolutePath}")
             return
         }
         val documentId = "primary:Download/$folderName/logs"
@@ -2135,7 +2135,7 @@ class MainActivity : AppCompatActivity() {
             viewModel.log(getString(R.string.logs_folder_opened, "/sdcard/Download/$folderName/logs"))
             startActivity(intent)
         } catch (e: Exception) {
-            viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ОШИБКА: не удалось открыть DocumentsUI для logs: ${e.message ?: e.javaClass.simpleName}")
+            viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ERROR: could not open DocumentsUI for logs: ${e.message ?: e.javaClass.simpleName}")
             copyTextToClipboard("NekoFlash logs", logsDir.absolutePath, getString(R.string.logs_path_copied))
         }
     }
@@ -2182,7 +2182,7 @@ class MainActivity : AppCompatActivity() {
             .setMessage(entry.file.name)
             .setPositiveButton(getString(R.string.delete_upper)) { _, _ ->
                 val deleted = runCatching { entry.file.delete() }.getOrDefault(false)
-                viewModel.log(if (deleted) "Удалён старый журнал: ${entry.file.name}" else "⚠️ Не удалось удалить журнал: ${entry.file.name}")
+                viewModel.log(if (deleted) "Old log deleted: ${entry.file.name}" else "⚠️ Could not delete log: ${entry.file.name}")
             }
             .setNegativeButton(getString(R.string.cancel_upper), null)
             .show()
@@ -2206,7 +2206,7 @@ class MainActivity : AppCompatActivity() {
                 miAuth = null
                 android.webkit.CookieManager.getInstance().removeAllCookies(null)
                 buildUnlockPage()
-                Toast.makeText(this, "Mi-сессия истекла. Войдите снова.", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, "Mi session expired. Sign in again.", Toast.LENGTH_LONG).show()
             }
         )
     }
@@ -2264,18 +2264,18 @@ class MainActivity : AppCompatActivity() {
         val fastbootReady = isFastbootConnected()
         val operationActive = viewModel.operationActive.value == true
 
-        container.addView(title("🔓 РАЗБЛОКИРОВКА ЗАГРУЗЧИКА", "#E9782B"))
+        container.addView(title("🔓 BOOTLOADER UNLOCK", "#E9782B"))
 
         container.addView(card().apply {
-            addView(body("Mi Unlock Xiaomi • Fastboot через USB/OTG", "#F3F6FA"))
-            addView(body("⚠️ Разблокировка стирает все данные устройства.", "#F2B766"))
+            addView(body("Xiaomi Mi Unlock • Fastboot over USB/OTG", "#F3F6FA"))
+            addView(body("⚠️ Unlocking erases all device data.", "#F2B766"))
         })
 
-        container.addView(title("ВХОД В MI-АККАУНТ"))
+        container.addView(title("MI ACCOUNT SIGN-IN"))
         val auth = miAuth
         if (auth == null) {
             container.addView(card().apply {
-                addView(body("Войдите в свой Mi-аккаунт (официальная страница Xiaomi), чтобы продолжить разблокировку.", "#F3F6FA"))
+                addView(body("Sign in to your Mi Account (official Xiaomi page) to continue unlocking.", "#F3F6FA"))
                 addView(android.widget.Button(this@MainActivity).apply {
                     text = getString(R.string.mi_unlock_sign_in_button)
                     isAllCaps = false
@@ -2286,8 +2286,8 @@ class MainActivity : AppCompatActivity() {
             })
         } else {
             container.addView(card().apply {
-                addView(body("✅ Авторизован. ID: ${auth.userId}", "#69C779"))
-                addView(body("Регион: ${auth.region} • dataCenterZone: ${auth.dataCenterZone} (${auth.zoneSource})", "#AEB8C5"))
+                addView(body("✅ Authorized. ID: ${auth.userId}", "#69C779"))
+                addView(body("Region: ${auth.region} • dataCenterZone: ${auth.dataCenterZone} (${auth.zoneSource})", "#AEB8C5"))
                 addView(android.widget.Button(this@MainActivity).apply {
                     text = getString(R.string.mi_unlock_change_zone_button)
                     isAllCaps = false
@@ -2301,7 +2301,7 @@ class MainActivity : AppCompatActivity() {
                             .setSingleChoiceItems(zoneItems, checked) { dialog, which ->
                                 val updated = MiAccountClient.withDataCenterZone(auth, zoneItems[which]).copy(zoneSource = "manual")
                                 miAuth = updated
-                                viewModel.log("🌍 dataCenterZone изменён вручную: ${updated.dataCenterZone}")
+                                viewModel.log("🌍 dataCenterZone changed manually: ${updated.dataCenterZone}")
                                 dialog.dismiss()
                                 buildUnlockPage()
                             }
@@ -2310,16 +2310,16 @@ class MainActivity : AppCompatActivity() {
                     }
                 })
                 addView(android.widget.Button(this@MainActivity).apply {
-                    text = "Выйти / сменить аккаунт"
+                    text = "Sign out / switch account"
                     isAllCaps = false
                     setTextColor("#F3F6FA".toColorInt())
                     setBackgroundColor("#192431".toColorInt())
                     setOnClickListener {
                         MaterialAlertDialogBuilder(this@MainActivity)
-                            .setTitle("Выйти из Mi-аккаунта?")
-                            .setMessage("ID: ${auth.userId} (регион ${auth.region}) будет отключён от NekoFlash. Для повторной разблокировки понадобится войти снова.")
+                            .setTitle("Sign out of Mi Account?")
+                            .setMessage("ID: ${auth.userId} (region ${auth.region}) will be disconnected from NekoFlash. To unlock again, you will need to sign in again.")
                             .setNegativeButton(getString(R.string.cancel_upper), null)
-                            .setPositiveButton("Выйти") { _, _ ->
+                            .setPositiveButton("Sign out") { _, _ ->
                                 miAuth = null
                                 android.webkit.CookieManager.getInstance().removeAllCookies(null)
                                 buildUnlockPage()
@@ -2329,22 +2329,22 @@ class MainActivity : AppCompatActivity() {
                 })
             })
 
-            container.addView(title("СТАТУС ЗАГРУЗЧИКА", if (unlocked) "#69C779" else "#E9782B"))
+            container.addView(title("BOOTLOADER STATUS", if (unlocked) "#69C779" else "#E9782B"))
             container.addView(card().apply {
                 if (unlocked) {
-                    addView(body("✅ Загрузчик разблокирован", "#69C779"))
+                    addView(body("✅ Bootloader unlocked", "#69C779"))
                     addView(body(unlockStatusSummary(), "#AEB8C5"))
-                    addView(body("Кнопка разблокировки скрыта: повторный unlock не требуется.", "#F3F6FA"))
+                    addView(body("Unlock button is hidden: repeated unlock is not required.", "#F3F6FA"))
                 } else {
-                    addView(body("Устройство должно быть в режиме Fastboot и подключено по OTG. Убедитесь, что аккаунт одобрен для разблокировки.", "#F3F6FA"))
+                    addView(body("Device must be in Fastboot mode and connected over OTG. Make sure the account is approved for unlocking.", "#F3F6FA"))
                     addView(body(unlockStatusSummary(), if (fastbootReady) "#AEB8C5" else "#F2B766"))
-                    addView(body("⚠️ Все данные устройства будут стёрты.", "#F2B766"))
+                    addView(body("⚠️ All device data will be erased.", "#F2B766"))
                     addView(android.widget.Button(this@MainActivity).apply {
                         val canRunUnlock = fastbootReady && !operationActive
                         text = when {
-                            operationActive -> "Операция выполняется…"
-                            !fastbootReady -> "Подключите устройство в Fastboot"
-                            else -> "🔓 Разблокировать загрузчик"
+                            operationActive -> "Operation is running…"
+                            !fastbootReady -> "Connect a device in Fastboot"
+                            else -> "🔓 Unlock bootloader"
                         }
                         isAllCaps = false
                         isEnabled = canRunUnlock
@@ -2433,7 +2433,7 @@ class MainActivity : AppCompatActivity() {
                     workspacePath.listFiles()?.forEach { if (it.isFile && it.delete()) count++ }
                 } catch (error: Exception) {
                     android.util.Log.w("NekoFlash", "Unable to enumerate or delete workspace files", error)
-                    viewModel.log("⚠️ Рабочая папка очищена частично: ${error.javaClass.simpleName}")
+                    viewModel.log("⚠️ Workspace folder was partially cleared: ${error.javaClass.simpleName}")
                 }
                 viewModel.log(resources.getQuantityString(R.plurals.settings_clear_workspace_done, count, count))
             }
@@ -2582,12 +2582,12 @@ class MainActivity : AppCompatActivity() {
             'b'
         }
         val allLabel = if (info.slotCount > 1) {
-            "Все слоты a..$lastSlot (--slot=all)"
+            "All slots a..$lastSlot (--slot=all)"
         } else {
-            "Все слоты (--slot=all)"
+            "All slots (--slot=all)"
         }
         val labels = arrayOf(
-            "Активный слот ${current ?: "current"} → $currentTarget",
+            "Active slot ${current ?: "current"} → $currentTarget",
             allLabel
         )
         // Do not mix AlertDialog.setMessage() with setItems() here: on some
@@ -2599,7 +2599,7 @@ class MainActivity : AppCompatActivity() {
             setPadding(dp(24), dp(4), dp(24), dp(4))
         }
         content.addView(TextView(this).apply {
-            text = "Раздел сообщает has-slot=yes. Выберите цель прошивки перед выбором файла."
+            text = "Partition reports has-slot=yes. Choose the flash target before selecting a file."
             setTextColor("#AEB8C5".toColorInt())
             textSize = 16f
             setPadding(0, dp(4), 0, dp(16))
@@ -2634,7 +2634,7 @@ class MainActivity : AppCompatActivity() {
         content.addView(allSlotsButton, LinearLayout.LayoutParams(buttonParams))
 
         val dialog = MaterialAlertDialogBuilder(this)
-            .setTitle("Куда прошить $partition")
+            .setTitle("Where to flash $partition")
             .setView(content)
             .setNegativeButton(getString(R.string.cancel_upper), null)
             .create()
@@ -2663,7 +2663,7 @@ class MainActivity : AppCompatActivity() {
             .setPositiveButton(getString(R.string.continue_upper)) { _, _ ->
                 val partition = input.text?.toString()?.trim()?.lowercase(Locale.US).orEmpty()
                 if (!PARTITION_NAME_PATTERN.matches(partition)) {
-                    viewModel.log("❌ Некорректное имя Fastboot-раздела: $partition")
+                    viewModel.log("❌ Invalid Fastboot partition name: $partition")
                     return@setPositiveButton
                 }
                 startDirectFlash(partition)
@@ -2778,7 +2778,7 @@ class MainActivity : AppCompatActivity() {
             appendLine("Topology: ${inventory?.topology ?: "unknown"}")
             appendLine("Inventory: ${inventory?.entries?.size ?: 0} partitions, warnings=${inventory?.warnings?.size ?: 0}")
         }.trim()
-        copyTextToClipboard("NekoFlash diagnostic summary", text, "Краткий итог скопирован")
+        copyTextToClipboard("NekoFlash diagnostic summary", text, "Short summary copied")
     }
 
     private fun openWorkspaceFolder() {
@@ -2803,7 +2803,7 @@ class MainActivity : AppCompatActivity() {
             viewModel.log(getString(R.string.home_workspace_opening, workspaceDisplayPath()))
             startActivity(intent)
         } catch (e: Exception) {
-            viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ОШИБКА: не удалось открыть рабочую папку: ${e.message ?: e.javaClass.simpleName}")
+            viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ERROR: could not open the workspace folder: ${e.message ?: e.javaClass.simpleName}")
             copyTextToClipboard(
                 "NekoFlash workspace",
                 workspaceDisplayPath(),
@@ -2816,7 +2816,7 @@ class MainActivity : AppCompatActivity() {
         if (!ensureWorkspaceReady()) return
         val reportsDir = File(workspacePath, "reports")
         if (!reportsDir.exists() && !reportsDir.mkdirs()) {
-            viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ОШИБКА: не удалось создать папку reports: ${reportsDir.absolutePath}")
+            viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ERROR: could not create folder reports: ${reportsDir.absolutePath}")
             return
         }
 
@@ -2833,11 +2833,11 @@ class MainActivity : AppCompatActivity() {
         }
 
         try {
-            viewModel.log("Открываю папку отчётов: /sdcard/Download/$folderName/reports")
+            viewModel.log("Opening reports folder: /sdcard/Download/$folderName/reports")
             startActivity(intent)
         } catch (e: Exception) {
-            viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ОШИБКА: не удалось открыть DocumentsUI для reports: ${e.message ?: e.javaClass.simpleName}")
-            copyTextToClipboard("ADB Fastboot reports", reportsDir.absolutePath, "Путь к reports скопирован")
+            viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ERROR: could not open DocumentsUI for reports: ${e.message ?: e.javaClass.simpleName}")
+            copyTextToClipboard("ADB Fastboot reports", reportsDir.absolutePath, "Reports path copied")
         }
     }
 
@@ -2855,7 +2855,7 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent.createChooser(intent, getString(R.string.share_file_chooser)))
             true
         } catch (e: Exception) {
-            viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ОШИБКА: не удалось отправить файл: ${e.message ?: e.javaClass.simpleName}")
+            viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ERROR: could not send file: ${e.message ?: e.javaClass.simpleName}")
             false
         }
     }
@@ -2875,11 +2875,11 @@ class MainActivity : AppCompatActivity() {
                     )
                 }
             } catch (e: Exception) {
-                viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ОШИБКА: не удалось подготовить очищенную копию лога: ${e.message ?: e.javaClass.simpleName}")
+                viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ERROR: could not prepare a sanitized log copy: ${e.message ?: e.javaClass.simpleName}")
                 return@launch
             }
 
-            viewModel.log("🔒 Для отправки создана временная очищенная копия лога.")
+            viewModel.log("🔒 A temporary sanitized log copy was created for sharing.")
             if (shareGenericFile(sanitized, "text/plain", "NekoFlash sanitized log")) {
                 // ACTION_SEND does not report when the receiving app has finished reading.
                 // Keep the cache file briefly, then remove it; stale files are also
@@ -2977,7 +2977,7 @@ class MainActivity : AppCompatActivity() {
     private fun logBatteryOptimizationState() {
         val powerManager = getSystemService(PowerManager::class.java)
         if (!powerManager.isIgnoringBatteryOptimizations(packageName)) {
-            viewModel.log("⚠️ Для долгой прошивки рекомендуется отключить оптимизацию батареи: кнопка «Батарея».")
+            viewModel.log("⚠️ For long flashing, it is recommended to disable battery optimization: Battery button.")
         }
     }
 
@@ -3063,11 +3063,11 @@ class MainActivity : AppCompatActivity() {
 
         val product = diagnostics?.product
             ?: inventory?.product
-            ?: extractConnectionField(connectionInfo, "Устройство")
+            ?: extractConnectionField(connectionInfo, "Device")
             ?: "—"
         val slot = when (inventory?.topology) {
-            FastbootPartitionInventory.SlotTopology.LEGACY_A_ONLY -> "без A/B (legacy A-only)"
-            FastbootPartitionInventory.SlotTopology.A_B -> diagnostics?.currentSlot ?: "A/B, текущий не определён"
+            FastbootPartitionInventory.SlotTopology.LEGACY_A_ONLY -> "without A/B (legacy A-only)"
+            FastbootPartitionInventory.SlotTopology.A_B -> diagnostics?.currentSlot ?: "A/B, current is unknown"
             FastbootPartitionInventory.SlotTopology.UNKNOWN, null -> diagnostics?.currentSlot ?: "—"
         }
         val unlocked = diagnostics?.unlocked?.let(::formatDeviceBoolean) ?: "—"
@@ -3079,8 +3079,8 @@ class MainActivity : AppCompatActivity() {
         val serialno = diagnostics?.serialno?.let { " | Serial: $it" } ?: ""
         val slotExtra = buildString {
             if (inventory?.topology != FastbootPartitionInventory.SlotTopology.LEGACY_A_ONLY) {
-                diagnostics?.slotCount?.let { append(" | Слотов: $it") }
-                diagnostics?.slotSuffix?.let { append(" | Суффикс: $it") }
+                diagnostics?.slotCount?.let { append(" | Slots: $it") }
+                diagnostics?.slotSuffix?.let { append(" | Suffix: $it") }
             }
         }
         val slotDisplay = if (slotExtra.isNotBlank()) "$slot$slotExtra" else slot
@@ -3106,9 +3106,9 @@ class MainActivity : AppCompatActivity() {
             val logical = snapshot.entries.count { it.storage == FastbootPartitionInventory.StorageKind.LOGICAL }
             val physical = snapshot.entries.count { it.storage == FastbootPartitionInventory.StorageKind.PHYSICAL }
             val incomplete = snapshot.entries.count { it.missingFields.isNotEmpty() }
-            " | Разделов: ${snapshot.entries.size} " +
-                "(обычные $normal / расширенные $advanced / критичные $critical; " +
-                "physical $physical / logical $logical; неполные $incomplete)"
+            " | Partitions: ${snapshot.entries.size} " +
+                "(normal $normal / advanced $advanced / critical $critical; " +
+                "physical $physical / logical $logical; incomplete $incomplete)"
         } ?: ""
         findViewById<TextView>(R.id.tvDeviceMaxDownloadValue).text = getString(
             R.string.device_max_download_value,
@@ -3568,9 +3568,9 @@ class MainActivity : AppCompatActivity() {
         val (status, color) = when {
             active -> getString(R.string.layout_operation_center_running) to "#F2B766"
             recentText == null -> getString(R.string.layout_operation_center_idle) to "#AEB8C5"
-            recentText.contains("❌") || recentText.contains("ОШИБКА") || recentText.contains("FAILED", ignoreCase = true) || recentText.contains("БЛОКИРОВКА") ->
+            recentText.contains("❌") || recentText.contains("ERROR") || recentText.contains("FAILED", ignoreCase = true) || recentText.contains("LOCKED") ->
                 getString(R.string.layout_operation_center_failed) to "#E06C75"
-            recentText.contains("✅") || recentText.contains("COMPLETED", ignoreCase = true) || recentText.contains("ЗАВЕРШЕНА") ->
+            recentText.contains("✅") || recentText.contains("COMPLETED", ignoreCase = true) || recentText.contains("COMPLETED") ->
                 getString(R.string.layout_operation_center_completed) to "#69C779"
             recentText.contains("⚠") || recentText.contains("WARN", ignoreCase = true) ->
                 getString(R.string.layout_operation_center_warning) to "#F2B766"
@@ -3590,18 +3590,18 @@ class MainActivity : AppCompatActivity() {
         val progress = viewModel.operationProgress.value
         val progressTitle = progress?.title.orEmpty()
         val terminalReadOnlyProgress =
-            progressTitle.equals("Fastboot-команда", ignoreCase = true) &&
+            progressTitle.equals("Fastboot command", ignoreCase = true) &&
                 recentText?.startsWith("✅ getvar:", ignoreCase = true) == true
 
         val hasErrorOrWarning = recentText != null && (
-            recentText.contains("❌") || recentText.contains("ОШИБКА") ||
-            recentText.contains("FAILED", ignoreCase = true) || recentText.contains("БЛОКИРОВКА") ||
+            recentText.contains("❌") || recentText.contains("ERROR") ||
+            recentText.contains("FAILED", ignoreCase = true) || recentText.contains("LOCKED") ||
             recentText.contains("⚠") || recentText.contains("WARN", ignoreCase = true)
         )
         val hasImportantFinishedOperation =
             progress?.finished == true &&
                 !terminalReadOnlyProgress &&
-                !progressTitle.equals("Fastboot-команда", ignoreCase = true)
+                !progressTitle.equals("Fastboot command", ignoreCase = true)
 
         findViewById<View>(R.id.cardOperationCenter).visibility =
             if (active || hasErrorOrWarning || hasImportantFinishedOperation) View.VISIBLE else View.GONE

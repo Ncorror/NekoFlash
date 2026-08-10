@@ -78,11 +78,11 @@ object CompactLogRenderPolicy {
 
     fun format(line: String): FormattedLine {
         val (tone, emoji) = when {
-            line.contains("ОШИБКА") || line.contains("БЛОКИРОВКА") || line.contains("❌") ->
+            line.contains("ERROR") || line.contains("LOCKED") || line.contains("❌") ->
                 Tone.ERROR to "🙀 "
 
             line.startsWith("💡") -> Tone.HINT to ""
-            line.contains("✅") || line.contains("===") || line.contains("ЗАВЕРШЕНА") ->
+            line.contains("✅") || line.contains("===") || line.contains("COMPLETED") ->
                 Tone.SUCCESS to "✨ "
 
             line.startsWith(">") || line.startsWith("->") || line.startsWith("<-") ->
