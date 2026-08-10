@@ -2590,17 +2590,64 @@ class MainActivity : AppCompatActivity() {
             "Активный слот ${current ?: "current"} → $currentTarget",
             allLabel
         )
-        MaterialAlertDialogBuilder(this)
+        // Do not mix AlertDialog.setMessage() with setItems() here: on some
+        // Android/Material theme combinations the message view can consume the
+        // dialog content area and leave the slot choices invisible. Keep the
+        // explanatory text and the two target choices in one explicit custom view.
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(24), dp(4), dp(24), dp(4))
+        }
+        content.addView(TextView(this).apply {
+            text = "Раздел сообщает has-slot=yes. Выберите цель прошивки перед выбором файла."
+            setTextColor("#AEB8C5".toColorInt())
+            textSize = 16f
+            setPadding(0, dp(4), 0, dp(16))
+        })
+        val activeSlotButton = MaterialButton(
+            this,
+            null,
+            com.google.android.material.R.attr.materialButtonOutlinedStyle
+        ).apply {
+            text = labels[0]
+            isAllCaps = false
+            minHeight = dp(48)
+            setPadding(dp(16), dp(8), dp(16), dp(8))
+        }
+        val allSlotsButton = MaterialButton(
+            this,
+            null,
+            com.google.android.material.R.attr.materialButtonOutlinedStyle
+        ).apply {
+            text = labels[1]
+            isAllCaps = false
+            minHeight = dp(48)
+            setPadding(dp(16), dp(8), dp(16), dp(8))
+        }
+        val buttonParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            bottomMargin = dp(8)
+        }
+        content.addView(activeSlotButton, buttonParams)
+        content.addView(allSlotsButton, LinearLayout.LayoutParams(buttonParams))
+
+        val dialog = MaterialAlertDialogBuilder(this)
             .setTitle("Куда прошить $partition")
-            .setMessage("Раздел сообщает has-slot=yes. Выберите цель прошивки перед выбором файла.")
+            .setView(content)
             .setNegativeButton(getString(R.string.cancel_upper), null)
-            .setItems(labels) { _, which ->
-                when (which) {
-                    0 -> onSlotChosen(current)
-                    1 -> onSlotChosen("all")
-                }
-            }
-            .show()
+            .create()
+
+        activeSlotButton.setOnClickListener {
+            dialog.dismiss()
+            onSlotChosen(current)
+        }
+        allSlotsButton.setOnClickListener {
+            dialog.dismiss()
+            onSlotChosen("all")
+        }
+        dialog.show()
     }
 
     private fun showManualQuickFlashTargetDialog() {
