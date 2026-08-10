@@ -97,35 +97,35 @@ Not requested:
 
     <!-- UX v3 full-window redesign -->
     <string name="flash_queue_empty">Queue is empty. Choose a partition below and select an .img file.</string>
-    <string name="flash_queue_empty_log">ОШИБКА: очередь прошивки пуста</string>
+    <string name="flash_queue_empty_log">ERROR: flash queue is empty</string>
     <string name="flash_queue_updated_log">Queue updated: %1$s → %2$s</string>
     <string name="flash_queue_cleared_log">Flash queue cleared</string>
     <string name="flash_queue_filename_warning">Warning: %1$s looks like %2$s, but you selected partition %3$s.</string>
 
     <!-- Onboarding -->
-    <string name="onboarding_subtitle">Прошивальщик Android через USB Host</string>
-    <string name="onboarding_bg_desc">Фоновое изображение запуска</string>
-    <string name="onboarding_grant_button">Настроить доступ</string>
-    <string name="perm_storage">Доступ к файлам</string>
-    <string name="perm_notifications">Уведомления</string>
-    <string name="perm_battery_opt">Игнор оптимизации батареи</string>
-    <string name="onboarding_ready_short">Готово к входу</string>
-    <string name="onboarding_need_storage_short">Нужен доступ к файлам</string>
-    <string name="onboarding_agree_text_short">Подтверждаю риски прошивки</string>
-    <string name="onboarding_enter_button">Продолжить</string>
-    <string name="onboarding_confirm_risk_short">Подтвердите риски прошивки</string>
-    <string name="onboarding_confirm_risk_first">Сначала отметьте согласие с рисками прошивки.</string>
-    <string name="onboarding_miui_battery_fallback_toast">Если MIUI не открыла батарею: Настройки → Приложения → NekoFlash → Батарея → Без ограничений.</string>
-    <string name="onboarding_gate_save_failed">Не удалось сохранить подтверждение онбординга. Повторите вход.</string>
-    <string name="onboarding_notifications_open_settings">Уведомления были отклонены несколько раз. Откройте настройки NekoFlash и разрешите их вручную; вход в приложение не заблокирован.</string>
+    <string name="onboarding_subtitle">Android flashing over USB Host</string>
+    <string name="onboarding_bg_desc">Welcome background image</string>
+    <string name="onboarding_grant_button">Set up access</string>
+    <string name="perm_storage">File access</string>
+    <string name="perm_notifications">Notifications</string>
+    <string name="perm_battery_opt">Ignore battery optimization</string>
+    <string name="onboarding_ready_short">Ready to enter</string>
+    <string name="onboarding_need_storage_short">File access required</string>
+    <string name="onboarding_agree_text_short">I accept the flashing risks</string>
+    <string name="onboarding_enter_button">Continue</string>
+    <string name="onboarding_confirm_risk_short">Confirm flashing risks</string>
+    <string name="onboarding_confirm_risk_first">Accept the flashing risks first.</string>
+    <string name="onboarding_miui_battery_fallback_toast">If MIUI did not open Battery settings: Settings → Apps → NekoFlash → Battery → No restrictions.</string>
+    <string name="onboarding_gate_save_failed">Could not save the onboarding confirmation. Try entering again.</string>
+    <string name="onboarding_notifications_open_settings">Notifications were denied several times. Open NekoFlash settings and allow them manually; app entry is not blocked.</string>
     <!-- Layout text extracted from activity_main.xml -->
     <string name="layout_status_no_device">● No device</string>
     <string name="layout_icon_scan">🔌</string>
     <string name="layout_icon_cancel">✕</string>
     <string name="layout_icon_home">⌂
-Главная</string>
+Home</string>
     <string name="layout_icon_fastboot">⚡
-Прошить</string>
+Flash</string>
     <string name="layout_icon_adb">↯
 Sideload</string>
     <string name="layout_device_title">DEVICE INFORMATION</string>
@@ -242,7 +242,7 @@ Use at your own risk. Flashing can brick a device.
 
 Android robot attribution: The Android robot is reproduced or modified from work created and shared by Google and used according to terms described in the Creative Commons 3.0 Attribution License. Android is a trademark of Google LLC.</string>
     <string name="layout_icon_settings_tab">⚙
-Настр.</string>
+Settings</string>
     <string name="layout_flash_reboot_mode">Reboot</string>
 <string name="flash_progress_writing">Writing…</string>
     <string name="flash_progress_title">⚡ Flashing in progress</string>

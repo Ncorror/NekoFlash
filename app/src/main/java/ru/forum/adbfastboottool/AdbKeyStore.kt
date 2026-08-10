@@ -38,7 +38,7 @@ class AdbKeyStore(
     fun getOrCreateKeyPair(): KeyPair {
         cachedKeyPair?.let { return it }
         if (!directory.exists() && !directory.mkdirs()) {
-            throw IllegalStateException("Не удалось создать папку ADB-ключей: ${directory.absolutePath}")
+            throw IllegalStateException("Could not create the ADB key folder: ${directory.absolutePath}")
         }
 
         val keyPair = if (privateKeyFile.exists()) {
@@ -46,7 +46,7 @@ class AdbKeyStore(
         } else {
             generateKeyPair().also {
                 savePrivateKey(it.private)
-                onLog("🔐 Создан новый ADB RSA-ключ приложения")
+                onLog("🔐 Created a new app ADB RSA key")
             }
         }
 
@@ -58,7 +58,7 @@ class AdbKeyStore(
     fun signToken(token: ByteArray): ByteArray {
         val privateKey = getOrCreateKeyPair().private
         if (token.size != ADB_AUTH_TOKEN_SIZE) {
-            throw IllegalArgumentException("ADB TOKEN должен быть 20 байт, получено: ${token.size}")
+            throw IllegalArgumentException("ADB TOKEN must be 20 bytes, got: ${token.size}")
         }
 
         // AOSP adb_auth_sign() calls RSA_sign(NID_sha1, token, 20, ...), i.e. it
@@ -126,7 +126,7 @@ class AdbKeyStore(
     private fun androidPubkeyBytes(publicKey: RSAPublicKey): ByteArray {
         val modulus = publicKey.modulus
         val exponent = publicKey.publicExponent
-        require(modulus.bitLength() <= ADB_RSA_BITS) { "Поддерживается только RSA-2048 для ADB" }
+        require(modulus.bitLength() <= ADB_RSA_BITS) { "Only RSA-2048 is supported for ADB" }
 
         val two32 = BigInteger.ONE.shiftLeft(32)
         val r = BigInteger.ONE.shiftLeft(ADB_RSA_WORDS * 32)

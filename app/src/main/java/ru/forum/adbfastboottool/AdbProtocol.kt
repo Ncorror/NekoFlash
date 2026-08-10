@@ -194,7 +194,7 @@ class AdbProtocol(
         clearPendingInboundPayload()
 
         val iface = findAdbInterface() ?: run {
-            onLog("ОШИБКА: ADB интерфейс не найден")
+            onLog("ERROR: ADB interface not found")
             return false
         }
         adbInterface = iface
@@ -203,7 +203,7 @@ class AdbProtocol(
         endpointIn = endpoints.first
         endpointOut = endpoints.second
         if (endpointIn == null || endpointOut == null) {
-            onLog("ОШИБКА: ADB bulk endpoints не найдены")
+            onLog("ERROR: ADB bulk endpoints not found")
             disconnect()
             return false
         }
@@ -216,12 +216,12 @@ class AdbProtocol(
 
         connection = usbManager.openDevice(device)
         if (connection == null) {
-            onLog("ОШИБКА: Не удалось открыть USB устройство для ADB")
+            onLog("ERROR: Could not open USB device for ADB")
             disconnect()
             return false
         }
         if (!connection!!.claimInterface(iface, true)) {
-            onLog("ОШИБКА: Не удалось захватить ADB интерфейс")
+            onLog("ERROR: Could not claim ADB interface")
             disconnect()
             return false
         }
@@ -238,7 +238,7 @@ class AdbProtocol(
             )
 
             val header = readHeader() ?: run {
-                onLog("ОШИБКА: Сбой подключения ADB (нет ответа)")
+                onLog("ERROR: ADB connection failed (no response)")
                 disconnect()
                 return false
             }
@@ -246,7 +246,7 @@ class AdbProtocol(
             when (header.command) {
                 A_CNXN -> {
                     handleConnectionBanner(header)
-                    onLog("=== СОЕДИНЕНИЕ ADB УСТАНОВЛЕНО ===")
+                    onLog("=== ADB CONNECTION ESTABLISHED ===")
                     startPacketDispatcher()
                     true
                 }
@@ -259,13 +259,13 @@ class AdbProtocol(
 
                 else -> {
                     if (header.dataLength > 0) readData(header.dataLength)
-                    onLog("ОШИБКА: Неожиданный ADB ответ (cmd=0x${header.command.toString(16)})")
+                    onLog("ERROR: Unexpected ADB response (cmd=0x${header.command.toString(16)})")
                     disconnect()
                     false
                 }
             }
         } catch (e: Exception) {
-            onLog("ОШИБКА: Сбой подключения ADB: ${e.message ?: e.javaClass.simpleName}")
+            onLog("ERROR: ADB connection failed: ${e.message ?: e.javaClass.simpleName}")
             disconnect()
             false
         }
@@ -278,7 +278,7 @@ class AdbProtocol(
                 if (isAdbInterface(iface) && findBulkEndpoints(iface).let { it.first != null && it.second != null }) {
                     return iface
                 }
-                onLog("⚠️ Выбранный ADB interface=$index больше не соответствует ожидаемому дескриптору — выполняем безопасный поиск")
+                onLog("⚠️ Selected ADB interface=$index no longer matches the expected descriptor — running a safe search")
             }
         }
 
@@ -311,24 +311,24 @@ class AdbProtocol(
     private fun handleAuthPacket(firstHeader: AdbHeader): Boolean {
         if (firstHeader.arg0 != AUTH_TOKEN) {
             if (firstHeader.dataLength > 0) readData(firstHeader.dataLength)
-            onLog("❌ Неподдерживаемый ADB AUTH тип: ${firstHeader.arg0}")
+            onLog("❌ Unsupported ADB AUTH type: ${firstHeader.arg0}")
             return false
         }
 
         val firstToken = readData(firstHeader.dataLength) ?: run {
-            onLog("❌ Не удалось прочитать ADB AUTH TOKEN")
+            onLog("❌ Could not read ADB AUTH TOKEN")
             return false
         }
 
-        onLog("🔐 ADB AUTH: устройство требует RSA-авторизацию")
+        onLog("🔐 ADB AUTH: device requires RSA authorization")
 
         var publicKeySent = false
         try {
             val signature = adbKeyStore.signToken(firstToken)
-            onLog("🔑 Пробуем авторизацию сохранённым ADB RSA-ключом")
+            onLog("🔑 Trying authorization with the saved ADB RSA key")
             sendMessageInternal(A_AUTH, AUTH_SIGNATURE, 0, signature)
         } catch (e: Exception) {
-            onLog("⚠️ Не удалось подписать ADB TOKEN: ${e.message ?: e.javaClass.simpleName}")
+            onLog("⚠️ Could not sign ADB TOKEN: ${e.message ?: e.javaClass.simpleName}")
             publicKeySent = sendAdbPublicKeyForAuth()
             if (!publicKeySent) return false
         }
@@ -339,9 +339,9 @@ class AdbProtocol(
             val timeout = if (publicKeySent) 60_000 else 10_000
             val header = readHeader(timeoutMs = timeout) ?: run {
                 if (publicKeySent) {
-                    onLog("❌ ADB RSA не подтверждён на устройстве за 60 сек")
+                    onLog("❌ ADB RSA was not confirmed on the device within 60 seconds")
                 } else {
-                    onLog("❌ Устройство не ответило на ADB RSA-подпись")
+                    onLog("❌ Device did not respond to the ADB RSA signature")
                 }
                 return false
             }
@@ -349,7 +349,7 @@ class AdbProtocol(
             when (header.command) {
                 A_CNXN -> {
                     handleConnectionBanner(header)
-                    onLog("✅ ADB авторизован. Соединение установлено.")
+                    onLog("✅ ADB authorized. Connection established.")
                     return true
                 }
 
@@ -357,7 +357,7 @@ class AdbProtocol(
                     when (header.arg0) {
                         AUTH_TOKEN -> {
                             if (header.dataLength > 0 && readData(header.dataLength) == null) {
-                                onLog("❌ Не удалось прочитать повторный ADB AUTH TOKEN")
+                                onLog("❌ Could not read repeated ADB AUTH TOKEN")
                                 return false
                             }
 
@@ -365,13 +365,13 @@ class AdbProtocol(
                                 publicKeySent = sendAdbPublicKeyForAuth()
                                 if (!publicKeySent) return false
                             } else if (attempt % 3 == 2) {
-                                onLog("⏳ Всё ещё ждём подтверждение ADB RSA на устройстве...")
+                                onLog("⏳ Still waiting for ADB RSA confirmation on the device...")
                             }
                         }
 
                         else -> {
                             if (header.dataLength > 0) readData(header.dataLength)
-                            onLog("❌ Неподдерживаемый ADB AUTH тип: ${header.arg0}")
+                            onLog("❌ Unsupported ADB AUTH type: ${header.arg0}")
                             return false
                         }
                     }
@@ -379,14 +379,14 @@ class AdbProtocol(
 
                 else -> {
                     if (header.dataLength > 0) readData(header.dataLength)
-                    onLog("❌ Неожиданный ответ во время ADB AUTH: cmd=0x${header.command.toString(16)}")
+                    onLog("❌ Unexpected response during ADB AUTH: cmd=0x${header.command.toString(16)}")
                     return false
                 }
             }
         }
 
-        onLog("❌ ADB RSA-авторизация не завершена")
-        onLog("💡 Проверьте экран устройства, USB-отладку и пункт 'Always allow from this computer'")
+        onLog("❌ ADB RSA authorization did not complete")
+        onLog("💡 Check the device screen, USB debugging, and 'Always allow from this computer'")
         return false
     }
 
@@ -395,12 +395,12 @@ class AdbProtocol(
         return try {
             val publicKeyPayload = adbKeyStore.publicKeyPayload()
             sendMessageInternal(A_AUTH, AUTH_RSAPUBLICKEY, 0, publicKeyPayload)
-            onLog("📤 Отправлен ADB public key")
-            onLog("⏳ Подтвердите запрос «Allow USB debugging» на экране устройства")
-            onLog("ℹ️ Public key сохранён: ${adbKeyStore.publicKeyPath()}")
+            onLog("📤 ADB public key sent")
+            onLog("⏳ Confirm the 'Allow USB debugging' prompt on the device screen")
+            onLog("ℹ️ Public key saved: ${adbKeyStore.publicKeyPath()}")
             true
         } catch (e: Exception) {
-            onLog("❌ Не удалось отправить ADB public key: ${e.message ?: e.javaClass.simpleName}")
+            onLog("❌ Could not send ADB public key: ${e.message ?: e.javaClass.simpleName}")
             false
         }
 
@@ -413,9 +413,9 @@ class AdbProtocol(
         parseRemoteFeatures(remoteBanner)
         if (remoteBanner.isNotBlank()) onLog("ADB banner: $remoteBanner")
         if (supportsShellV2) {
-            onLog("✅ ADB feature shell_v2 обнаружена: доступен exit-code и разделение stdout/stderr")
+            onLog("✅ ADB feature shell_v2 detected: exit code and stdout/stderr separation are available")
         } else {
-            onLog("ℹ️ ADB feature shell_v2 не заявлена: shell будет работать в legacy-режиме без точного exit-code")
+            onLog("ℹ️ ADB feature shell_v2 is not advertised: shell will run in legacy mode without an exact exit code")
         }
     }
 
@@ -440,26 +440,26 @@ class AdbProtocol(
 
     fun sideloadZip(file: File): SideloadResult {
         if (!isConnected) {
-            return SideloadResult.Failed(SideloadFailureKind.TRANSPORT, "Нет ADB-соединения")
+            return SideloadResult.Failed(SideloadFailureKind.TRANSPORT, "No ADB connection")
         }
         if (peerMode != PeerMode.SIDELOAD) {
-            onLog("ОШИБКА: ADB Sideload не запущен. Текущий ADB-режим: ${peerMode.name}")
-            onLog("💡 Откройте: Recovery → Apply update → Apply from ADB")
+            onLog("ERROR: ADB Sideload is not started. Current ADB mode: ${peerMode.name}")
+            onLog("💡 Open: Recovery → Apply update → Apply from ADB")
             return SideloadResult.NotInSideloadMode(peerMode)
         }
 
         if (!file.exists() || !file.isFile || !file.canRead()) {
-            return SideloadResult.Failed(SideloadFailureKind.FILE, "Файл недоступен: ${file.absolutePath}")
+            return SideloadResult.Failed(SideloadFailureKind.FILE, "File is unavailable: ${file.absolutePath}")
         }
         val fileSize = file.length()
         if (fileSize <= 0L) {
-            return SideloadResult.Failed(SideloadFailureKind.FILE, "Файл пустой: ${file.name}")
+            return SideloadResult.Failed(SideloadFailureKind.FILE, "File is empty: ${file.name}")
         }
 
         cancelled = false
         var terminalState = SideloadTerminalState.RUNNING
-        onLog("Старт ADB Sideload: ${file.name} ($fileSize байт)")
-        onProgress(0, "ADB Sideload · ожидание запросов recovery")
+        onLog("Starting ADB Sideload: ${file.name} ($fileSize bytes)")
+        onProgress(0, "ADB Sideload · waiting for recovery requests")
 
         return try {
             sendMessageInternal(
@@ -469,10 +469,10 @@ class AdbProtocol(
             val openResp = readHeader()
             if (openResp == null || openResp.command != A_OKAY) {
                 if (openResp != null && openResp.dataLength > 0) readData(openResp.dataLength)
-                onLog("ОШИБКА: Recovery не подтвердило sideload-host OPEN.")
+                onLog("ERROR: Recovery did not confirm sideload-host OPEN.")
                 return SideloadResult.Failed(
                     SideloadFailureKind.PROTOCOL,
-                    "Recovery не подтвердило sideload-host OPEN"
+                    "Recovery did not confirm sideload-host OPEN"
                 )
             }
 
@@ -493,8 +493,8 @@ class AdbProtocol(
             fun closeBeforeDoneDone(kind: SideloadFailureKind, message: String): SideloadResult {
                 val percent = servedPercent()
                 return if (percent >= SIDELOAD_CLOSE_VERIFY_PENDING_PERCENT) {
-                    val detail = "$message после ≈$percent% передачи. Recovery могла уже перейти к post-install/reboot flow; итог смотрите на экране Recovery."
-                    onProgress(100, "ADB Sideload · ожидает проверки Recovery")
+                    val detail = "$message after ≈$percent% transfer. Recovery may have already moved to the post-install/reboot flow; check the final result on the Recovery screen."
+                    onProgress(100, "ADB Sideload · waiting for Recovery verification")
                     onLog("⚠️ ADB Sideload: $detail")
                     SideloadResult.TransferClosedBeforeDoneDone(
                         servedBytes = servedBytes,
@@ -511,20 +511,20 @@ class AdbProtocol(
                 val ack = readHeader()
                     ?: return closeBeforeDoneDone(
                         SideloadFailureKind.TRANSPORT,
-                        "ADB transport закрылся во время подтверждения блока"
+                        "ADB transport closed while confirming the block"
                     )
                 if (ack.dataLength > 0 && readData(ack.dataLength) == null) {
-                    return fail(SideloadFailureKind.TRANSPORT, "Не удалось прочитать данные ответа ADB")
+                    return fail(SideloadFailureKind.TRANSPORT, "Could not read ADB response data")
                 }
                 return when (ack.command) {
                     A_OKAY -> null
                     A_CLSE -> closeBeforeDoneDone(
                         SideloadFailureKind.PROTOCOL,
-                        "Recovery закрыла sideload stream до DONEDONE"
+                        "Recovery closed the sideload stream before DONEDONE"
                     )
                     else -> fail(
                         SideloadFailureKind.PROTOCOL,
-                        "Неожиданный ADB-ответ после блока: cmd=0x${ack.command.toString(16)}"
+                        "Unexpected ADB response after block: cmd=0x${ack.command.toString(16)}"
                     )
                 }
             }
@@ -535,7 +535,7 @@ class AdbProtocol(
                     if (reqHeader == null) {
                         result = closeBeforeDoneDone(
                             SideloadFailureKind.TRANSPORT,
-                            "ADB transport закрылся до подтверждения DONEDONE"
+                            "ADB transport closed before DONEDONE confirmation"
                         )
                         break@sideloadLoop
                     }
@@ -546,14 +546,14 @@ class AdbProtocol(
                             runCatching { sendMessageInternal(A_CLSE, 1, remoteId, EMPTY_PAYLOAD) }
                             result = closeBeforeDoneDone(
                                 SideloadFailureKind.PROTOCOL,
-                                "Recovery закрыла sideload stream до DONEDONE"
+                                "Recovery closed the sideload stream before DONEDONE"
                             )
                         }
 
                         A_WRTE -> {
                             val reqData = readData(reqHeader.dataLength)
                             if (reqData == null) {
-                                result = fail(SideloadFailureKind.TRANSPORT, "Не удалось прочитать запрос sideload-блока")
+                                result = fail(SideloadFailureKind.TRANSPORT, "Could not read sideload block request")
                                 continue@sideloadLoop
                             }
 
@@ -566,9 +566,9 @@ class AdbProtocol(
 
                             if (ascii == "DONEDONE") {
                                 terminalState = SideloadTerminalState.TRANSFER_COMPLETE
-                                onProgress(100, "ADB Sideload · передача завершена")
-                                onLog("✅ Recovery прислало DONEDONE — sideload-поток завершён.")
-                                onLog("ℹ️ DONEDONE не подтверждает успешную установку ZIP. Ожидаем возврат в Recovery и проверяем её итоговый лог.")
+                                onProgress(100, "ADB Sideload · transfer completed")
+                                onLog("✅ Recovery sent DONEDONE — sideload stream completed.")
+                                onLog("ℹ️ DONEDONE does not confirm a successful ZIP install. Waiting for the return to Recovery and checking its final log.")
                                 result = SideloadResult.TransferComplete
                                 break@sideloadLoop
                             }
@@ -579,20 +579,20 @@ class AdbProtocol(
                                 val hex = reqData.joinToString(" ") { "%02x".format(it) }
                                 result = fail(
                                     SideloadFailureKind.PROTOCOL,
-                                    "Некорректный запрос блока (${reqData.size} байт): $hex"
+                                    "Invalid block request (${reqData.size} bytes): $hex"
                                 )
                                 continue@sideloadLoop
                             }
 
                             if (blockNum == -1) {
-                                onLog("ℹ️ Recovery сообщило о завершении запросов блоков; ожидаем DONEDONE...")
+                                onLog("ℹ️ Recovery reported that block requests are complete; waiting for DONEDONE...")
                                 sendMessageInternal(A_WRTE, 1, remoteId, EMPTY_PAYLOAD)
                                 result = readStreamAck()
                                 continue@sideloadLoop
                             }
 
                             if (blockNum < 0) {
-                                result = fail(SideloadFailureKind.PROTOCOL, "Отрицательный номер sideload-блока: $blockNum")
+                                result = fail(SideloadFailureKind.PROTOCOL, "Negative sideload block number: $blockNum")
                                 continue@sideloadLoop
                             }
 
@@ -600,7 +600,7 @@ class AdbProtocol(
                             if (offset < 0L || offset >= fileSize) {
                                 result = fail(
                                     SideloadFailureKind.PROTOCOL,
-                                    "Recovery запросило блок за пределами ZIP: block=$blockNum offset=$offset size=$fileSize"
+                                    "Recovery requested a block outside the ZIP: block=$blockNum offset=$offset size=$fileSize"
                                 )
                                 continue@sideloadLoop
                             }
@@ -621,7 +621,7 @@ class AdbProtocol(
                             val bucket = approximateProgress / 5
                             if (bucket > lastLoggedBucket) {
                                 val displayProgress = (bucket * 5).coerceAtMost(99)
-                                onLog("Sideload: ≈$displayProgress% (отдано $servedBytes байт, блок $blockNum)")
+                                onLog("Sideload: ≈$displayProgress% (served $servedBytes bytes, block $blockNum)")
                                 val overallProgress = displayProgress
                                 onProgress(overallProgress.coerceIn(0, 99), "ADB Sideload · ≈$displayProgress%")
                                 lastLoggedBucket = bucket
@@ -632,7 +632,7 @@ class AdbProtocol(
                             if (reqHeader.dataLength > 0) readData(reqHeader.dataLength)
                             result = fail(
                                 SideloadFailureKind.PROTOCOL,
-                                "Неожиданная ADB-команда в sideload stream: 0x${reqHeader.command.toString(16)}"
+                                "Unexpected ADB command in sideload stream: 0x${reqHeader.command.toString(16)}"
                             )
                         }
                     }
@@ -643,12 +643,12 @@ class AdbProtocol(
                 terminalState == SideloadTerminalState.TRANSFER_COMPLETE -> SideloadResult.TransferComplete
                 cancelled -> {
                     terminalState = SideloadTerminalState.CANCELLED
-                    onLog("⚠️ ADB Sideload отменён")
+                    onLog("⚠️ ADB Sideload cancelled")
                     SideloadResult.Cancelled
                 }
                 else -> result ?: SideloadResult.Failed(
                     SideloadFailureKind.TRANSPORT,
-                    "ADB Sideload завершился без DONEDONE"
+                    "ADB Sideload finished without DONEDONE"
                 )
             }
         } catch (e: Exception) {
@@ -660,7 +660,7 @@ class AdbProtocol(
             } else {
                 terminalState = SideloadTerminalState.FAILED
                 val message = e.message ?: e.javaClass.simpleName
-                onLog("ОШИБКА Sideload: $message")
+                onLog("ERROR Sideload: $message")
                 SideloadResult.Failed(SideloadFailureKind.TRANSPORT, message)
             }
         }
@@ -677,7 +677,7 @@ class AdbProtocol(
             localPath.exists() && localPath.isFile && localPath.canRead() -> pushFile(localPath, remotePath, mode)
             localPath.exists() && localPath.isDirectory && localPath.canRead() -> pushDirectory(localPath, remotePath, mode)
             else -> {
-                onLog("❌ adb push: локальный путь недоступен: ${localPath.absolutePath}")
+                onLog("❌ adb push: local path is unavailable: ${localPath.absolutePath}")
                 false
             }
         }
@@ -688,17 +688,17 @@ class AdbProtocol(
         cancelled = false
 
         if (!localFile.exists() || !localFile.isFile || !localFile.canRead()) {
-            onLog("❌ adb push: локальный файл недоступен: ${localFile.absolutePath}")
+            onLog("❌ adb push: local file is unavailable: ${localFile.absolutePath}")
             return false
         }
         val cleanRemote = remotePath.trim()
         if (!isValidRemotePath(cleanRemote)) {
-            onLog("❌ adb push: некорректный remote path")
+            onLog("❌ adb push: invalid remote path")
             return false
         }
 
         onLog("-> adb push ${localFile.name} $cleanRemote")
-        onLog("Размер: ${localFile.length()} байт")
+        onLog("Size: ${localFile.length()} bytes")
 
         val stream = openAdbStream("sync:") ?: return false
         try {
@@ -717,23 +717,23 @@ class AdbProtocol(
                     sentBytes += read.toLong()
                     val progress = ((sentBytes * 100L) / total).toInt()
                     if (progress >= 100 || progress / 10 != lastProgress / 10) {
-                        onLog("adb push: $progress% ($sentBytes/${localFile.length()} байт)")
+                        onLog("adb push: $progress% ($sentBytes/${localFile.length()} bytes)")
                         lastProgress = progress
                     }
                 }
             }
             if (cancelled) {
-                onLog("⚠️ adb push отменён")
+                onLog("⚠️ adb push cancelled")
                 return false
             }
 
             val mtime = (localFile.lastModified() / 1000L).toInt()
             if (!writeSyncIdAndInt(stream, "DONE", mtime)) return false
             val ok = readSyncStatus(stream, "adb push")
-            if (ok) onLog("✅ adb push завершён: $cleanRemote")
+            if (ok) onLog("✅ adb push completed: $cleanRemote")
             return ok
         } catch (e: Exception) {
-            onLog("❌ adb push ошибка: ${e.message ?: e.javaClass.simpleName}")
+            onLog("❌ adb push error: ${e.message ?: e.javaClass.simpleName}")
             return false
         } finally {
             closeAdbStream(stream)
@@ -745,12 +745,12 @@ class AdbProtocol(
         cancelled = false
 
         if (!localDir.exists() || !localDir.isDirectory || !localDir.canRead()) {
-            onLog("❌ adb push: локальная папка недоступна: ${localDir.absolutePath}")
+            onLog("❌ adb push: local folder is unavailable: ${localDir.absolutePath}")
             return false
         }
         val cleanRemote = remotePath.trim()
         if (!isValidRemotePath(cleanRemote)) {
-            onLog("❌ adb push: некорректный remote path")
+            onLog("❌ adb push: invalid remote path")
             return false
         }
 
@@ -765,7 +765,7 @@ class AdbProtocol(
         val directories = allEntries.filter { it.isDirectory }
         val files = allEntries.filter { it.isFile }
         onLog("-> adb push -r ${localDir.absolutePath} $targetRoot")
-        onLog("ℹ️ Каталог: ${directories.size} папок, ${files.size} файлов")
+        onLog("ℹ️ Directory: ${directories.size} folders, ${files.size} files")
 
         directories.forEach { dir ->
             if (cancelled) return false
@@ -785,10 +785,10 @@ class AdbProtocol(
         }
 
         return if (cancelled) {
-            onLog("⚠️ adb push каталога отменён")
+            onLog("⚠️ adb push directory cancelled")
             false
         } else {
-            onLog("✅ adb push каталога завершён: $pushed файлов → $targetRoot")
+            onLog("✅ adb push directory completed: $pushed files → $targetRoot")
             true
         }
     }
@@ -799,13 +799,13 @@ class AdbProtocol(
 
         val cleanRemote = remotePath.trim()
         if (!isValidRemotePath(cleanRemote)) {
-            onLog("❌ adb pull: некорректный remote path")
+            onLog("❌ adb pull: invalid remote path")
             return false
         }
 
         val stat = statRemotePath(cleanRemote)
         if (stat == null || !stat.exists) {
-            onLog("❌ adb pull: remote path не найден или недоступен: $cleanRemote")
+            onLog("❌ adb pull: remote path not found or unavailable: $cleanRemote")
             return false
         }
 
@@ -820,13 +820,13 @@ class AdbProtocol(
         val cleanRemote = remotePath.trim()
         val parent = localFile.parentFile
         if (parent != null && !parent.exists() && !parent.mkdirs()) {
-            onLog("❌ adb pull: не удалось создать папку: ${parent.absolutePath}")
+            onLog("❌ adb pull: could not create folder: ${parent.absolutePath}")
             return false
         }
 
         onLog("-> adb pull $cleanRemote ${localFile.absolutePath}")
         if (expectedSize != null && expectedSize >= 0L) {
-            onLog("Размер remote-файла: $expectedSize байт")
+            onLog("Remote file size: $expectedSize bytes")
         }
 
         val stream = openAdbStream("sync:") ?: return false
@@ -843,7 +843,7 @@ class AdbProtocol(
                     when (header.id) {
                         "DATA" -> {
                             if (header.value < 0 || header.value > SYNC_DATA_CHUNK * 4) {
-                                onLog("❌ adb pull: некорректный размер DATA=${header.value}")
+                                onLog("❌ adb pull: invalid size DATA=${header.value}")
                                 return false
                             }
                             val data = readAdbStreamExact(stream, header.value) ?: return false
@@ -854,23 +854,23 @@ class AdbProtocol(
                                 val previousProgress = ((previousBytes * 100L) / expectedSize).toInt().coerceAtMost(100)
                                 val progress = ((receivedBytes * 100L) / expectedSize).toInt().coerceAtMost(100)
                                 if (progress >= 100 || progress / 10 != previousProgress / 10) {
-                                    onLog("adb pull: $progress% ($receivedBytes/$expectedSize байт)")
+                                    onLog("adb pull: $progress% ($receivedBytes/$expectedSize bytes)")
                                 }
                             } else if (receivedBytes == data.size.toLong() || receivedBytes % (1024L * 1024L) < data.size) {
-                                onLog("adb pull: принято $receivedBytes байт")
+                                onLog("adb pull: received $receivedBytes bytes")
                             }
                         }
                         "DONE" -> {
                             raf.fd.sync()
                             if (localFile.exists() && !localFile.delete()) {
-                                onLog("❌ adb pull: не удалось заменить файл: ${localFile.absolutePath}")
+                                onLog("❌ adb pull: could not replace file: ${localFile.absolutePath}")
                                 return false
                             }
                             if (!tempFile.renameTo(localFile)) {
-                                onLog("❌ adb pull: не удалось сохранить файл: ${localFile.absolutePath}")
+                                onLog("❌ adb pull: could not save file: ${localFile.absolutePath}")
                                 return false
                             }
-                            onLog("✅ adb pull завершён: ${localFile.absolutePath} ($receivedBytes байт)")
+                            onLog("✅ adb pull completed: ${localFile.absolutePath} ($receivedBytes bytes)")
                             return true
                         }
                         "FAIL" -> {
@@ -879,25 +879,25 @@ class AdbProtocol(
                             return false
                         }
                         else -> {
-                            onLog("❌ adb pull: неожиданный sync id=${header.id}")
+                            onLog("❌ adb pull: unexpected sync id=${header.id}")
                             return false
                         }
                     }
                 }
             }
 
-            onLog("⚠️ adb pull отменён")
+            onLog("⚠️ adb pull cancelled")
             return false
         } catch (e: Exception) {
-            onLog("❌ adb pull ошибка: ${e.message ?: e.javaClass.simpleName}")
+            onLog("❌ adb pull error: ${e.message ?: e.javaClass.simpleName}")
             return false
         } finally {
             runCatching {
                 if (tempFile.exists() && !tempFile.delete()) {
-                    onLog("ℹ️ adb pull: временный файл не удалён")
+                    onLog("ℹ️ adb pull: temporary file was not deleted")
                 }
             }.onFailure { error ->
-                onLog("ℹ️ adb pull: cleanup временного файла пропущен (${error.javaClass.simpleName})")
+                onLog("ℹ️ adb pull: temporary file cleanup skipped (${error.javaClass.simpleName})")
             }
             closeAdbStream(stream)
         }
@@ -908,11 +908,11 @@ class AdbProtocol(
         cancelled = false
 
         if (localDir.exists() && localDir.isFile) {
-            onLog("❌ adb pull: remote path является каталогом, а локальный путь — файл: ${localDir.absolutePath}")
+            onLog("❌ adb pull: remote path is a directory, but local path is a file: ${localDir.absolutePath}")
             return false
         }
         if (!localDir.exists() && !localDir.mkdirs()) {
-            onLog("❌ adb pull: не удалось создать локальную папку: ${localDir.absolutePath}")
+            onLog("❌ adb pull: could not create local folder: ${localDir.absolutePath}")
             return false
         }
 
@@ -920,20 +920,20 @@ class AdbProtocol(
         val listCommand = "cd ${shellQuote(remoteDir)} && echo AFT_DIRS_BEGIN && find . -type d -print && echo AFT_FILES_BEGIN && find . -type f -print"
         val listResult = runShellCommandForResult(listCommand, logOutput = false)
         if (!listResult.success) {
-            onLog("❌ adb pull: не удалось получить список файлов remote-каталога")
+            onLog("❌ adb pull: could not list files in the remote directory")
             return false
         }
 
         val sections = parseFindSections(listResult.stdout)
         val dirs = sections.first
         val files = sections.second
-        onLog("ℹ️ Remote-каталог: ${dirs.size} папок, ${files.size} файлов")
+        onLog("ℹ️ Remote directory: ${dirs.size} folders, ${files.size} files")
 
         dirs.forEach { relative ->
             if (cancelled) return false
             val localSubDir = if (relative == ".") localDir else File(localDir, normalizeRelativeRemotePath(relative))
             if (!localSubDir.exists() && !localSubDir.mkdirs()) {
-                onLog("❌ adb pull: не удалось создать локальную папку: ${localSubDir.absolutePath}")
+                onLog("❌ adb pull: could not create local folder: ${localSubDir.absolutePath}")
                 return false
             }
         }
@@ -952,17 +952,17 @@ class AdbProtocol(
         }
 
         return if (cancelled) {
-            onLog("⚠️ adb pull каталога отменён")
+            onLog("⚠️ adb pull directory cancelled")
             false
         } else {
-            onLog("✅ adb pull каталога завершён: $pulled файлов → ${localDir.absolutePath}")
+            onLog("✅ adb pull directory completed: $pulled files → ${localDir.absolutePath}")
             true
         }
     }
 
     fun installPackage(packageFile: File, options: List<String>): Boolean {
         if (!packageFile.exists() || !packageFile.isFile || !packageFile.canRead()) {
-            onLog("❌ adb install: файл недоступен: ${packageFile.absolutePath}")
+            onLog("❌ adb install: file is unavailable: ${packageFile.absolutePath}")
             return false
         }
 
@@ -970,7 +970,7 @@ class AdbProtocol(
             "apk" -> installApk(packageFile, options)
             "apks", "xapk" -> installPackageArchive(packageFile, options)
             else -> {
-                onLog("⚠️ adb install: неизвестное расширение .${packageFile.extension}. Пробуем как APK.")
+                onLog("⚠️ adb install: unknown extension .${packageFile.extension}. Trying as APK.")
                 installApk(packageFile, options)
             }
         }
@@ -978,7 +978,7 @@ class AdbProtocol(
 
     fun installApk(apkFile: File, options: List<String>): Boolean {
         if (!apkFile.exists() || !apkFile.isFile || !apkFile.canRead()) {
-            onLog("❌ adb install: APK недоступен: ${apkFile.absolutePath}")
+            onLog("❌ adb install: APK is unavailable: ${apkFile.absolutePath}")
             return false
         }
         val safeName = apkFile.name.replace(Regex("[^A-Za-z0-9._-]"), "_")
@@ -994,8 +994,8 @@ class AdbProtocol(
             append(' ').append(shellQuote(remotePath))
             append("; rc=\$?; echo AFT_PM_INSTALL_RC:\$rc; rm -f ").append(shellQuote(remotePath)).append("; exit \$rc")
         }
-        onLog("ℹ️ APK временно загружен в $remotePath")
-        onLog("ℹ️ Запускаем package manager на target-устройстве")
+        onLog("ℹ️ APK temporarily uploaded to $remotePath")
+        onLog("ℹ️ Starting package manager on the target device")
         return runShellCommand(command)
     }
 
@@ -1005,31 +1005,31 @@ class AdbProtocol(
 
         val cacheRoot = File(keyDirectory.parentFile ?: keyDirectory, "adb-package-cache")
         if (!cacheRoot.exists() && !cacheRoot.mkdirs()) {
-            onLog("❌ adb install: не удалось создать временную папку: ${cacheRoot.absolutePath}")
+            onLog("❌ adb install: could not create temporary folder: ${cacheRoot.absolutePath}")
             return false
         }
         val workDir = File(cacheRoot, "pkg-${System.currentTimeMillis()}")
         if (!workDir.mkdirs()) {
-            onLog("❌ adb install: не удалось создать временную папку: ${workDir.absolutePath}")
+            onLog("❌ adb install: could not create temporary folder: ${workDir.absolutePath}")
             return false
         }
 
         onLog("-> adb install ${options.joinToString(" ")} ${archiveFile.name}".trim())
-        onLog("ℹ️ Контейнер ${archiveFile.extension.uppercase()}: распаковываем APK-файлы")
+        onLog("ℹ️ Container ${archiveFile.extension.uppercase()}: extracting APK files")
 
         try {
             val contents = extractPackageArchiveContents(archiveFile, workDir)
             val extracted = contents.apks
             if (extracted.isEmpty()) {
-                onLog("❌ В контейнере не найдено APK-файлов: ${archiveFile.name}")
+                onLog("❌ No APK files found in the container: ${archiveFile.name}")
                 return false
             }
             if (contents.obbs.isNotEmpty()) {
-                onLog("ℹ️ Найдено OBB в контейнере: ${contents.obbs.size}")
+                onLog("ℹ️ Found OBB files in the container: ${contents.obbs.size}")
             }
 
             val selected = selectArchiveApksForInstall(extracted)
-            onLog("ℹ️ Выбрано APK для установки: ${selected.size}")
+            onLog("ℹ️ Selected APKs for installation: ${selected.size}")
             selected.forEachIndexed { index, item ->
                 onLog("   ${index + 1}. ${item.file.name} ← ${item.entryName}")
             }
@@ -1043,7 +1043,7 @@ class AdbProtocol(
 
             return pushArchiveObbs(contents.obbs, contents.manifestPackageName)
         } catch (e: Exception) {
-            onLog("❌ adb install: ошибка обработки контейнера ${archiveFile.name}: ${e.message ?: e.javaClass.simpleName}")
+            onLog("❌ adb install: container processing error ${archiveFile.name}: ${e.message ?: e.javaClass.simpleName}")
             return false
         } finally {
             deleteRecursivelyQuietly(workDir)
@@ -1066,7 +1066,7 @@ class AdbProtocol(
                 val normalizedName = entry.name.replace('\\', '/')
                 val lowerName = normalizedName.lowercase()
                 if (!isValidArchiveEntryName(normalizedName)) {
-                    onLog("⚠️ Пропущен небезопасный путь в архиве: $normalizedName")
+                    onLog("⚠️ Skipped unsafe path in archive: $normalizedName")
                     continue
                 }
 
@@ -1102,8 +1102,8 @@ class AdbProtocol(
                 }
             }
         }
-        onLog("ℹ️ Найдено APK в контейнере: ${apks.size}")
-        manifestPackageName?.let { onLog("ℹ️ package_name из manifest.json: $it") }
+        onLog("ℹ️ Found APK files in the container: ${apks.size}")
+        manifestPackageName?.let { onLog("ℹ️ package_name from manifest.json: $it") }
         return PackageArchiveContents(apks, obbs, manifestPackageName)
     }
 
@@ -1115,7 +1115,7 @@ class AdbProtocol(
             if (cancelled) return false
             val packageName = obb.packageNameFromPath ?: manifestPackageName
             if (packageName.isNullOrBlank()) {
-                onLog("⚠️ OBB ${obb.entryName}: пакет не определён, файл не отправлен. Распакуйте XAPK и выполните adb push вручную.")
+                onLog("⚠️ OBB ${obb.entryName}: package was not detected, file was not sent. Extract the XAPK and run adb push manually.")
                 ok = false
                 return@forEachIndexed
             }
@@ -1125,7 +1125,7 @@ class AdbProtocol(
             onLog("ℹ️ OBB ${index + 1}/${obbs.size}: ${obb.entryName} → $remotePath")
             val mkdirResult = runShellCommandForResult("mkdir -p ${shellQuote(remoteDir)}", logOutput = false)
             if (!mkdirResult.success) {
-                onLog("❌ Не удалось создать папку OBB: $remoteDir")
+                onLog("❌ Could not create folder OBB: $remoteDir")
                 ok = false
                 return@forEachIndexed
             }
@@ -1134,7 +1134,7 @@ class AdbProtocol(
                 return@forEachIndexed
             }
         }
-        if (ok) onLog("✅ OBB-файлы отправлены")
+        if (ok) onLog("✅ OBB files sent")
         return ok
     }
 
@@ -1182,7 +1182,7 @@ class AdbProtocol(
     private fun selectArchiveApksForInstall(apks: List<ExtractedArchiveApk>): List<ExtractedArchiveApk> {
         val universal = apks.firstOrNull { it.entryName.substringAfterLast('/').equals("universal.apk", ignoreCase = true) }
         if (universal != null) {
-            onLog("ℹ️ Найден universal.apk — используем одиночную установку вместо split-набора")
+            onLog("ℹ️ Found universal.apk — using single APK installation instead of a split set")
             return listOf(universal)
         }
 
@@ -1196,13 +1196,13 @@ class AdbProtocol(
         }
         val splitSet = if (splitLike.any { isBaseApkLike(it) }) splitLike else emptyList()
         if (splitSet.isNotEmpty()) {
-            onLog("ℹ️ Найден split-набор с base APK")
+            onLog("ℹ️ Found split set with base APK")
             return sortApksForInstall(splitSet)
         }
 
         val xapkSet = apks.filter { isBaseApkLike(it) || isConfigSplitLike(it) }
         if (xapkSet.any { isBaseApkLike(it) }) {
-            onLog("ℹ️ Найден XAPK/APK-набор с base/config split")
+            onLog("ℹ️ Found XAPK/APK set with base/config split")
             return sortApksForInstall(xapkSet)
         }
 
@@ -1211,16 +1211,16 @@ class AdbProtocol(
             path.startsWith("standalones/") || path.contains("/standalones/")
         }
         if (standalone.size == 1) {
-            onLog("ℹ️ Найден один standalone APK")
+            onLog("ℹ️ Found one standalone APK")
             return standalone
         }
         if (standalone.size > 1) {
-            onLog("⚠️ В контейнере несколько standalone APK. Автоматически выбран первый; для точного выбора распакуйте архив и установите нужный APK вручную.")
+            onLog("⚠️ The container has multiple standalone APKs. The first one was selected automatically; for exact selection, extract the archive and install the required APK manually.")
             return listOf(standalone.first())
         }
 
         if (apks.size > 1) {
-            onLog("⚠️ Не удалось уверенно определить base/split структуру. Пробуем установить все APK из контейнера.")
+            onLog("⚠️ Could not confidently detect the base/split structure. Trying to install all APKs from the container.")
         }
         return sortApksForInstall(apks)
     }
@@ -1262,10 +1262,10 @@ class AdbProtocol(
     private fun deleteRecursivelyQuietly(file: File) {
         runCatching {
             if (file.exists() && !file.deleteRecursively()) {
-                onLog("ℹ️ Не удалось полностью удалить временный каталог")
+                onLog("ℹ️ Could not fully delete the temporary directory")
             }
         }.onFailure { error ->
-            onLog("ℹ️ Cleanup временного каталога пропущен (${error.javaClass.simpleName})")
+            onLog("ℹ️ Temporary directory cleanup skipped (${error.javaClass.simpleName})")
         }
     }
 
@@ -1275,12 +1275,12 @@ class AdbProtocol(
 
         val files = apkFiles.distinctBy { it.absolutePath }
         if (files.size < 2) {
-            onLog("❌ adb install-multiple: нужно минимум 2 APK-файла")
+            onLog("❌ adb install-multiple: requires at least 2 APK files")
             return false
         }
         files.forEach { file ->
             if (!file.exists() || !file.isFile || !file.canRead()) {
-                onLog("❌ adb install-multiple: APK недоступен: ${file.absolutePath}")
+                onLog("❌ adb install-multiple: APK is unavailable: ${file.absolutePath}")
                 return false
             }
         }
@@ -1293,7 +1293,7 @@ class AdbProtocol(
         }
 
         onLog("-> adb install-multiple ${installOptions.joinToString(" ")} ${files.joinToString(" ") { it.name }}".trim())
-        onLog("ℹ️ Split APK: ${files.size} файлов. Используется package-manager session API.")
+        onLog("ℹ️ Split APK: ${files.size} files. Using package-manager session API.")
 
         var sessionId: String? = null
         try {
@@ -1311,13 +1311,13 @@ class AdbProtocol(
             }
             val createResult = runShellCommandForResult(createCommand)
             if (!createResult.success) {
-                onLog("❌ install-multiple: pm install-create завершился ошибкой")
+                onLog("❌ install-multiple: pm install-create failed")
                 return false
             }
 
             sessionId = parseInstallSessionId(createResult.combinedOutput())
             if (sessionId.isNullOrBlank()) {
-                onLog("❌ install-multiple: не удалось определить session id из вывода pm install-create")
+                onLog("❌ install-multiple: could not determine session id from pm install-create output")
                 return false
             }
             onLog("ℹ️ install session: $sessionId")
@@ -1329,7 +1329,7 @@ class AdbProtocol(
                 onLog("ℹ️ install-write ${index + 1}/${remoteFiles.size}: $splitName")
                 val writeResult = runShellCommandForResult(writeCommand)
                 if (!writeResult.success) {
-                    onLog("❌ install-multiple: ошибка install-write для ${file.name}")
+                    onLog("❌ install-multiple: install-write error for ${file.name}")
                     abandonInstallSession(sessionId)
                     return false
                 }
@@ -1337,15 +1337,15 @@ class AdbProtocol(
 
             val commitResult = runShellCommandForResult("pm install-commit $sessionId")
             return if (commitResult.success) {
-                onLog("✅ adb install-multiple завершён")
+                onLog("✅ adb install-multiple completed")
                 true
             } else {
-                onLog("❌ install-multiple: pm install-commit завершился ошибкой")
+                onLog("❌ install-multiple: pm install-commit failed")
                 abandonInstallSession(sessionId)
                 false
             }
         } catch (e: Exception) {
-            onLog("❌ adb install-multiple ошибка: ${e.message ?: e.javaClass.simpleName}")
+            onLog("❌ adb install-multiple error: ${e.message ?: e.javaClass.simpleName}")
             sessionId?.let { abandonInstallSession(it) }
             return false
         } finally {
@@ -1358,7 +1358,7 @@ class AdbProtocol(
 
     private fun abandonInstallSession(sessionId: String) {
         if (sessionId.isBlank()) return
-        onLog("ℹ️ Отменяем install session $sessionId")
+        onLog("ℹ️ Cancelling install session $sessionId")
         runShellCommandForResult("pm install-abandon $sessionId", logOutput = false)
     }
 
@@ -1424,7 +1424,7 @@ class AdbProtocol(
             session.stopRequested = true
             session.stdinQueue.add("exit\n".toByteArray(Charsets.UTF_8))
         }
-        onLog("⏹ Запрошено закрытие интерактивного adb shell")
+        onLog("⏹ Interactive adb shell close requested")
         return true
     }
 
@@ -1434,7 +1434,7 @@ class AdbProtocol(
 
         synchronized(interactiveShellLock) {
             if (interactiveShellSession != null) {
-                onLog("ℹ️ Интерактивный adb shell уже открыт. Вводите команды без префикса adb shell.")
+                onLog("ℹ️ Interactive adb shell is already open. Enter commands without the adb shell prefix.")
                 return true
             }
             interactiveShellSession = InteractiveShellSession()
@@ -1444,8 +1444,8 @@ class AdbProtocol(
         val service = if (useShellV2) "shell,v2,pty:" else "shell:"
         onLog("=== ADB INTERACTIVE SHELL START ===")
         onLog("-> adb open: $service")
-        onLog("ℹ️ Вводите команды в нижнюю строку. Для выхода: exit, adb shell-stop или кнопка Стоп.")
-        onLog("ℹ️ Прерывание процесса: :ctrl-c, :interrupt или adb shell-ctrl-c. EOF: :ctrl-d.")
+        onLog("ℹ️ Enter commands in the input line below. To exit: exit, adb shell-stop, or the Stop button.")
+        onLog("ℹ️ Process interrupt: :ctrl-c, :interrupt, or adb shell-ctrl-c. EOF: :ctrl-d.")
 
         val stream = openAdbStream(service, logOpen = false) ?: run {
             clearInteractiveShellSession()
@@ -1455,7 +1455,7 @@ class AdbProtocol(
         return try {
             if (useShellV2) runInteractiveShellV2(stream) else runInteractiveLegacyShell(stream)
         } catch (e: Exception) {
-            onLog("❌ interactive adb shell ошибка: ${e.message ?: e.javaClass.simpleName}")
+            onLog("❌ interactive adb shell error: ${e.message ?: e.javaClass.simpleName}")
             false
         } finally {
             closeAdbStream(stream)
@@ -1493,7 +1493,7 @@ class AdbProtocol(
                 }
                 else -> {
                     if (header.dataLength > 0) readData(header.dataLength)
-                    onLog("⚠️ interactive shell/v2: неожиданный ADB packet cmd=0x${header.command.toString(16)}")
+                    onLog("⚠️ interactive shell/v2: unexpected ADB packet cmd=0x${header.command.toString(16)}")
                 }
             }
         }
@@ -1527,7 +1527,7 @@ class AdbProtocol(
             val id = headerRaw[0].toInt() and 0xFF
             val length = ByteBuffer.wrap(headerRaw, 1, 4).order(ByteOrder.LITTLE_ENDIAN).int
             if (length < 0 || length > MAX_PAYLOAD) {
-                onLog("❌ interactive shell_v2: некорректная длина packet=$length")
+                onLog("❌ interactive shell_v2: invalid length packet=$length")
                 stream.closed = true
                 return
             }
@@ -1545,13 +1545,13 @@ class AdbProtocol(
                     return
                 }
                 SHELL_ID_STDIN, SHELL_ID_CLOSE_STDIN -> Unit
-                else -> onLog("⚠️ interactive shell_v2: неизвестный packet id=$id, length=$length")
+                else -> onLog("⚠️ interactive shell_v2: unknown packet id=$id, length=$length")
             }
         }
     }
 
     private fun runInteractiveLegacyShell(stream: AdbStream): Boolean {
-        onLog("ℹ️ legacy shell: stdout/stderr и exit-code не разделяются")
+        onLog("ℹ️ legacy shell: stdout/stderr and exit code are not separated")
         while (!cancelled && !stream.closed) {
             drainInteractiveLegacyOutput(stream)
             drainInteractiveLegacyInput(stream)
@@ -1578,7 +1578,7 @@ class AdbProtocol(
                 }
                 else -> {
                     if (header.dataLength > 0) readData(header.dataLength)
-                    onLog("⚠️ interactive legacy shell: неожиданный ADB packet cmd=0x${header.command.toString(16)}")
+                    onLog("⚠️ interactive legacy shell: unexpected ADB packet cmd=0x${header.command.toString(16)}")
                 }
             }
         }
@@ -1644,7 +1644,7 @@ class AdbProtocol(
         if (!isConnected || peerMode != PeerMode.RECOVERY) {
             return RecoveryInstallVerifier.Result(
                 verdict = RecoveryInstallVerifier.Verdict.UNKNOWN,
-                message = "ADB Recovery ещё не готово для проверки результата установки"
+                message = "ADB Recovery is not ready to verify the install result yet"
             )
         }
 
@@ -1657,7 +1657,7 @@ class AdbProtocol(
             }
             if (text.isNotBlank()) {
                 val boundedText = text.takeLast(MAX_RECOVERY_INSTALL_LOG_CHARS)
-                onLog("ℹ️ Получен Recovery-лог: $path (${boundedText.length} символов)")
+                onLog("ℹ️ Recovery log received: $path (${boundedText.length} characters)")
                 sources += RecoveryInstallVerifier.LogSource(path, boundedText)
             }
         }
@@ -1683,7 +1683,7 @@ class AdbProtocol(
         return if (!forceLegacy && supportsShellV2) {
             runShellV2ForResult(cleanCommand, logOutput)
         } else {
-            if (logOutput) onLog("ℹ️ adb shell legacy: exit-code недоступен на этом устройстве/режиме")
+            if (logOutput) onLog("ℹ️ adb shell legacy: exit code is unavailable on this device/mode")
             runLegacyShellForResult(cleanCommand, logOutput)
         }
     }
@@ -1692,7 +1692,7 @@ class AdbProtocol(
         val service = "shell,v2,raw:$command"
         if (logOutput) onLog("-> adb shell/v2: $command")
         val stream = openAdbStream(service, logOpen = false) ?: run {
-            if (logOutput) onLog("⚠️ shell_v2 открыть не удалось, пробуем legacy shell")
+            if (logOutput) onLog("⚠️ shell_v2 could not open; trying legacy shell")
             return runShellCommandForResult(command, logOutput = logOutput, forceLegacy = true)
         }
 
@@ -1736,18 +1736,18 @@ class AdbProtocol(
                         if (header.length > 0 && readAdbStreamExact(stream, header.length) == null) {
                             return ShellResult(stdout.toString(), stderr.toString(), exitCode, false)
                         }
-                        if (logOutput) onLog("⚠️ shell_v2: неизвестный packet id=${header.id}, length=${header.length}")
+                        if (logOutput) onLog("⚠️ shell_v2: unknown packet id=${header.id}, length=${header.length}")
                     }
                 }
             }
         } catch (e: Exception) {
-            if (logOutput) onLog("❌ adb shell/v2 ошибка: ${e.message ?: e.javaClass.simpleName}")
+            if (logOutput) onLog("❌ adb shell/v2 error: ${e.message ?: e.javaClass.simpleName}")
             return ShellResult(stdout.toString(), stderr.toString(), exitCode, false)
         } finally {
             closeAdbStream(stream)
         }
 
-        if (exitCode == null && logOutput) onLog("⚠️ shell_v2 завершился без exit packet")
+        if (exitCode == null && logOutput) onLog("⚠️ shell_v2 finished without an exit packet")
         return ShellResult(stdout.toString(), stderr.toString(), exitCode, exitCode == 0)
     }
 
@@ -1779,12 +1779,12 @@ class AdbProtocol(
                     }
                     else -> {
                         if (header.dataLength > 0) readData(header.dataLength)
-                        if (logOutput) onLog("⚠️ legacy shell: неожиданный packet cmd=0x${header.command.toString(16)}")
+                        if (logOutput) onLog("⚠️ legacy shell: unexpected packet cmd=0x${header.command.toString(16)}")
                     }
                 }
             }
         } catch (e: Exception) {
-            if (logOutput) onLog("❌ adb shell legacy ошибка: ${e.message ?: e.javaClass.simpleName}")
+            if (logOutput) onLog("❌ adb shell legacy error: ${e.message ?: e.javaClass.simpleName}")
             return ShellResult(stdout.toString(), "", null, false)
         } finally {
             closeAdbStream(stream)
@@ -1845,14 +1845,14 @@ class AdbProtocol(
 
         while (!cancelled) {
             val header = readHeader(timeoutMs = 10_000) ?: run {
-                onLog("❌ ADB stream не ответил: $service")
+                onLog("❌ ADB stream did not respond: $service")
                 return null
             }
             when (header.command) {
                 A_OKAY -> {
                     if (header.dataLength > 0) readData(header.dataLength)
                     if (!packetTargetsLocalStream(header, localId)) {
-                        onLog("ℹ️ ADB open: проигнорирован stale OKAY для local=${header.arg1}, ожидается local=$localId")
+                        onLog("ℹ️ ADB open: ignored stale OKAY for local=${header.arg1}, expected local=$localId")
                         continue
                     }
                     return AdbStream(localId, header.arg0)
@@ -1861,18 +1861,18 @@ class AdbProtocol(
                     if (header.dataLength > 0) readData(header.dataLength)
                     if (!packetTargetsLocalStream(header, localId)) {
                         acknowledgeRemoteClose(header.arg1, header.arg0)
-                        onLog("ℹ️ ADB open: проигнорирован stale CLSE для local=${header.arg1}, ожидается local=$localId")
+                        onLog("ℹ️ ADB open: ignored stale CLSE for local=${header.arg1}, expected local=$localId")
                         continue
                     }
                     acknowledgeRemoteClose(localId, header.arg0)
-                    onLog("❌ ADB stream закрыт устройством: $service")
+                    onLog("❌ ADB stream closed by the device: $service")
                     return null
                 }
                 A_WRTE -> {
                     val data = readData(header.dataLength)
                     if (!packetTargetsLocalStream(header, localId)) {
                         acknowledgeRemoteClose(header.arg1, header.arg0)
-                        onLog("ℹ️ ADB open: проигнорирован stale WRTE для local=${header.arg1}, ожидается local=$localId")
+                        onLog("ℹ️ ADB open: ignored stale WRTE for local=${header.arg1}, expected local=$localId")
                         continue
                     }
                     sendMessageInternal(A_OKAY, localId, header.arg0, EMPTY_PAYLOAD)
@@ -1880,7 +1880,7 @@ class AdbProtocol(
                 }
                 else -> {
                     if (header.dataLength > 0) readData(header.dataLength)
-                    onLog("⚠️ Неожиданный ADB packet при open: cmd=0x${header.command.toString(16)}")
+                    onLog("⚠️ Unexpected ADB packet while opening: cmd=0x${header.command.toString(16)}")
                 }
             }
         }
@@ -1904,7 +1904,7 @@ class AdbProtocol(
             stream.closeSent = true
         }.onFailure { error ->
             // Transport может уже исчезнуть; локально stream всё равно закрывается ниже.
-            onLog("ℹ️ ADB stream close packet не отправлен (${error.javaClass.simpleName})")
+            onLog("ℹ️ ADB stream close packet was not sent (${error.javaClass.simpleName})")
         }
         stream.closed = true
     }
@@ -1914,7 +1914,7 @@ class AdbProtocol(
         sendMessageInternal(A_WRTE, stream.localId, stream.remoteId, payload)
         while (!cancelled) {
             val header = readHeader(timeoutMs = 10_000) ?: run {
-                onLog("❌ ADB stream: нет ACK на WRTE")
+                onLog("❌ ADB stream: no ACK for WRTE")
                 return false
             }
             when (header.command) {
@@ -1941,12 +1941,12 @@ class AdbProtocol(
                     }
                     stream.remoteId = header.arg0
                     closeAdbStream(stream)
-                    onLog("❌ ADB stream закрыт во время записи")
+                    onLog("❌ ADB stream closed during write")
                     return false
                 }
                 else -> {
                     if (header.dataLength > 0) readData(header.dataLength)
-                    onLog("⚠️ ADB stream: неожиданный packet cmd=0x${header.command.toString(16)}")
+                    onLog("⚠️ ADB stream: unexpected packet cmd=0x${header.command.toString(16)}")
                 }
             }
         }
@@ -1975,7 +1975,7 @@ class AdbProtocol(
             if (stream.closed || cancelled) return null
 
             val header = readHeader(timeoutMs = 30_000) ?: run {
-                onLog("❌ ADB stream: таймаут чтения данных")
+                onLog("❌ ADB stream: data read timeout")
                 return null
             }
             when (header.command) {
@@ -2005,7 +2005,7 @@ class AdbProtocol(
                 }
                 else -> {
                     if (header.dataLength > 0) readData(header.dataLength)
-                    onLog("⚠️ ADB stream: неожиданный packet cmd=0x${header.command.toString(16)}")
+                    onLog("⚠️ ADB stream: unexpected packet cmd=0x${header.command.toString(16)}")
                 }
             }
         }
@@ -2071,7 +2071,7 @@ class AdbProtocol(
         val id = raw[0].toInt() and 0xFF
         val length = ByteBuffer.wrap(raw, 1, 4).order(ByteOrder.LITTLE_ENDIAN).int
         if (length < 0 || length > MAX_PAYLOAD) {
-            onLog("❌ shell_v2: некорректная длина packet=$length")
+            onLog("❌ shell_v2: invalid length packet=$length")
             return null
         }
         return ShellPacketHeader(id, length)
@@ -2136,7 +2136,7 @@ class AdbProtocol(
                 false
             }
             else -> {
-                onLog("❌ $opName: неожиданный sync id=${header.id}")
+                onLog("❌ $opName: unexpected sync id=${header.id}")
                 false
             }
         }
@@ -2150,18 +2150,18 @@ class AdbProtocol(
             if (!writeSyncRequest(stream, "STAT", cleanRemote.toByteArray(Charsets.UTF_8))) return null
             val stat = readSyncStatResponse(stream, "adb stat") ?: return null
             if (!stat.exists && logMissing) {
-                onLog("❌ adb stat: remote path не найден: $cleanRemote")
+                onLog("❌ adb stat: remote path not found: $cleanRemote")
             } else if (stat.exists && logMissing) {
                 val kind = when {
-                    stat.isDirectory -> "каталог"
-                    stat.isRegularFile -> "файл"
-                    else -> "объект"
+                    stat.isDirectory -> "directory"
+                    stat.isRegularFile -> "file"
+                    else -> "object"
                 }
                 onLog("ℹ️ adb stat: $kind, size=${stat.size}, mode=0${stat.mode.toString(8)}")
             }
             return stat
         } catch (e: Exception) {
-            if (logMissing) onLog("❌ adb stat ошибка: ${e.message ?: e.javaClass.simpleName}")
+            if (logMissing) onLog("❌ adb stat error: ${e.message ?: e.javaClass.simpleName}")
             return null
         } finally {
             closeAdbStream(stream)
@@ -2196,7 +2196,7 @@ class AdbProtocol(
                 null
             }
             else -> {
-                onLog("❌ $opName: неожиданный sync id=$id")
+                onLog("❌ $opName: unexpected sync id=$id")
                 null
             }
         }
@@ -2206,7 +2206,7 @@ class AdbProtocol(
         if (!isValidRemotePath(remoteDir)) return false
         val result = runShellCommandForResult("mkdir -p ${shellQuote(remoteDir)}", logOutput = false)
         if (!result.success) {
-            onLog("❌ Не удалось создать remote-папку: $remoteDir")
+            onLog("❌ Could not create remote folder: $remoteDir")
             return false
         }
         return true
@@ -2308,7 +2308,7 @@ class AdbProtocol(
         // left by the previous one-way command.
         clearExpectedServiceDisconnect()
         if (normalizedService.isBlank()) {
-            onLog("❌ ОШИБКА: пустой ADB service")
+            onLog("❌ ERROR: empty ADB service")
             return false
         }
 
@@ -2336,7 +2336,7 @@ class AdbProtocol(
             if (oneWayReboot) {
                 expectedDisconnectOpenWritten = true
                 expectedDisconnectExpiresAtNs = System.nanoTime() + EXPECTED_REBOOT_DISCONNECT_WINDOW_NS
-                onLog("ℹ️ ADB reboot service передан полностью; дальнейшее отключение USB является ожидаемым переходом.")
+                onLog("ℹ️ ADB reboot service was fully sent; further USB disconnect is an expected transition.")
             }
 
             while (!cancelled) {
@@ -2352,7 +2352,7 @@ class AdbProtocol(
                         if (signal == AdbServiceCompletionPolicy.TerminalSignal.TRANSPORT_CLOSED) {
                             expectedDisconnectObserved = true
                         }
-                        onLog("✅ ADB reboot command accepted: устройство начало переход и может временно исчезнуть с USB.")
+                        onLog("✅ ADB reboot command accepted: device started the transition and may temporarily disappear from USB.")
                         return true
                     }
                     if (signal == AdbServiceCompletionPolicy.TerminalSignal.EXPLICIT_PROTOCOL_FAILURE) {
@@ -2367,12 +2367,12 @@ class AdbProtocol(
                         return false
                     }
                     if (!opened) {
-                        onLog("❌ ОШИБКА: ADB service не ответил")
+                        onLog("❌ ERROR: ADB service did not respond")
                         return false
                     }
                     idleTimeouts++
                     if (idleTimeouts >= 3) {
-                        onLog("ℹ️ ADB service перестал присылать данные; после $idleTimeouts циклов ожидания операция завершена.")
+                        onLog("ℹ️ ADB service stopped sending data; after $idleTimeouts idle cycles the operation is considered complete.")
                         return true
                     }
                     continue
@@ -2400,7 +2400,7 @@ class AdbProtocol(
                     }
                     else -> {
                         if (header.dataLength > 0) readData(header.dataLength)
-                        onLog("⚠️ Неожиданный ADB packet: cmd=0x${header.command.toString(16)}")
+                        onLog("⚠️ Unexpected ADB packet: cmd=0x${header.command.toString(16)}")
                     }
                 }
             }
@@ -2415,7 +2415,7 @@ class AdbProtocol(
                 onLog("✅ ADB reboot command accepted; transport closed during expected reboot hand-off.")
                 return true
             }
-            onLog("ОШИБКА ADB service: ${e.message ?: e.javaClass.simpleName}")
+            onLog("ERROR ADB service: ${e.message ?: e.javaClass.simpleName}")
             return false
         } finally {
             if (expectedDisconnectService == normalizedService &&
@@ -2425,7 +2425,7 @@ class AdbProtocol(
             }
         }
 
-        onLog("⚠️ ADB service отменён пользователем")
+        onLog("⚠️ ADB service cancelled by user")
         return false
     }
 
@@ -2468,13 +2468,13 @@ class AdbProtocol(
         putIntLe(header, 16, checksum)
         putIntLe(header, 20, command.inv().toInt())
 
-        if (!bulkWriteFully(header)) throw Exception("Ошибка передачи заголовка ADB")
+        if (!bulkWriteFully(header)) throw Exception("ADB header transfer error")
 
         if (data.isNotEmpty()) {
             var offset = 0
             while (offset < data.size) {
                 val len = minOf(USB_BULK_CHUNK_BYTES, data.size - offset)
-                if (!bulkWriteFully(data, offset, len)) throw Exception("Ошибка передачи данных ADB")
+                if (!bulkWriteFully(data, offset, len)) throw Exception("ADB data transfer error")
                 offset += len
             }
         }
@@ -2551,8 +2551,8 @@ class AdbProtocol(
                     if (expected) {
                         expectedDisconnectObserved = true
                         onLog(
-                            "ℹ️ ADB reboot передан устройству; ожидаемое отключение транспорта " +
-                                "[${code.name}] не считается ошибкой операции."
+                            "ℹ️ ADB reboot was sent to the device; expected transport disconnect " +
+                                "[${code.name}] is not considered an operation error."
                         )
                         runCatching { connection?.close() }
                         connection = null
@@ -2569,7 +2569,7 @@ class AdbProtocol(
         packetDispatcher = dispatcher
         dispatchedPayloadPacket = null
         if (dispatcher.start()) {
-            onLog("✅ ADB single-reader dispatcher запущен (bounded queue=256)")
+            onLog("✅ ADB single-reader dispatcher started (bounded queue=256)")
         }
     }
 
@@ -2580,7 +2580,7 @@ class AdbProtocol(
         lastDispatcherSnapshot = dispatcher.snapshot()
         packetDispatcher = null
         dispatchedPayloadPacket = null
-        onLog("ℹ️ ADB dispatcher остановлен: $reason")
+        onLog("ℹ️ ADB dispatcher stopped: $reason")
     }
 
     private fun readCompletePacketDirect(timeoutMs: Int): AdbPacketDispatcher.ReadResult {

@@ -223,7 +223,7 @@ class MiUnlockClient(
             val detail = when {
                 decodedJson != null -> describeXiaomiJson(decodedJson)
                 response.body.isNotBlank() -> describeRawError(response.body)
-                else -> "сервер не прислал тело ответа"
+                else -> "server did not return a response body"
             }
             val message =
                 "HTTP ${response.code}: $detail " +
@@ -235,7 +235,7 @@ class MiUnlockClient(
         }
 
         return decodedJson ?: throw IOException(
-            "Сервер вернул HTTP ${response.code}, но ответ не удалось расшифровать/прочитать: " +
+            "Server returned HTTP ${response.code}, but the response could not be decrypted/read: " +
                 describeRawError(response.body)
         )
     }
@@ -330,13 +330,13 @@ class MiUnlockClient(
     }
 
     private fun describeRawError(raw: String): String {
-        if (raw.isBlank()) return "пустой ответ"
+        if (raw.isBlank()) return "empty response"
         val normalized = raw
             .replace("\r", " ")
             .replace("\n", " ")
             .replace(Regex("\\s+"), " ")
             .trim()
-        return "не удалось разобрать ответ сервера; raw=${normalized.take(MAX_ERROR_BODY_LOG)}"
+        return "could not parse server response; raw=${normalized.take(MAX_ERROR_BODY_LOG)}"
     }
 
     /** Человекочитаемая причина на основе фактического JSON ответа Xiaomi. */
@@ -354,19 +354,19 @@ class MiUnlockClient(
             .orEmpty()
 
         val fallback = when (code) {
-            10000 -> "неверный deviceToken или product"
-            10013 -> "устройство не активировано либо срок активации слишком мал"
-            10023 -> "достигнут лимит разблокируемых устройств для аккаунта"
-            20030 -> "для аккаунта достигнут месячный лимит получения данных разблокировки"
-            20031 -> "аккаунт/устройство не привязаны в Mi Unlock status"
-            20033 -> "аккаунт не авторизован для разблокировки"
-            20035 -> "версия unlock-клиента устарела"
-            20036 -> "сервер назначил период ожидания перед разблокировкой"
-            20038 -> "устройство заблокировано через Find Device"
-            20039 -> "проверка базовых данных устройства не пройдена"
-            20041 -> "к Mi-аккаунту не привязан номер телефона"
-            20045 -> "неверный регион сервера либо несовпадение региона аккаунта и устройства"
-            30002 -> "нужно одобрение/привязка через официальные механизмы Xiaomi"
+            10000 -> "invalid deviceToken or product"
+            10013 -> "device is not activated or the activation period is too short"
+            10023 -> "unlockable-device limit reached for the account"
+            20030 -> "monthly unlock-data request limit reached for the account"
+            20031 -> "account/device is not linked in Mi Unlock status"
+            20033 -> "account is not authorized for unlocking"
+            20035 -> "unlock client version is outdated"
+            20036 -> "server assigned a waiting period before unlocking"
+            20038 -> "device is locked through Find Device"
+            20039 -> "basic device-data check failed"
+            20041 -> "no phone number is bound to the Mi Account"
+            20045 -> "invalid server region or account/device region mismatch"
+            30002 -> "approval/binding through official Xiaomi mechanisms is required"
             else -> ""
         }
 

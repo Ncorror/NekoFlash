@@ -93,8 +93,8 @@ class DeviceViewModel(
     data class OperationProgress(
         val title: String,        // что прошивается, напр. "flash recovery_a"
         val percent: Int,         // 0..100, -1 = неопределённый (busy)
-        val detail: String,       // строка скорости/ETA или статус
-        val finished: Boolean = false,  // операция завершена (показать результат)
+        val detail: String,       // linesа скорости/ETA или статус
+        val finished: Boolean = false,  // operation завершена (показать результат)
         val success: Boolean = false,   // успех (для обратной совместимости UI)
         val outcome: OperationOutcomeKind? = null
     )
@@ -229,7 +229,7 @@ class DeviceViewModel(
 
         val logsDir = File(workspacePath, "logs")
         if (!logsDir.exists() && !logsDir.mkdirs()) {
-            log("⚠️ Не удалось создать папку логов: ${logsDir.absolutePath}")
+            log("⚠️ Could not create logs folder: ${logsDir.absolutePath}")
             return
         }
         val stamp = SimpleDateFormat("yyyy-MM-dd-HH-mm-ss", Locale.US).format(Date())
@@ -237,7 +237,7 @@ class DeviceViewModel(
         val store = try {
             DiagnosticLogStore(logsDir, stamp)
         } catch (e: Exception) {
-            log("⚠️ Не удалось инициализировать bounded log store: ${e.message ?: e.javaClass.simpleName}")
+            log("⚠️ Could not initialize bounded log store: ${e.message ?: e.javaClass.simpleName}")
             return
         }
         logStore = store
@@ -258,8 +258,8 @@ class DeviceViewModel(
         logFile = createdLog
         traceLogFile = store.currentTraceFile()
         persistSessionSummary()
-        log("Лог-файл: /sdcard/Download/NekoFlash/logs/${createdLog?.name ?: "log-$stamp.txt"}")
-        log("ℹ️ Сырой USB/Fastboot trace отделён от основного журнала и автоматически ротируется.")
+        log("Log file: /sdcard/Download/NekoFlash/logs/${createdLog?.name ?: "log-$stamp.txt"}")
+        log("ℹ️ Raw USB/Fastboot trace is separated from the main log and rotates automatically.")
     }
 
     fun log(message: String) {
@@ -336,7 +336,7 @@ class DeviceViewModel(
 
     private fun flushSuppressedDuplicatesLocked() {
         if (suppressedDuplicateCount <= 0L) return
-        val repeated = "↻ Предыдущая строка повторилась ещё $suppressedDuplicateCount раз(а); дубликаты свёрнуты."
+        val repeated = "↻ Previous line repeated $suppressedDuplicateCount time(s); duplicates collapsed."
         suppressedDuplicateCount = 0L
         appendCompactMessageLocked(repeated, DiagnosticLogPolicy.Level.INFO)
     }
@@ -419,7 +419,7 @@ class DeviceViewModel(
                 File(dir, "usb-session-$sessionId.txt").writeText(snapshot.toText(), Charsets.UTF_8)
                 File(dir, "usb-session-$sessionId.json").writeText(snapshot.toJson(), Charsets.UTF_8)
             }.onFailure { error ->
-                log("⚠️ USB session snapshot не сохранён: ${error.message ?: error.javaClass.simpleName}")
+                log("⚠️ USB session snapshot was not saved: ${error.message ?: error.javaClass.simpleName}")
             }
         }
     }
@@ -430,7 +430,7 @@ class DeviceViewModel(
         automatic: Boolean = false
     ) {
         if (transportRestartRequired.get()) {
-            log("⛔ USB transport заблокирован после неподтверждённой очистки. Полностью перезапустите NekoFlash перед новым подключением.")
+            log("⛔ USB transport is locked after unconfirmed cleanup. Fully restart NekoFlash before a new connection.")
             _connectionState.postValue(ConnectionState.ERROR)
             return
         }
@@ -462,7 +462,7 @@ class DeviceViewModel(
                         if (pendingUsbTargetKey == candidate.stableKey) pendingUsbTargetKey = null
                         return@withLock
                     }
-                    if (!shutdownCurrentTransportsSafely("новая USB generation=$generation")) {
+                    if (!shutdownCurrentTransportsSafely("new USB generation=$generation")) {
                         if (pendingUsbTargetKey == candidate.stableKey) pendingUsbTargetKey = null
                         _connectionState.postValue(ConnectionState.ERROR)
                         return@withLock
@@ -529,7 +529,7 @@ class DeviceViewModel(
                 val qualifiedProduct = proto.qualifyConnection()
                 if (qualifiedProduct == null) {
                     if (generation == connectionGeneration.get()) _connectionState.postValue(ConnectionState.ERROR)
-                    log(DiagnosticLogPolicy.Level.ERROR, "ОШИБКА: Fastboot handshake не подтверждён. Повторное подключение разрешено.")
+                    log(DiagnosticLogPolicy.Level.ERROR, "ERROR: Fastboot handshake was not confirmed. Reconnection is allowed.")
                     return
                 }
                 if (viewModelCleared.get() || generation != connectionGeneration.get()) return
@@ -538,7 +538,7 @@ class DeviceViewModel(
                 if (viewModelCleared.get() || generation != connectionGeneration.get()) return
                 if (proto.isSessionBroken) {
                     _connectionState.postValue(ConnectionState.ERROR)
-                    log(DiagnosticLogPolicy.Level.ERROR, "ОШИБКА: USB-интерфейс открылся, но корректный Fastboot-обмен не подтвердился")
+                    log(DiagnosticLogPolicy.Level.ERROR, "ERROR: USB interface opened, but a valid Fastboot exchange was not confirmed")
                     return
                 }
 
@@ -581,7 +581,7 @@ class DeviceViewModel(
                     diagnosticSessionTracker.recordMilestone("adb.reader.failure", 0L)
                     persistSessionSummary()
                     _connectionState.postValue(ConnectionState.ERROR)
-                    log("⛔ ADB transport остановлен [${code.name}]: $message. Автоповтор запрещён до ручного переподключения.")
+                    log("⛔ ADB transport stopped [${code.name}]: $message. Auto-retry is forbidden until manual reconnection.")
                 }
             }
             var published = false
@@ -636,7 +636,7 @@ class DeviceViewModel(
             NativeUsbfsBackend.hasActiveTransfer || nativeStateBefore.nativeTransferActive
 
         if (needsDrain) {
-            log("⏳ USB shutdown requested ($reason). Сначала отменяем операцию и ждём подтверждённый Native USBFS drain.")
+            log("⏳ USB shutdown requested ($reason). First cancelling the operation and waiting for confirmed Native USBFS drain.")
             activeOperation?.cancel(CancellationException("Transport shutdown requested: $reason"))
             fastbootProtocol?.cancel()
             adbProtocol?.cancel()
@@ -648,7 +648,7 @@ class DeviceViewModel(
 
             if (!clean) {
                 transportRestartRequired.set(true)
-                log("⛔ Безопасное завершение USB не подтверждено за ${TRANSPORT_SHUTDOWN_TIMEOUT_MS} мс. UsbDeviceConnection не закрывается; новые подключения запрещены до полного перезапуска NekoFlash.")
+                log("⛔ Safe USB shutdown was not confirmed within ${TRANSPORT_SHUTDOWN_TIMEOUT_MS} ms. UsbDeviceConnection will not be closed; new connections are blocked until NekoFlash is fully restarted.")
                 _connectionState.postValue(ConnectionState.ERROR)
                 return false
             }
@@ -661,7 +661,7 @@ class DeviceViewModel(
             )
         ) {
             transportRestartRequired.set(true)
-            log("⛔ Native USBFS всё ещё сообщает активную передачу после ожидания. Закрытие USB запрещено до перезапуска приложения.")
+            log("⛔ Native USBFS still reports an active transfer after waiting. USB close is blocked until the app is restarted.")
             _connectionState.postValue(ConnectionState.ERROR)
             return false
         }
@@ -669,7 +669,7 @@ class DeviceViewModel(
         val fastbootClosed = fastbootProtocol?.disconnect() ?: true
         if (!fastbootClosed) {
             transportRestartRequired.set(true)
-            log("⛔ FastbootProtocol отказался закрывать USB до подтверждённого drain. Новые подключения запрещены до перезапуска NekoFlash.")
+            log("⛔ FastbootProtocol refused to close USB before confirmed drain. New connections are blocked until NekoFlash is restarted.")
             _connectionState.postValue(ConnectionState.ERROR)
             return false
         }
@@ -725,7 +725,7 @@ class DeviceViewModel(
         val device = candidate.device
         val mode = candidate.mode.name
         val name = device.productName ?: device.deviceName
-        return "Режим: $mode | Устройство: $name | VID=${device.vendorId} | PID=${device.productId} | " +
+        return "Mode: $mode | Device: $name | VID=${device.vendorId} | PID=${device.productId} | " +
             "interface=${candidate.interfaceIndex} | match=${candidate.matchKind.label}"
     }
 
@@ -782,7 +782,7 @@ class DeviceViewModel(
             log(text(R.string.device_not_connected))
         } else {
             val details = deviceInfo.substringAfter(" | ", missingDelimiterValue = "")
-            log(if (details.isBlank()) "Режим: $modeLabel" else "Режим: $modeLabel | $details")
+            log(if (details.isBlank()) "Mode: $modeLabel" else "Mode: $modeLabel | $details")
         }
 
         adbProtocol?.takeIf { it.isConnected }?.let { log("ADB peer mode: ${it.peerMode.name}") }
@@ -841,14 +841,14 @@ class DeviceViewModel(
                 if (inventory != null) {
                     _fastbootPartitionInventory.postValue(inventory)
                     val topology = when (inventory.topology) {
-                        FastbootPartitionInventory.SlotTopology.LEGACY_A_ONLY -> "legacy A-only (без A/B)"
+                        FastbootPartitionInventory.SlotTopology.LEGACY_A_ONLY -> "legacy A-only (without A/B)"
                         FastbootPartitionInventory.SlotTopology.A_B -> "A/B"
-                        FastbootPartitionInventory.SlotTopology.UNKNOWN -> "не определена"
+                        FastbootPartitionInventory.SlotTopology.UNKNOWN -> "unknown"
                     }
                     val incomplete = inventory.entries.count { it.missingFields.isNotEmpty() }
                     log(
-                        "ℹ️ Инвентаризация разделов: ${inventory.entries.size}, " +
-                            "топология=$topology, incomplete=$incomplete, " +
+                        "ℹ️ Partition inventory: ${inventory.entries.size}, " +
+                            "topology=$topology, incomplete=$incomplete, " +
                             "point-queries=${inventory.pointQueryCount}, status=${inventory.finalStatus}"
                     )
                     inventory.warnings
@@ -858,13 +858,13 @@ class DeviceViewModel(
                 } else {
                     _fastbootPartitionInventory.postValue(null)
                     if (!proto.isSessionBroken) {
-                        log("⚠️ getvar:all не дал инвентаризацию; точечная Fastboot-диагностика сохранена.")
+                        log("⚠️ getvar:all did not provide inventory; point Fastboot diagnostics were saved.")
                     }
                 }
 
                 if (proto.isSessionBroken) {
                     _connectionState.postValue(ConnectionState.ERROR)
-                    failOperation("Fastboot-сессия потеряла синхронизацию во время обновления данных. Переподключите устройство.")
+                    failOperation("Fastboot session lost synchronization while refreshing data. Reconnect the device.")
                 }
             } else {
                 val message = text(R.string.error_no_fastboot)
@@ -890,15 +890,15 @@ class DeviceViewModel(
         startOperation(text(R.string.notif_fastboot_command), "Mi Unlock", heavy = true) {
             val proto = fastbootProtocol
             if (proto?.isConnected != true) {
-                val message = "Устройство не в режиме Fastboot. Переведите его в Fastboot и подключите по OTG."
+                val message = "Device is not in Fastboot mode. Put it into Fastboot and connect it over OTG."
                 log("❌ $message")
                 failOperation(message)
             }
 
-            log("🔍 Чтение данных устройства...")
+            log("🔍 Reading device data...")
             val product = proto.getVar("product")?.replace(Regex("\\s"), "")
             if (product.isNullOrEmpty()) {
-                val message = "Не удалось прочитать product устройства"
+                val message = "Could not read device product"
                 log("❌ $message")
                 failOperation(message)
             }
@@ -907,11 +907,11 @@ class DeviceViewModel(
             val serial = proto.currentDiagnostics()?.serialno?.trim()?.takeIf { it.isNotBlank() }
             val deviceToken = proto.readXiaomiUnlockToken()
             if (deviceToken.isNullOrEmpty()) {
-                val message = "Не удалось прочитать token устройства"
+                val message = "Could not read device token"
                 log("❌ $message")
                 failOperation(message)
             }
-            log("🔑 deviceToken получен (${deviceToken.length} символов)")
+            log("🔑 deviceToken received (${deviceToken.length} characters)")
 
             // Новая явная попытка отменяет только старый незавершённый verify-marker.
             clearPendingUnlockVerification()
@@ -925,18 +925,18 @@ class DeviceViewModel(
                     deviceId = auth.deviceId
                 )
                 log("🌐 Mi Unlock transport: migate-auth + signed-query v3 (${BuildConfig.VERSION_NAME})")
-                log("🌐 Запрос nonce у Mi сервера...")
+                log("🌐 Requesting nonce from the Mi server...")
                 val nonce = client.getNonce()
 
-                log("🌐 Проверка устройства...")
+                log("🌐 Checking device...")
                 val clearInfo = client.checkClear(product, nonce)
                 if (clearInfo.notice.isNotEmpty()) log("ℹ️ ${clearInfo.notice}")
-                log(if (clearInfo.clearsData) "⚠️ Разблокировка СОТРЁТ данные устройства" else "ℹ️ Данные не будут стёрты")
+                log(if (clearInfo.clearsData) "⚠️ Unlocking WILL ERASE device data" else "ℹ️ Data will not be erased")
                 postMainThread { onClearInfo(clearInfo.notice, clearInfo.clearsData) }
 
-                log("🌐 Запрос разблокировки у Mi сервера...")
+                log("🌐 Requesting unlock from the Mi server...")
                 val encryptDataHex = client.requestUnlock(product, deviceToken, nonce)
-                log("✅ Сервер выдал данные разблокировки")
+                log("✅ Server returned unlock data")
 
                 val bytes = hexToBytes(encryptDataHex)
                 val file = File(getApplication<Application>().filesDir, "encryptData")
@@ -948,41 +948,41 @@ class DeviceViewModel(
                 }
 
                 if (!accepted) {
-                    val message = "Разблокировка не удалась на этапе устройства"
+                    val message = "Unlock failed at the device stage"
                     log("❌ $message")
                     failOperation(message)
                 }
 
                 persistPendingUnlockVerification(product, serial)
-                log("✅ Команда oem unlock принята устройством.")
-                log("🔎 Финальный успех будет подтверждён только после нового Fastboot-подключения и getvar:unlocked=yes.")
-                verificationPending("Команда разблокировки принята. Ожидается переподключение для проверки unlocked=yes.")
+                log("✅ The oem unlock command was accepted by the device.")
+                log("🔎 Final success will be confirmed only after a new Fastboot connection and getvar:unlocked=yes.")
+                verificationPending("Unlock command accepted. Waiting for reconnect to verify unlocked=yes.")
             } catch (abort: OperationAbort) {
                 throw abort
             } catch (e: MiUnlockClient.SessionExpiredException) {
-                val message = "Mi-сессия истекла или отозвана (HTTP 401). Выполните вход в Mi-аккаунт заново."
+                val message = "Mi session expired or was revoked (HTTP 401). Sign in to Mi Account again."
                 log("❌ $message")
                 postMainThread { onAuthExpired() }
                 failOperation(message)
             } catch (e: MiUnlockClient.BusinessException) {
                 val message = e.message ?: "Xiaomi code ${e.code}"
-                log("❌ Ошибка разблокировки: $message")
+                log("❌ Unlock error: $message")
                 if (e.code == 20045) {
-                    log("💡 Код 20045: проверьте dataCenterZone. Текущая зона: ${auth.dataCenterZone}; выберите другую зону вручную и повторите только после проверки региона аккаунта.")
+                    log("💡 Code 20045: check dataCenterZone. Current zone: ${auth.dataCenterZone}; choose another zone manually and retry only after checking the account region.")
                 } else {
-                    log("💡 Точную причину см. выше. Проверьте официальный Mi Unlock status устройства.")
+                    log("💡 See the exact reason above. Check the official Mi Unlock device status.")
                 }
                 failOperation(message)
             } catch (e: Exception) {
                 val msg = e.message ?: e.javaClass.simpleName
-                log("❌ Ошибка разблокировки: $msg")
+                log("❌ Unlock error: $msg")
                 val hasSpecificReason = msg.contains("Xiaomi code") ||
                     msg.contains("Xiaomi:") ||
                     msg.contains("code ")
                 if (!hasSpecificReason) {
-                    log("💡 Сервер не сообщил конкретную причину. Проверьте сеть, отключите VPN/Private DNS и повторите безопасный этап.")
+                    log("💡 Server did not provide a specific reason. Check the network, disable VPN/Private DNS, and repeat the safe step.")
                 } else {
-                    log("💡 Точную причину см. выше. Проверьте официальный Mi Unlock status устройства.")
+                    log("💡 See the exact reason above. Check the official Mi Unlock device status.")
                 }
                 failOperation(msg)
             }
@@ -1015,7 +1015,7 @@ class DeviceViewModel(
             val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
             if (!proto.isConnected) failOperation(text(R.string.error_no_fastboot))
             val ok = if (heavy) proto.sendCommand(cmd) else proto.runTerminalCommand(cmd)
-            if (!ok) failOperation("Fastboot-команда завершилась ошибкой: $cmd")
+            if (!ok) failOperation("Fastboot command failed: $cmd")
         }
     }
 
@@ -1024,7 +1024,7 @@ class DeviceViewModel(
         startOperation(text(R.string.notif_fastboot_command), text(R.string.notif_executing, commandAfterDownload)) {
             val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
             if (!proto.downloadAndRun(file, commandAfterDownload)) {
-                failOperation("Fastboot download+run завершился ошибкой: $commandAfterDownload")
+                failOperation("Fastboot download+run failed: $commandAfterDownload")
             }
         }
     }
@@ -1033,7 +1033,7 @@ class DeviceViewModel(
     fun runFastbootLogicalPartitionCommand(command: String) {
         startOperation(text(R.string.notif_fastboot_command), text(R.string.notif_executing, command)) {
             val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
-            if (!proto.runLogicalPartitionCommand(command)) failOperation("Fastboot logical-команда завершилась ошибкой: $command")
+            if (!proto.runLogicalPartitionCommand(command)) failOperation("Fastboot logical command failed: $command")
         }
     }
 
@@ -1041,7 +1041,7 @@ class DeviceViewModel(
         startOperation(text(R.string.notif_fastboot_diagnostics), text(R.string.notif_updating_device), heavy = false) {
             val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
             if (proto.inspectLogicalPartition(partition) == null) {
-                failOperation("Не удалось получить сведения о logical-разделе: $partition")
+                failOperation("Could not get logical partition info: $partition")
             }
         }
     }
@@ -1050,10 +1050,10 @@ class DeviceViewModel(
         startOperation(text(R.string.notif_fastboot_command), text(R.string.notif_executing, "fetch $partition")) {
             val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
             val targets = proto.resolveSlotPartitionTargets(partition, slot)
-                ?: failOperation("Fastboot slot не удалось применить для $partition")
-            if (targets.size > 1) failOperation("Fastboot fetch для нескольких слотов требует отдельные output-файлы")
-            val target = targets.firstOrNull() ?: failOperation("Fastboot fetch: нет подходящего раздела для $partition")
-            if (!proto.fetchPartition(target, outputFile)) failOperation("Fastboot fetch завершился ошибкой: $target")
+                ?: failOperation("Could not apply Fastboot slot for $partition")
+            if (targets.size > 1) failOperation("Fastboot fetch for multiple slots requires separate output files")
+            val target = targets.firstOrNull() ?: failOperation("Fastboot fetch: no suitable partition for $partition")
+            if (!proto.fetchPartition(target, outputFile)) failOperation("Fastboot fetch failed: $target")
         }
     }
 
@@ -1063,10 +1063,10 @@ class DeviceViewModel(
             val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
             if (!proto.isConnected) failOperation(text(R.string.error_no_fastboot))
             val targets = proto.resolveSlotPartitionTargets(partition, slot)
-                ?: failOperation("Fastboot slot не удалось применить для $partition")
+                ?: failOperation("Could not apply Fastboot slot for $partition")
             targets.forEach { target ->
                 val wire = "$wirePrefix:$target"
-                if (!proto.sendCommand(wire)) failOperation("Fastboot $wirePrefix завершился ошибкой: $target")
+                if (!proto.sendCommand(wire)) failOperation("Fastboot $wirePrefix failed: $target")
             }
         }
     }
@@ -1074,13 +1074,13 @@ class DeviceViewModel(
     fun runAdbService(service: String) {
         startOperation(text(R.string.notif_adb_command), text(R.string.notif_executing, service)) {
             val proto = adbProtocol ?: failOperation(text(R.string.error_no_adb))
-            if (!proto.runService(service)) failOperation("ADB service завершился ошибкой: $service")
+            if (!proto.runService(service)) failOperation("ADB service failed: $service")
             if (AdbServiceCompletionPolicy.expectsOneWayDisconnect(service)) {
                 _operationProgress.postValue(
                     OperationProgress(
                         title = text(R.string.notif_adb_command),
                         percent = 100,
-                        detail = "Команда перезагрузки передана. Устройство временно отключится и появится в новом режиме."
+                        detail = "Reboot command sent. The device will temporarily disconnect and appear in the new mode."
                     )
                 )
             }
@@ -1104,7 +1104,7 @@ class DeviceViewModel(
         ) {
             val proto = adbProtocol ?: failOperation(text(R.string.error_no_adb))
             if (!proto.isConnected) failOperation(text(R.string.error_no_adb))
-            if (!proto.runShellCommand(command)) failOperation("ADB shell завершился ошибкой: $label")
+            if (!proto.runShellCommand(command)) failOperation("ADB shell failed: $label")
         }
     }
 
@@ -1115,7 +1115,7 @@ class DeviceViewModel(
         if (proto?.isConnected == true && proto.hasInteractiveShell) {
             proto.sendInteractiveShellInput(line)
         } else {
-            log("❌ Интерактивный adb shell не открыт")
+            log("❌ Interactive adb shell is not open")
         }
     }
 
@@ -1124,7 +1124,7 @@ class DeviceViewModel(
         if (proto?.isConnected == true && proto.hasInteractiveShell) {
             proto.sendInteractiveShellInterrupt()
         } else {
-            log("❌ Интерактивный adb shell не открыт")
+            log("❌ Interactive adb shell is not open")
         }
     }
 
@@ -1133,7 +1133,7 @@ class DeviceViewModel(
         if (proto?.isConnected == true && proto.hasInteractiveShell) {
             proto.sendInteractiveShellEof()
         } else {
-            log("❌ Интерактивный adb shell не открыт")
+            log("❌ Interactive adb shell is not open")
         }
     }
 
@@ -1142,7 +1142,7 @@ class DeviceViewModel(
         if (proto?.isConnected == true && proto.hasInteractiveShell) {
             proto.stopInteractiveShell()
         } else {
-            log("ℹ️ Интерактивный adb shell уже закрыт")
+            log("ℹ️ Interactive adb shell is already closed")
         }
     }
 
@@ -1150,7 +1150,7 @@ class DeviceViewModel(
         startOperation(text(R.string.notif_adb_command), text(R.string.notif_executing, "push ${localFile.name} $remotePath")) {
             val proto = adbProtocol ?: failOperation(text(R.string.error_no_adb))
             if (!proto.isConnected) failOperation(text(R.string.error_no_adb))
-            if (!proto.pushPath(localFile, remotePath)) failOperation("ADB push завершился ошибкой")
+            if (!proto.pushPath(localFile, remotePath)) failOperation("ADB push failed")
         }
     }
 
@@ -1158,7 +1158,7 @@ class DeviceViewModel(
         startOperation(text(R.string.notif_adb_command), text(R.string.notif_executing, "pull $remotePath")) {
             val proto = adbProtocol ?: failOperation(text(R.string.error_no_adb))
             if (!proto.isConnected) failOperation(text(R.string.error_no_adb))
-            if (!proto.pullFile(remotePath, localFile)) failOperation("ADB pull завершился ошибкой")
+            if (!proto.pullFile(remotePath, localFile)) failOperation("ADB pull failed")
         }
     }
 
@@ -1166,7 +1166,7 @@ class DeviceViewModel(
         startOperation(text(R.string.notif_adb_command), text(R.string.notif_executing, "install ${packageFile.name}")) {
             val proto = adbProtocol ?: failOperation(text(R.string.error_no_adb))
             if (!proto.isConnected) failOperation(text(R.string.error_no_adb))
-            if (!proto.installPackage(packageFile, options)) failOperation("Установка APK завершилась ошибкой")
+            if (!proto.installPackage(packageFile, options)) failOperation("APK installation failed")
         }
     }
 
@@ -1175,17 +1175,17 @@ class DeviceViewModel(
         startOperation(text(R.string.notif_adb_command), text(R.string.notif_executing, "install-multiple $names")) {
             val proto = adbProtocol ?: failOperation(text(R.string.error_no_adb))
             if (!proto.isConnected) failOperation(text(R.string.error_no_adb))
-            if (!proto.installMultipleApks(apkFiles, options)) failOperation("install-multiple завершился ошибкой")
+            if (!proto.installMultipleApks(apkFiles, options)) failOperation("install-multiple failed")
         }
     }
 
     fun runFlash(partition: String, file: File, slot: String? = null) {
         val label = partition + slot?.let { " --slot=$it" }.orEmpty()
         startOperation(text(R.string.notif_flash_img), text(R.string.notif_flashing_partition, file.name, label)) {
-            val proto = fastbootProtocol ?: failOperation("Нет Fastboot-соединения")
-            if (!proto.isConnected) failOperation("Нет Fastboot-соединения")
+            val proto = fastbootProtocol ?: failOperation("No Fastboot connection")
+            if (!proto.isConnected) failOperation("No Fastboot connection")
             val targets = proto.resolveSlotPartitionTargets(partition, slot)
-                ?: failOperation("Fastboot slot не удалось применить для $partition")
+                ?: failOperation("Could not apply Fastboot slot for $partition")
             targets.forEach { target ->
                 val result = proto.flashPartitionDetailed(target, file)
                 if (!result.success) failOperation(formatFlashFailure(target, result))
@@ -1196,10 +1196,10 @@ class DeviceViewModel(
 
     private fun formatFlashFailure(partition: String, result: FastbootProtocol.FlashResult): String {
         return buildString {
-            append("Прошивка $partition провалилась")
+            append("Flashing $partition failed")
             append(" [stage=${result.stage}, kind=${result.failureKind}]")
             if (result.message.isNotBlank()) append(": ${result.message}")
-            if (result.sessionCorrupted) append(". Требуется полный повторный вход целевого устройства в Fastboot")
+            if (result.sessionCorrupted) append(". A full target-device re-entry into Fastboot is required")
         }
     }
 
@@ -1210,12 +1210,12 @@ class DeviceViewModel(
     fun addFlashQueueFile(partition: String, file: File) {
         val item = runCatching { FlashOperationDraftPolicy.createItem(partition, file) }
             .getOrElse { error ->
-                log("❌ Не удалось добавить файл в очередь: ${error.message ?: error.javaClass.simpleName}")
+                log("❌ Could not add file to the queue: ${error.message ?: error.javaClass.simpleName}")
                 return
             }
         val next = runCatching { FlashOperationDraftPolicy.upsert(currentFlashOperationDraft(), item) }
             .getOrElse { error ->
-                log("❌ Не удалось обновить очередь: ${error.message ?: error.javaClass.simpleName}")
+                log("❌ Could not update queue: ${error.message ?: error.javaClass.simpleName}")
                 return
             }
         publishFlashOperationDraft(next, persist = true)
@@ -1240,7 +1240,7 @@ class DeviceViewModel(
         for (item in draft.items) {
             val file = FlashOperationDraftPolicy.resolve(item)
             if (file == null) {
-                log("❌ ${item.partition} ← ${item.displayName}: файл недоступен")
+                log("❌ ${item.partition} ← ${item.displayName}: file is unavailable")
                 return
             }
             executionItems += FlashQueueItem(item.partition, file)
@@ -1266,7 +1266,7 @@ class DeviceViewModel(
             if (idx < 0) order.size else idx
         }
 
-        startOperation(text(R.string.notif_flash_img), "Flash queue: ${sorted.size} шт. Не отключайте кабель.") {
+        startOperation(text(R.string.notif_flash_img), "Flash queue: ${sorted.size} item(s) Do not disconnect the cable.") {
             setOperationSteps(sorted.mapIndexed { index, item ->
                 OperationStep(
                     index = index + 1,
@@ -1279,7 +1279,7 @@ class DeviceViewModel(
             val proto = fastbootProtocol
             if (proto?.isConnected != true) {
                 markOperationStep(1, OperationStepStatus.FAILED, text(R.string.error_no_fastboot))
-                failOperation("Нет Fastboot-соединения")
+                failOperation("No Fastboot connection")
             }
             sorted.forEachIndexed { index, item ->
                 val stepNumber = index + 1
@@ -1294,11 +1294,11 @@ class DeviceViewModel(
                     diagnosticsBrief(diagnostics)
                 )
                 if (!result.success) {
-                    log("❌ Очередь остановлена на разделе ${item.partition}")
+                    log("❌ Queue stopped at partition ${item.partition}")
                     failOperation(formatFlashFailure(item.partition, result))
                 }
             }
-            log("✅ Очередь прошивки завершена")
+            log("✅ Flash queue completed")
         }
     }
 
@@ -1378,7 +1378,7 @@ class DeviceViewModel(
             .putLong(SIDELOAD_VERIFY_CREATED_AT, System.currentTimeMillis())
             .commit()
         if (!saved) {
-            log("⚠️ Не удалось сохранить маркер результата ADB Sideload.")
+            log("⚠️ Could not save ADB Sideload result marker.")
         }
     }
 
@@ -1413,7 +1413,7 @@ class DeviceViewModel(
         val ageMs = System.currentTimeMillis() - pending.createdAtMs
         if (pending.createdAtMs <= 0L || ageMs < 0L || ageMs > SIDELOAD_VERIFY_TIMEOUT_MS) {
             clearPendingSideloadVerification()
-            log("⚠️ Ожидание результата ADB Sideload истекло; итог установки смотрите на экране Recovery.")
+            log("⚠️ ADB Sideload result wait timed out; check the install result on the Recovery screen.")
             return
         }
 
@@ -1423,8 +1423,8 @@ class DeviceViewModel(
             if (!pending.device.equals(currentDevice, ignoreCase = true)) return
         }
 
-        log("=== РЕЗУЛЬТАТ ADB SIDELOAD ===")
-        log("Пакет: ${pending.packageName} (${pending.packageSize} байт)")
+        log("=== ADB SIDELOAD RESULT ===")
+        log("Package: ${pending.packageName} (${pending.packageSize} bytes)")
         val verification = proto.inspectRecoveryInstallResult()
         verification.source?.let { log("Recovery source: $it") }
         verification.evidence?.takeIf { it.isNotBlank() }?.let { log("Recovery evidence: $it") }
@@ -1432,7 +1432,7 @@ class DeviceViewModel(
         when (verification.verdict) {
             RecoveryInstallVerifier.Verdict.SUCCESS -> {
                 clearPendingSideloadVerification()
-                log("✅ Recovery сообщает успешную установку: ${verification.message}")
+                log("✅ Recovery reports successful installation: ${verification.message}")
             }
             RecoveryInstallVerifier.Verdict.FAILED -> {
                 clearPendingSideloadVerification()
@@ -1440,10 +1440,10 @@ class DeviceViewModel(
                     append(verification.message)
                     verification.evidence?.takeIf { it.isNotBlank() }?.let { append(" · ").append(it) }
                 }
-                log("❌ Recovery сообщает ошибку установки: $detail")
+                log("❌ Recovery reports an install error: $detail")
             }
             RecoveryInstallVerifier.Verdict.UNKNOWN -> {
-                log("ℹ️ Передача завершена; Recovery не предоставило однозначный install result.")
+                log("ℹ️ Transfer completed; Recovery did not provide a clear install result.")
             }
         }
     }
@@ -1453,7 +1453,7 @@ class DeviceViewModel(
         val ageMs = System.currentTimeMillis() - pending.createdAtMs
         if (pending.createdAtMs <= 0L || ageMs < 0L || ageMs > MI_UNLOCK_VERIFY_TIMEOUT_MS) {
             clearPendingUnlockVerification()
-            log("⚠️ Ожидание проверки ${pending.operationLabel} истекло. Запустите операцию заново.")
+            log("⚠️ Verification wait ${pending.operationLabel} timed out. Start the operation again.")
             return
         }
 
@@ -1489,7 +1489,7 @@ class DeviceViewModel(
         when (actualUnlocked) {
             pending.expectedUnlocked -> {
                 clearPendingUnlockVerification()
-                val message = "${pending.operationLabel} подтверждён устройством: getvar:unlocked=$expectedText"
+                val message = "${pending.operationLabel} confirmed by device: getvar:unlocked=$expectedText"
                 log("🎉 $message")
                 _operationProgress.postValue(
                     OperationProgress(
@@ -1502,11 +1502,11 @@ class DeviceViewModel(
                     )
                 )
             }
-            null -> log("ℹ️ ${pending.operationLabel} ожидает финальную проверку: getvar:unlocked пока недоступен.")
+            null -> log("ℹ️ ${pending.operationLabel} is waiting for final verification: getvar:unlocked is not available yet.")
             else -> {
                 clearPendingUnlockVerification()
                 val actualText = if (actualUnlocked) "yes" else "no"
-                val message = "${pending.operationLabel} не подтверждён: устройство сообщает getvar:unlocked=$actualText, ожидалось $expectedText"
+                val message = "${pending.operationLabel} not confirmed: device reports getvar:unlocked=$actualText, expected $expectedText"
                 log("❌ $message")
                 _operationProgress.postValue(
                     OperationProgress(
@@ -1535,20 +1535,20 @@ class DeviceViewModel(
                 AdbProtocol.SideloadResult.TransferComplete -> {
                     persistPendingSideloadVerification(file, proto)
                     verificationPending(
-                        "Передача файла завершена. Recovery само определяет допустимость пакета; итог установки будет считан после возврата в Recovery, если лог доступен."
+                        "File transfer completed. Recovery decides whether the package is valid; the install result will be read after returning to Recovery if a log is available."
                     )
                 }
                 is AdbProtocol.SideloadResult.TransferClosedBeforeDoneDone -> {
                     persistPendingSideloadVerification(file, proto)
                     verificationPending(
-                        "Recovery закрыла ADB до DONEDONE после ≈${result.percent}% передачи. Это не считается ошибкой транспорта; проверьте итог установки на экране Recovery или после возврата в Recovery."
+                        "Recovery closed ADB before DONEDONE after ≈${result.percent}% transfer. This is not treated as a transport error; check the final install result on the Recovery screen or after returning to Recovery."
                     )
                 }
                 AdbProtocol.SideloadResult.Cancelled -> {
-                    throw OperationAbort(OperationOutcome.Cancelled("ADB Sideload отменён"))
+                    throw OperationAbort(OperationOutcome.Cancelled("ADB Sideload cancelled"))
                 }
                 is AdbProtocol.SideloadResult.NotInSideloadMode -> {
-                    failOperation("ADB Sideload не активирован. Текущий режим: ${result.mode.name}")
+                    failOperation("ADB Sideload is not active. Current mode: ${result.mode.name}")
                 }
                 is AdbProtocol.SideloadResult.Failed -> {
                     failOperation("ADB Sideload [${result.kind.name}]: ${result.message}")
@@ -1571,21 +1571,21 @@ class DeviceViewModel(
     ) {
         synchronized(operationLaunchLock) {
             if (viewModelCleared.get()) {
-                log("⚠️ Новая операция отклонена: DeviceViewModel уже завершает безопасное закрытие USB.")
+                log("⚠️ New operation rejected: DeviceViewModel is already finishing safe USB shutdown.")
                 return
             }
             if (transportRestartRequired.get()) {
-                log("⛔ Новая операция запрещена: USB transport требует полного перезапуска NekoFlash после неподтверждённой очистки.")
+                log("⛔ New operation is blocked: USB transport requires a full NekoFlash restart after unconfirmed cleanup.")
                 return
             }
             if (connectionJob?.isCompleted == false) {
-                log("⚠️ Подключение или отключение USB ещё не завершено. Дождитесь стабильного статуса устройства.")
+                log("⚠️ USB connect or disconnect is still in progress. Wait for a stable device status.")
                 return
             }
             if (operationJob?.isCompleted == false || NativeUsbfsBackend.hasActiveTransfer ||
                 NativeUsbfsBackend.backendState().nativeTransferActive
             ) {
-                log("⚠️ Другая USB-операция ещё активна. Сначала дождитесь её завершения или выполните безопасную отмену.")
+                log("⚠️ Another USB operation is still active. Wait for it to finish first or perform a safe cancel.")
                 return
             }
 
@@ -1609,7 +1609,7 @@ class DeviceViewModel(
                     if (prepareFastbootSession && fastboot?.isConnected == true && !fastboot.beginOperation()) {
                         throw OperationAbort(
                             OperationOutcome.Failed(
-                                "Fastboot-сессия не готова к новой операции. Переподключите устройство."
+                                "Fastboot session is not ready for a new operation. Reconnect the device."
                             )
                         )
                     }
@@ -1617,7 +1617,7 @@ class DeviceViewModel(
                 } catch (abort: OperationAbort) {
                     outcome = abort.outcome
                 } catch (_: CancellationException) {
-                    outcome = OperationOutcome.Cancelled("Операция отменена")
+                    outcome = OperationOutcome.Cancelled("Operation cancelled")
                 } catch (e: Exception) {
                     val message = e.message ?: e.javaClass.simpleName
                     outcome = OperationOutcome.Failed(message)
@@ -1716,13 +1716,13 @@ class DeviceViewModel(
         adbProtocol?.cancel()
         _operationProgress.postValue(
             _operationProgress.value?.copy(
-                detail = "Отмена запрошена. Завершаем pending USB URB и закрываем сессию безопасно…",
+                detail = "Cancellation requested. Finishing pending USB URB and closing the session safely…",
                 finished = false,
                 success = false,
                 outcome = null
             )
         )
-        log("⏳ Отмена запрошена. WakeLock и foreground-service останутся активны до фактического завершения USB-очистки.")
+        log("⏳ Cancel requested. WakeLock and foreground service will remain active until USB cleanup actually finishes.")
     }
 
     // ─── ОТКЛЮЧЕНИЕ ──────────────────────────────────────────────────────────

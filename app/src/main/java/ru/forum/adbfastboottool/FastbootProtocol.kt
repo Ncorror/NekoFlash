@@ -197,7 +197,7 @@ class FastbootProtocol(
         lastBrokenReason = null
 
         val iface = findFastbootInterface() ?: run {
-            onLog("ОШИБКА: Fastboot интерфейс не найден")
+            onLog("ERROR: Fastboot interface not found")
             return false
         }
         fastbootInterface = iface
@@ -206,26 +206,26 @@ class FastbootProtocol(
         endpointIn = endpoints.first
         endpointOut = endpoints.second
         if (endpointIn == null || endpointOut == null) {
-            onLog("ОШИБКА: Fastboot bulk IN/OUT endpoints не найдены")
+            onLog("ERROR: Fastboot bulk IN/OUT endpoints not found")
             disconnect()
             return false
         }
 
         connection = usbManager.openDevice(device)
         if (connection == null) {
-            onLog("ОШИБКА: Не удалось открыть USB устройство для Fastboot")
+            onLog("ERROR: Could not open USB device for Fastboot")
             disconnect()
             return false
         }
         if (!connection!!.claimInterface(iface, true)) {
-            onLog("ОШИБКА: Не удалось захватить Fastboot интерфейс")
+            onLog("ERROR: Could not claim Fastboot interface")
             disconnect()
             return false
         }
 
         sessionState = SessionState.IDLE
         onLog(
-            "=== СОЕДИНЕНИЕ FASTBOOT УСТАНОВЛЕНО === " +
+            "=== FASTBOOT CONNECTION ESTABLISHED === " +
                 "interface=${iface.id}, class=${iface.interfaceClass}, " +
                 "subclass=${iface.interfaceSubclass}, protocol=${iface.interfaceProtocol}, " +
                 "IN=0x${endpointIn!!.address.toString(16)}, OUT=0x${endpointOut!!.address.toString(16)}"
@@ -259,13 +259,13 @@ class FastbootProtocol(
         val product = getVar("product", timeoutMs)?.trim()?.takeIf { it.isNotBlank() }
         if (product != null) {
             lastKnownProduct = product
-            onLog("✅ Fastboot handshake подтверждён: product=$product")
+            onLog("✅ Fastboot handshake confirmed: product=$product")
             return@withLock product
         }
         if (sessionState == SessionState.IDLE) {
             // Полученный FAIL на необязательный getvar всё равно доказывает, что peer говорит Fastboot.
             // Не превращаем отсутствие product в host-side запрет на реальную сессию.
-            onLog("ℹ️ Fastboot peer ответил на handshake, но getvar:product не предоставлен; соединение разрешено")
+            onLog("ℹ️ Fastboot peer responded to handshake, but getvar:product was not provided; connection allowed")
             return@withLock ""
         }
         null
@@ -278,7 +278,7 @@ class FastbootProtocol(
             if (index in 0 until device.interfaceCount) {
                 val iface = device.getInterface(index)
                 if (isFastbootCompatibleInterface(iface, allowGeneric = true)) return iface
-                onLog("⚠️ Выбранный Fastboot interface=$index больше не имеет bulk IN/OUT — выполняем повторный поиск")
+                onLog("⚠️ Selected Fastboot interface=$index no longer has bulk IN/OUT — running a new search")
             }
         }
 
@@ -292,7 +292,7 @@ class FastbootProtocol(
         for (i in 0 until device.interfaceCount) {
             val iface = device.getInterface(i)
             if (isFastbootCompatibleInterface(iface, allowGeneric = false)) {
-                onLog("ℹ️ Fastboot-интерфейс с нестандартным protocol=${iface.interfaceProtocol} принят по полному bulk IN/OUT pair")
+                onLog("ℹ️ Fastboot interface with non-standard protocol=${iface.interfaceProtocol} accepted by full bulk IN/OUT pair")
                 return iface
             }
         }
@@ -330,11 +330,11 @@ class FastbootProtocol(
     fun beginOperation(): Boolean = transactionLock.withLock {
         if (!isConnected) return@withLock false
         if (sessionState == SessionState.BROKEN || sessionState == SessionState.CLOSED) {
-            onLog("⛔ Fastboot-сессия непригодна для новой операции: $sessionState. Переподключите устройство.")
+            onLog("⛔ Fastboot session is not usable for a new operation: $sessionState. Reconnect the device.")
             return@withLock false
         }
         if (sessionState != SessionState.IDLE) {
-            markSessionBroken("Новая операция начата при незавершённой Fastboot-транзакции: $sessionState")
+            markSessionBroken("New operation started while a Fastboot transaction is incomplete: $sessionState")
             return@withLock false
         }
         cancelled = false
@@ -352,19 +352,19 @@ class FastbootProtocol(
                 ?: return@withLock false
             val actual = getVar("current-slot")?.trim()?.removePrefix("_")?.lowercase(Locale.US)
             if (actual != expected) {
-                onLog("⛔ set_active не подтверждён: requested=$expected, current-slot=${actual ?: "unknown"}")
+                onLog("⛔ set_active not confirmed: requested=$expected, current-slot=${actual ?: "unknown"}")
                 return@withLock false
             }
-            onLog("✅ set_active подтверждён повторным getvar:current-slot=$actual")
+            onLog("✅ set_active confirmed by repeated getvar:current-slot=$actual")
         }
 
         if (mutation?.kind == PostVerifyKind.SNAPSHOT_CONTROL) {
             val actual = FastbootValueParser.parseSnapshotState(getVar("snapshot-update-status"))
             if (actual != FastbootValueParser.SnapshotState.NONE) {
-                onLog("⛔ Snapshot control не подтверждён: после команды состояние=$actual, ожидалось NONE")
+                onLog("⛔ Snapshot control not confirmed: state after command=$actual, expected NONE")
                 return@withLock false
             }
-            onLog("✅ Snapshot control подтверждён: snapshot-update-status=NONE")
+            onLog("✅ Snapshot control confirmed: snapshot-update-status=NONE")
         }
         true
     }
@@ -394,7 +394,7 @@ class FastbootProtocol(
             if (packet == null) {
                 val elapsedSec = elapsedMs / 1000
                 if (elapsedSec / 10 != lastWaitLogSec / 10) {
-                    onLog("⏳ Fastboot ждёт ответ... ${elapsedSec} сек")
+                    onLog("⏳ Fastboot is waiting for a response... ${elapsedSec} sec")
                     lastWaitLogSec = elapsedSec
                 }
                 continue
@@ -423,11 +423,11 @@ class FastbootProtocol(
                     markSessionBroken(message)
                     return@withLock false
                 }
-                else -> onLog("⚠️ Неизвестный ответ Fastboot: ${packet.raw}")
+                else -> onLog("⚠️ Unknown Fastboot response: ${packet.raw}")
             }
         }
 
-        onLog("⚠️ Операция отменена пользователем")
+        onLog("⚠️ Operation cancelled by user")
         false
     }
 
@@ -436,19 +436,19 @@ class FastbootProtocol(
             val expected = mutation.slot?.trim()?.removePrefix("_")?.lowercase(Locale.US) ?: return false
             val actual = getVar("current-slot")?.trim()?.removePrefix("_")?.lowercase(Locale.US)
             if (actual != expected) {
-                onLog("⛔ set_active не подтверждён: requested=$expected, current-slot=${actual ?: "unknown"}")
+                onLog("⛔ set_active not confirmed: requested=$expected, current-slot=${actual ?: "unknown"}")
                 return false
             }
-            onLog("✅ set_active подтверждён: current-slot=$actual")
+            onLog("✅ set_active confirmed: current-slot=$actual")
         }
 
         if (mutation?.kind == PostVerifyKind.SNAPSHOT_CONTROL) {
             val actual = FastbootValueParser.parseSnapshotState(getVar("snapshot-update-status"))
             if (actual != FastbootValueParser.SnapshotState.NONE) {
-                onLog("⛔ Snapshot control не подтверждён: после команды состояние=$actual, ожидалось NONE")
+                onLog("⛔ Snapshot control not confirmed: state after command=$actual, expected NONE")
                 return false
             }
-            onLog("✅ Snapshot control подтверждён: snapshot-update-status=NONE")
+            onLog("✅ Snapshot control confirmed: snapshot-update-status=NONE")
         }
         return true
     }
@@ -475,7 +475,7 @@ class FastbootProtocol(
     fun readXiaomiUnlockToken(): String? = transactionLock.withLock {
         val direct = getVar("token")?.let { normalizeUnlockTokenCandidate(it) }
         if (!direct.isNullOrEmpty()) {
-            onLog("🔑 device token получен через getvar:token (${direct.length} символов)")
+            onLog("🔑 device token received through getvar:token (${direct.length} characters)")
             return@withLock direct
         }
 
@@ -490,7 +490,7 @@ class FastbootProtocol(
         while (!cancelled) {
             val elapsedMs = System.currentTimeMillis() - startedMs
             if (elapsedMs >= 30_000L) {
-                markSessionBroken("Таймаут ответа oem get_token после подтверждённой отправки команды")
+                markSessionBroken("oem get_token response timeout after confirmed command send")
                 return@withLock null
             }
 
@@ -498,7 +498,7 @@ class FastbootProtocol(
             if (packet == null) {
                 emptyReads += 1
                 if (emptyReads >= GETVAR_MAX_FAILED_READS && elapsedMs >= GETVAR_MIN_PATIENCE_MS) {
-                    markSessionBroken("Fastboot read failed $emptyReads раза для oem get_token")
+                    markSessionBroken("Fastboot read failed $emptyReads times for oem get_token")
                     return@withLock null
                 }
                 if (GETVAR_READ_RETRY_DELAY_MS > 0L) {
@@ -520,22 +520,22 @@ class FastbootProtocol(
                     extractUnlockTokenPart(packet.payload)?.let { parts += it }
                     val token = parts.joinToString(separator = "").filterNot { it.isWhitespace() }
                     if (token.isNotBlank()) {
-                        onLog("🔑 device token получен через oem get_token (${parts.size} фрагм., ${token.length} символов)")
+                        onLog("🔑 device token received through oem get_token (${parts.size} fragments, ${token.length} characters)")
                         return@withLock token
                     }
-                    onLog("⚠️ oem get_token завершён без token-фрагментов")
+                    onLog("⚠️ oem get_token finished without token fragments")
                     return@withLock null
                 }
                 "FAIL" -> {
                     sessionState = SessionState.IDLE
-                    onLog("⚠️ oem get_token не поддерживается: ${packet.payload.ifBlank { packet.raw }}")
+                    onLog("⚠️ oem get_token is not supported: ${packet.payload.ifBlank { packet.raw }}")
                     return@withLock null
                 }
-                else -> onLog("⚠️ Неизвестный ответ oem get_token: ${packet.raw}")
+                else -> onLog("⚠️ Unknown oem get_token response: ${packet.raw}")
             }
         }
 
-        onLog("⚠️ Операция отменена пользователем")
+        onLog("⚠️ Operation cancelled by user")
         null
     }
 
@@ -639,21 +639,21 @@ class FastbootProtocol(
         if (plan.discoveryFallbackUsed) {
             collectionWarnings += FastbootPartitionInventory.Warning(
                 code = "LIMITED_POINT_DISCOVERY",
-                message = "getvar:all не подтвердил конкретные разделы; выполнен ограниченный read-only поиск известных имён.",
+                message = "getvar:all did not confirm concrete partitions; a limited read-only scan of known names was performed.",
                 severity = FastbootPartitionInventory.WarningSeverity.WARNING
             )
         }
         if (plan.omittedRequestCount > 0) {
             collectionWarnings += FastbootPartitionInventory.Warning(
                 code = "POINT_QUERY_BUDGET_EXHAUSTED",
-                message = "Лимит точечных getvar достигнут; пропущено запросов: ${plan.omittedRequestCount}.",
+                message = "Point getvar limit reached; skipped requests: ${plan.omittedRequestCount}.",
                 severity = FastbootPartitionInventory.WarningSeverity.INFO
             )
         }
         if (abortedByBrokenSession) {
             collectionWarnings += FastbootPartitionInventory.Warning(
                 code = "POINT_QUERY_ABORTED",
-                message = "Дозаполнение метаданных остановлено: Fastboot-сессия потеряла синхронизацию.",
+                message = "Metadata backfill stopped: Fastboot session lost synchronization.",
                 severity = FastbootPartitionInventory.WarningSeverity.CRITICAL
             )
         }
@@ -706,12 +706,12 @@ class FastbootProtocol(
         val now = System.currentTimeMillis()
         val cached = cachedDiagnostics
         if (!force && cached != null && now - cached.timestamp <= maxAgeMs) {
-            onLog("=== FASTBOOT ДАННЫЕ ИЗ КЭША ===")
+            onLog("=== FASTBOOT DATA FROM CACHE ===")
             logDiagnostics(cached)
             return cached
         }
 
-        onLog("=== FASTBOOT ДИАГНОСТИКА ===")
+        onLog("=== FASTBOOT DIAGNOSTICS ===")
         fun queryVarIfSessionAlive(name: String): String? {
             if (sessionState == SessionState.BROKEN || sessionState == SessionState.CLOSED) return null
             return getVar(name)
@@ -737,7 +737,7 @@ class FastbootProtocol(
         val maxFetchSizeBytes = parseFastbootSize(maxFetchSizeRaw)
 
         if (sessionState == SessionState.BROKEN) {
-            onLog("⚠️ Диагностический опрос остановлен: Fastboot-транспорт потерял синхронизацию. Новые getvar не отправляются.")
+            onLog("⚠️ Diagnostic polling stopped: Fastboot transport lost synchronization. New getvar commands are not sent.")
         }
 
         val diagnostics = DeviceDiagnostics(
@@ -772,36 +772,36 @@ class FastbootProtocol(
 
 
     private fun logDiagnostics(d: DeviceDiagnostics) {
-        onLog("Устройство/product: ${d.product ?: "неизвестно"}")
+        onLog("Device/product: ${d.product ?: "unknown"}")
         d.serialno?.let          { onLog("Serial: $it") }
         d.versionBootloader?.let { onLog("Bootloader version: $it") }
         d.antiRollback?.let { onLog("Anti-rollback index: $it") }
         val fbMode = when {
             d.isUserspace?.equals("yes", ignoreCase = true) == true -> "fastbootd / userspace"
             d.isUserspace?.equals("no", ignoreCase = true) == true -> "bootloader fastboot"
-            else -> "неизвестно"
+            else -> "unknown"
         }
         onLog("Fastboot mode: $fbMode")
         d.superPartitionName?.let { onLog("Super partition: $it") }
         onLog("Snapshot update status: ${d.snapshotUpdateStatus ?: "unknown"}")
         if (FastbootPartitionInventory.isLegacyAOnlyProduct(d.product)) {
-            onLog("Текущий слот: не применяется (legacy A-only / без A/B)")
+            onLog("Current slot: not applicable (legacy A-only / no A/B)")
             onLog(
-                "Топология слотов: legacy A-only по product compatibility; " +
-                    "конкретный раздел всё равно подтверждается read-only inventory/point-query"
+                "Slot topology: legacy A-only by product compatibility; " +
+                    "the concrete partition is still confirmed by read-only inventory/point-query"
             )
         } else {
-            onLog("Текущий слот: ${d.currentSlot ?: "—"}")
-            d.slotCount?.let { onLog("Количество слотов: $it") }
-                ?: onLog("Количество слотов: неизвестно/не поддерживается")
-            d.slotSuffix?.let { onLog("Суффикс слота: $it") }
+            onLog("Current slot: ${d.currentSlot ?: "—"}")
+            d.slotCount?.let { onLog("Slot count: $it") }
+                ?: onLog("Slot count: unknown/not supported")
+            d.slotSuffix?.let { onLog("Suffix slot: $it") }
         }
-        onLog("Bootloader unlocked: ${d.unlocked ?: "неизвестно"}")
-        onLog("Secure: ${d.secure ?: "неизвестно"}")
-        onLog("Max download size: ${d.maxDownloadSizeRaw ?: "неизвестно"}${d.maxDownloadSizeBytes?.let { " ($it байт)" } ?: ""}")
-        d.maxFetchSizeRaw?.let { onLog("Max fetch size: $it${d.maxFetchSizeBytes?.let { bytes -> " ($bytes байт)" } ?: ""}") }
+        onLog("Bootloader unlocked: ${d.unlocked ?: "unknown"}")
+        onLog("Secure: ${d.secure ?: "unknown"}")
+        onLog("Max download size: ${d.maxDownloadSizeRaw ?: "unknown"}${d.maxDownloadSizeBytes?.let { " ($it bytes)" } ?: ""}")
+        d.maxFetchSizeRaw?.let { onLog("Max fetch size: $it${d.maxFetchSizeBytes?.let { bytes -> " ($bytes bytes)" } ?: ""}") }
         if (d.unlocked?.equals("no", ignoreCase = true) == true) {
-            onLog("⚠️ ВНИМАНИЕ: загрузчик сообщает unlocked=no. Полный терминал доступен, но fastboot flash будет заблокирован приложением.")
+            onLog("⚠️ WARNING: bootloader reports unlocked=no. Full terminal is available, but fastboot flash will be blocked by the app.")
         }
     }
 
@@ -811,20 +811,20 @@ class FastbootProtocol(
             ?: return@withLock resolveCurrentSlotPartitionTarget(normalized)?.let { listOf(it) }
 
         if (slot != "all" && slot != "other" && !(slot.length == 1 && slot[0] in 'a'..'z')) {
-            onLog("❌ ОШИБКА: некорректный slot: $slotOverride")
+            onLog("❌ ERROR: invalid slot: $slotOverride")
             return@withLock null
         }
 
         val base = normalized.substringBefore(':')
         val hasSlot = getVar("has-slot:$base")?.equals("yes", ignoreCase = true) == true
         if (!hasSlot) {
-            onLog("⚠️ Раздел $base не сообщает has-slot=yes; --slot=$slot будет проигнорирован.")
+            onLog("⚠️ Partition $base does not report has-slot=yes; --slot=$slot will be ignored.")
             return@withLock listOf(normalized)
         }
 
         val count = fastbootSlotCount()
         if (count <= 0) {
-            onLog("❌ ОШИБКА: устройство сообщает has-slot=yes для $base, но slot-count неизвестен")
+            onLog("❌ ERROR: device reports has-slot=yes for $base, but slot-count is unknown")
             return@withLock null
         }
 
@@ -838,7 +838,7 @@ class FastbootProtocol(
             else -> {
                 val index = slot[0] - 'a'
                 if (index !in 0 until count) {
-                    onLog("❌ ОШИБКА: slot $slot не существует; slot-count=$count")
+                    onLog("❌ ERROR: slot $slot does not exist; slot-count=$count")
                     return@withLock null
                 }
                 listOf(applySlotSuffix(normalized, slot))
@@ -860,7 +860,7 @@ class FastbootProtocol(
             ?.removePrefix("_")
             ?.lowercase(Locale.US)
             ?.takeIf { it.length == 1 && it[0] in 'a'..'z' }
-        if (current == null) onLog("❌ ОШИБКА: не удалось определить current-slot")
+        if (current == null) onLog("❌ ERROR: could not determine current-slot")
         return current
     }
 
@@ -885,57 +885,57 @@ class FastbootProtocol(
             return@withLock FlashResult.fail(
                 FlashStage.VALIDATION,
                 FlashFailureKind.SESSION_BROKEN,
-                "Fastboot-сессия недоступна: $sessionState",
+                "Fastboot session unavailable: $sessionState",
                 sessionCorrupted = sessionState == SessionState.BROKEN
             )
         }
 
         val normalizedPartition = partition.trim().lowercase(Locale.US)
         if (normalizedPartition.isBlank() || !normalizedPartition.matches(Regex("[A-Za-z0-9._:-]+"))) {
-            val message = "Некорректное имя раздела: $partition"
-            onLog("❌ ОШИБКА: $message")
+            val message = "Invalid partition name: $partition"
+            onLog("❌ ERROR: $message")
             return@withLock FlashResult.fail(FlashStage.VALIDATION, FlashFailureKind.VALIDATION, message)
         }
         val partitionBase = normalizedPartition.removeSuffix("_ab").removeSuffix("_a").removeSuffix("_b")
         if (partitionBase !in TYPICAL_FLASH_PARTITIONS) {
-            onLog("⚠️ Раздел $normalizedPartition не входит в типовой список. Жёсткая блокировка снята, команда разрешена терминальным режимом.")
+            onLog("⚠️ Partition $normalizedPartition is not in the standard list. The hard block is removed; the command is allowed in terminal mode.")
         }
 
         if (!file.exists() || !file.isFile || !file.canRead()) {
-            val message = "Файл недоступен: ${file.name}"
-            onLog("❌ ОШИБКА: $message")
+            val message = "File is unavailable: ${file.name}"
+            onLog("❌ ERROR: $message")
             return@withLock FlashResult.fail(FlashStage.VALIDATION, FlashFailureKind.VALIDATION, message)
         }
         if (file.length() <= 0L) {
-            val message = "Файл пустой: ${file.name}"
-            onLog("❌ ОШИБКА: $message")
+            val message = "File is empty: ${file.name}"
+            onLog("❌ ERROR: $message")
             return@withLock FlashResult.fail(FlashStage.VALIDATION, FlashFailureKind.VALIDATION, message)
         }
         if (file.length() > 0xFFFF_FFFFL) {
-            val message = "Fastboot download поддерживает размер до 4 GiB в этой реализации"
-            onLog("❌ ОШИБКА: $message")
+            val message = "Fastboot download supports sizes up to 4 GiB in this implementation"
+            onLog("❌ ERROR: $message")
             return@withLock FlashResult.fail(FlashStage.VALIDATION, FlashFailureKind.VALIDATION, message)
         }
 
         val fileSizeMb = file.length().toDouble() / 1024.0 / 1024.0
-        onLog("Прошивка $normalizedPartition. Файл: ${file.name} (${"%.2f".format(fileSizeMb)} MB)")
+        onLog("Flashing $normalizedPartition. File: ${file.name} (${"%.2f".format(fileSizeMb)} MB)")
 
         val hexSize = String.format("%08x", file.length())
         if (!writeCommand("download:$hexSize", 5000)) {
-            return@withLock flashTransportFailure(FlashStage.SEND_DOWNLOAD, "Сбой отправки команды download")
+            return@withLock flashTransportFailure(FlashStage.SEND_DOWNLOAD, "Failed to send download command")
         }
 
         val downloadPacket = readUntilDataOrFinal(10000)
-            ?: return@withLock flashTransportFailure(FlashStage.WAIT_DATA, "Нет корректного ответа на download")
+            ?: return@withLock flashTransportFailure(FlashStage.WAIT_DATA, "No valid response to download")
         when (downloadPacket.type) {
-            "DATA" -> onLog("Загрузчик готов принять образ: ${downloadPacket.payload}")
+            "DATA" -> onLog("Bootloader is ready to receive the image: ${downloadPacket.payload}")
             "FAIL" -> {
                 val message = downloadPacket.payload.ifBlank { downloadPacket.raw }
-                logFastbootFailure("Загрузчик отказал в download", message)
+                logFastbootFailure("Bootloader rejected download", message)
                 return@withLock FlashResult.fail(FlashStage.WAIT_DATA, FlashFailureKind.PROTOCOL, message)
             }
             else -> {
-                val message = "Ожидался DATA, получено ${downloadPacket.raw}"
+                val message = "Expected DATA, got ${downloadPacket.raw}"
                 markSessionBroken(message)
                 return@withLock FlashResult.fail(FlashStage.WAIT_DATA, FlashFailureKind.TRANSPORT, message, true)
             }
@@ -955,11 +955,11 @@ class FastbootProtocol(
 
         sessionState = SessionState.AWAITING_DATA_FINAL
         val downloadDone = readUntilFinalWithRetry(singleReadTimeoutMs = 2000, maxTotalTimeMs = 30_000)
-            ?: return@withLock flashTransportFailure(FlashStage.WAIT_DOWNLOAD_FINAL, "Нет финального ответа после DATA")
+            ?: return@withLock flashTransportFailure(FlashStage.WAIT_DOWNLOAD_FINAL, "No final response after DATA")
                 .copy(dataBytesTransferred = file.length())
         if (downloadDone.type != "OKAY") {
             val message = downloadDone.payload.ifBlank { downloadDone.raw }
-            logFastbootFailure("Устройство забраковало образ после передачи", message)
+            logFastbootFailure("Device rejected the image after transfer", message)
             return@withLock FlashResult.fail(
                 FlashStage.WAIT_DOWNLOAD_FINAL,
                 FlashFailureKind.PROTOCOL,
@@ -968,23 +968,23 @@ class FastbootProtocol(
             )
         }
 
-        onLog("Запись образа в раздел $normalizedPartition (может занять несколько минут)...")
+        onLog("Writing image to partition $normalizedPartition (this may take several minutes)...")
         if (!writeCommand("flash:$normalizedPartition", 5000)) {
-            return@withLock flashTransportFailure(FlashStage.SEND_FLASH, "Сбой отправки команды flash")
+            return@withLock flashTransportFailure(FlashStage.SEND_FLASH, "Failed to send flash command")
                 .copy(dataBytesTransferred = file.length())
         }
         sessionState = SessionState.AWAITING_COMMAND_FINAL
 
         val flashDone = readUntilFinalWithRetry(singleReadTimeoutMs = 2000, maxTotalTimeMs = 600_000)
-            ?: return@withLock flashTransportFailure(FlashStage.WAIT_FLASH_FINAL, "Нет финального ответа flash")
+            ?: return@withLock flashTransportFailure(FlashStage.WAIT_FLASH_FINAL, "No final flash response")
                 .copy(dataBytesTransferred = file.length())
 
         if (flashDone.type == "OKAY") {
-            onLog("✅ Прошивка $normalizedPartition успешно завершена!")
+            onLog("✅ Flashing $normalizedPartition completed successfully!")
             FlashResult.ok(dataBytesTransferred = file.length())
         } else {
             val message = flashDone.payload.ifBlank { flashDone.raw }
-            logFastbootFailure("ОШИБКА записи раздела $normalizedPartition", message)
+            logFastbootFailure("Partition write ERROR $normalizedPartition", message)
             FlashResult.fail(
                 FlashStage.WAIT_FLASH_FINAL,
                 FlashFailureKind.PROTOCOL,
@@ -1002,7 +1002,7 @@ class FastbootProtocol(
         onLog("=== FASTBOOTD LOGICAL PARTITION INFO: $normalized ===")
         val diagnostics = refreshDiagnostics(force = false)
         if (diagnostics.isUserspace?.equals("yes", ignoreCase = true) != true) {
-            onLog("⚠️ Устройство не сообщает is-userspace=yes. Для dynamic partitions обычно нужен userspace fastbootd. Выполните: fastboot reboot fastboot")
+            onLog("⚠️ Device does not report is-userspace=yes. Dynamic partitions usually require userspace fastbootd. Run: fastboot reboot fastboot")
         }
         val isLogical = getVar("is-logical:$normalized")
         val sizeRaw = getVar("partition-size:$normalized")
@@ -1016,9 +1016,9 @@ class FastbootProtocol(
             type = type
         )
         onLog("Partition: ${info.partition}")
-        onLog("Logical: ${info.isLogical ?: "неизвестно"}")
-        onLog("Size: ${info.sizeRaw ?: "неизвестно"}${info.sizeBytes?.let { " ($it байт)" } ?: ""}")
-        onLog("Type: ${info.type ?: "неизвестно"}")
+        onLog("Logical: ${info.isLogical ?: "unknown"}")
+        onLog("Size: ${info.sizeRaw ?: "unknown"}${info.sizeBytes?.let { " ($it bytes)" } ?: ""}")
+        onLog("Type: ${info.type ?: "unknown"}")
         diagnostics.superPartitionName?.let { onLog("Super partition: $it") }
         return info
     }
@@ -1027,7 +1027,7 @@ class FastbootProtocol(
         if (!isConnected) return false
         val clean = command.trim()
         if (!isLogicalPartitionManagementCommand(clean)) {
-            onLog("❌ ОШИБКА: команда не является командой управления logical partition: $clean")
+            onLog("❌ ERROR: command is not a logical partition management command: $clean")
             return false
         }
         return sendCommand(clean)
@@ -1038,20 +1038,20 @@ class FastbootProtocol(
         val normalized = normalizePartitionName(partition) ?: return false
         val diagnostics = refreshDiagnostics(force = false)
         if (diagnostics.isUserspace?.equals("yes", ignoreCase = true) != true) {
-            onLog("⚠️ fetch обычно реализован в fastbootd. Если устройство вернёт FAIL, выполните: fastboot reboot fastboot")
+            onLog("⚠️ fetch is usually implemented in fastbootd. If the device returns FAIL, run: fastboot reboot fastboot")
         }
         if (diagnostics.unlocked?.equals("yes", ignoreCase = true) != true) {
-            onLog("⚠️ fetch в AOSP обычно требует unlocked/debuggable-состояние. Устройство может отказать.")
+            onLog("⚠️ fetch in AOSP usually requires an unlocked/debuggable state. The device may reject it.")
         }
 
         val parent = outputFile.parentFile
         if (parent != null && !parent.exists() && !parent.mkdirs()) {
-            onLog("❌ ОШИБКА: не удалось создать папку: ${parent.absolutePath}")
+            onLog("❌ ERROR: could not create folder: ${parent.absolutePath}")
             return false
         }
         val partFile = File(outputFile.parentFile ?: File("."), outputFile.name + ".part")
         if (partFile.exists() && !partFile.delete()) {
-            onLog("❌ ОШИБКА: не удалось удалить временный файл: ${partFile.absolutePath}")
+            onLog("❌ ERROR: could not delete temporary file: ${partFile.absolutePath}")
             return false
         }
 
@@ -1059,8 +1059,8 @@ class FastbootProtocol(
         val partitionSize = parseFastbootSize(partitionSizeRaw)
         val maxFetch = diagnostics.maxFetchSizeBytes?.takeIf { it > 0L }
         onLog("Fastboot fetch: $normalized → ${outputFile.absolutePath}")
-        partitionSize?.let { onLog("Partition size: $partitionSizeRaw ($it байт)") }
-        maxFetch?.let { onLog("Max fetch chunk: $it байт") }
+        partitionSize?.let { onLog("Partition size: $partitionSizeRaw ($it bytes)") }
+        maxFetch?.let { onLog("Max fetch chunk: $it bytes") }
 
         return try {
             partFile.outputStream().use { out ->
@@ -1071,7 +1071,7 @@ class FastbootProtocol(
                         val command = "fetch:$normalized:$offset:$chunkSize"
                         val fetched = fetchChunk(command, out, offset, partitionSize) ?: return false
                         if (fetched <= 0L) {
-                            onLog("❌ ОШИБКА fetch: устройство вернуло нулевой chunk")
+                            onLog("❌ ERROR fetch: device returned a zero-length chunk")
                             return false
                         }
                         offset += fetched
@@ -1083,22 +1083,22 @@ class FastbootProtocol(
                 }
             }
             if (cancelled) {
-                onLog("⚠️ fetch отменён пользователем")
+                onLog("⚠️ fetch cancelled by user")
                 false
             } else {
                 if (outputFile.exists() && !outputFile.delete()) {
-                    onLog("❌ ОШИБКА: не удалось заменить файл: ${outputFile.absolutePath}")
+                    onLog("❌ ERROR: could not replace file: ${outputFile.absolutePath}")
                     false
                 } else if (!partFile.renameTo(outputFile)) {
-                    onLog("❌ ОШИБКА: не удалось переименовать .part в итоговый файл")
+                    onLog("❌ ERROR: could not rename .part to the final file")
                     false
                 } else {
-                    onLog("✅ Fastboot fetch завершён: ${outputFile.absolutePath} (${outputFile.length()} байт)")
+                    onLog("✅ Fastboot fetch completed: ${outputFile.absolutePath} (${outputFile.length()} bytes)")
                     true
                 }
             }
         } catch (e: Exception) {
-            onLog("❌ ОШИБКА fastboot fetch: ${e.message ?: e.javaClass.simpleName}")
+            onLog("❌ ERROR fastboot fetch: ${e.message ?: e.javaClass.simpleName}")
             false
         } finally {
             if (partFile.exists() && partFile.length() == 0L) partFile.delete()
@@ -1114,59 +1114,59 @@ class FastbootProtocol(
 
         val command = commandAfterDownload.trim()
         if (command.isBlank()) {
-            onLog("❌ ОШИБКА: пустая команда после download")
+            onLog("❌ ERROR: empty command after download")
             return false
         }
         if (command.any { it.code !in 32..126 }) {
-            onLog("❌ ОШИБКА: Fastboot-команда должна быть ASCII")
+            onLog("❌ ERROR: Fastboot command must be ASCII")
             return false
         }
 
         if (!file.exists() || !file.isFile || !file.canRead()) {
-            onLog("❌ ОШИБКА: файл недоступен: ${file.name}")
+            onLog("❌ ERROR: file is unavailable: ${file.name}")
             return false
         }
         if (file.length() <= 0L) {
-            onLog("❌ ОШИБКА: файл пустой: ${file.name}")
+            onLog("❌ ERROR: file is empty: ${file.name}")
             return false
         }
         if (file.length() > 0xFFFF_FFFFL) {
-            onLog("❌ ОШИБКА: Fastboot download поддерживает размер до 4 GiB в этой реализации")
+            onLog("❌ ERROR: Fastboot download supports sizes up to 4 GiB in this implementation")
             return false
         }
 
         val fileSizeMb = file.length().toDouble() / 1024.0 / 1024.0
-        onLog("Fastboot download: ${file.name} (${"%.2f".format(fileSizeMb)} MB), затем команда: $command")
+        onLog("Fastboot download: ${file.name} (${"%.2f".format(fileSizeMb)} MB), then command: $command")
 
         val hexSize = String.format("%08x", file.length())
         if (!writeCommand("download:$hexSize", 5000)) {
-            onLog("ОШИБКА: Сбой отправки команды download")
+            onLog("ERROR: Failed to send download command")
             return false
         }
 
         val downloadPacket = readUntilDataOrFinal(10000) ?: return false
         when (downloadPacket.type) {
-            "DATA" -> onLog("Загрузчик готов принять файл: ${downloadPacket.payload}")
-            "FAIL" -> { logFastbootFailure("Загрузчик отказал в download", downloadPacket.payload); return false }
-            else   -> { onLog("ОШИБКА: ожидался DATA, получено ${downloadPacket.raw}"); return false }
+            "DATA" -> onLog("Bootloader is ready to receive the file: ${downloadPacket.payload}")
+            "FAIL" -> { logFastbootFailure("Bootloader rejected download", downloadPacket.payload); return false }
+            else   -> { onLog("ERROR: expected DATA, got ${downloadPacket.raw}"); return false }
         }
 
         if (!transferDownloadPayload(file, "download + $command").success) return false
         sessionState = SessionState.AWAITING_DATA_FINAL
 
         if (cancelled) {
-            onLog("⚠️ Операция отменена пользователем")
+            onLog("⚠️ Operation cancelled by user")
             return false
         }
 
         val downloadDone = readUntilFinal(30000) ?: return false
         if (downloadDone.type != "OKAY") {
-            logFastbootFailure("Устройство забраковало файл после передачи", downloadDone.payload.ifBlank { downloadDone.raw })
+            logFastbootFailure("Device rejected the file after transfer", downloadDone.payload.ifBlank { downloadDone.raw })
             return false
         }
 
         if (!writeCommand(command, 5000)) {
-            onLog("ОШИБКА: Сбой отправки команды после download")
+            onLog("ERROR: Failed to send command after download")
             return false
         }
 
@@ -1176,10 +1176,10 @@ class FastbootProtocol(
         ) ?: return false
 
         return if (done.type == "OKAY") {
-            onLog("✅ Fastboot-команда после download выполнена: $command")
+            onLog("✅ Fastboot command after download completed: $command")
             true
         } else {
-            logFastbootFailure("Fastboot-команда после download не выполнена: $command", done.payload.ifBlank { done.raw })
+            logFastbootFailure("Fastboot command after download failed: $command", done.payload.ifBlank { done.raw })
             false
         }
     }
@@ -1191,46 +1191,46 @@ class FastbootProtocol(
      */
     fun stageAndOemUnlock(encryptDataFile: File): Boolean = transactionLock.withLock {
         if (!isConnected) {
-            onLog("❌ Нет соединения с устройством")
+            onLog("❌ No connection to device")
             return false
         }
         if (!encryptDataFile.exists() || !encryptDataFile.isFile || encryptDataFile.length() <= 0L) {
-            onLog("❌ ОШИБКА: файл разблокировки недоступен или пуст")
+            onLog("❌ ERROR: unlock file is unavailable or empty")
             return false
         }
 
-        onLog("🔓 Staging данных разблокировки (${encryptDataFile.length()} байт)...")
+        onLog("🔓 Staging unlock data (${encryptDataFile.length()} bytes)...")
         val hexSize = String.format("%08x", encryptDataFile.length())
         if (!writeCommand("download:$hexSize", 5000)) {
-            onLog("❌ ОШИБКА: сбой команды download для разблокировки")
+            onLog("❌ ERROR: download command failed for unlock")
             return false
         }
         val downloadPacket = readUntilDataOrFinal(10000) ?: return false
         when (downloadPacket.type) {
-            "DATA" -> onLog("Загрузчик готов принять данные разблокировки")
-            "FAIL" -> { logFastbootFailure("Загрузчик отказал в download", downloadPacket.payload); return false }
-            else   -> { onLog("❌ ОШИБКА: ожидался DATA, получено ${downloadPacket.raw}"); return false }
+            "DATA" -> onLog("Bootloader is ready to receive unlock data")
+            "FAIL" -> { logFastbootFailure("Bootloader rejected download", downloadPacket.payload); return false }
+            else   -> { onLog("❌ ERROR: expected DATA, got ${downloadPacket.raw}"); return false }
         }
         if (!transferDownloadPayload(encryptDataFile, "unlock data").success) return false
         sessionState = SessionState.AWAITING_DATA_FINAL
 
         val downloadDone = readUntilFinal(30000) ?: return false
         if (downloadDone.type != "OKAY") {
-            onLog("❌ ОШИБКА: download разблокировки не подтверждён: ${downloadDone.raw}")
+            onLog("❌ ERROR: unlock download was not confirmed: ${downloadDone.raw}")
             return false
         }
 
-        onLog("🔓 Выполняется fastboot oem unlock...")
+        onLog("🔓 Running fastboot oem unlock...")
         if (!writeCommand("oem unlock", 10000)) {
-            onLog("❌ ОШИБКА: сбой отправки oem unlock")
+            onLog("❌ ERROR: failed to send oem unlock")
             return false
         }
         val unlockDone = readUntilFinal(30000) ?: return false
         return if (unlockDone.type == "OKAY") {
-            onLog("✅ Загрузчик разблокирован успешно!")
+            onLog("✅ Bootloader unlocked successfully!")
             true
         } else {
-            logFastbootFailure("oem unlock отклонён", unlockDone.payload)
+            logFastbootFailure("oem unlock rejected", unlockDone.payload)
             false
         }
     }
@@ -1242,12 +1242,12 @@ class FastbootProtocol(
     // runs on the healthy transfer path.
     private fun attemptEndpointResetRecovery(reason: String) {
         val conn = connection ?: return
-        onLog("🧯 USB endpoint wedge: пробую USBDEVFS_RESET для расклинивания ($reason)")
+        onLog("🧯 USB endpoint wedge: trying USBDEVFS_RESET to unwedge ($reason)")
         val rc = NativeUsbfsBackend.resetUsbDevice(conn)
         when {
-            rc == 0 -> onLog("✅ USBDEVFS_RESET выполнен: устройство переинициализируется. Дождитесь реэнумерации или переподключите OTG, затем повторите вход в Fastboot.")
-            rc > 0 -> onLog("ℹ️ USBDEVFS_RESET не удался (errno=$rc). Выполните физический реконнект OTG и заново войдите в Fastboot.")
-            else -> onLog("ℹ️ USBDEVFS_RESET недоступен (нет USB-fd). Выполните физический реконнект OTG.")
+            rc == 0 -> onLog("✅ USBDEVFS_RESET completed: device is reinitializing. Wait for re-enumeration or reconnect OTG, then enter Fastboot again.")
+            rc > 0 -> onLog("ℹ️ USBDEVFS_RESET failed (errno=$rc). Physically reconnect OTG and enter Fastboot again.")
+            else -> onLog("ℹ️ USBDEVFS_RESET unavailable (no USB fd). Physically reconnect OTG.")
         }
     }
 
@@ -1256,7 +1256,7 @@ class FastbootProtocol(
         val totalBytes = file.length().coerceAtLeast(1L)
 
         if (sessionState != SessionState.DATA_OUT) {
-            val message = "DATA-передача запущена в неверном состоянии: $sessionState"
+            val message = "DATA transfer started in an invalid state: $sessionState"
             markSessionBroken(message)
             return TransferResult(false, message = message, bytesTransferred = 0L)
         }
@@ -1264,7 +1264,7 @@ class FastbootProtocol(
         val conn = connection
         val out = endpointOut
         if (conn == null || out == null) {
-            val message = "USB DATA transport недоступен: соединение или OUT endpoint отсутствует"
+            val message = "USB DATA transport unavailable: connection or OUT endpoint is missing"
             markSessionBroken(message)
             return TransferResult(false, message = message, bytesTransferred = 0L)
         }
@@ -1280,7 +1280,7 @@ class FastbootProtocol(
 
         val request = UsbRequest()
         if (!request.initialize(conn, out)) {
-            val message = "Не удалось инициализировать UsbRequest для Fastboot DATA OUT"
+            val message = "Could not initialize UsbRequest for Fastboot DATA OUT"
             markSessionBroken(message)
             return TransferResult(false, message = message, bytesTransferred = 0L)
         }
@@ -1297,10 +1297,10 @@ class FastbootProtocol(
         val startedMs = lastRateLogMs
 
         onLog(
-            "Передача $label: ${formatBytes(totalBytes)}. " +
+            "Transfer $label: ${formatBytes(totalBytes)}. " +
                 "transport=UsbRequest, block=${formatBytes(blockBytes.toLong())}, " +
                 "watchdog=${formatDuration(DATA_REQUEST_WATCHDOG_MS)}. " +
-                "Не сворачивайте приложение и не отключайте OTG/кабель."
+                "Do not background the app or disconnect OTG/cable."
         )
         onLogVerbose(
             "[fastboot-data] mode=UsbRequest sdk=${Build.VERSION.SDK_INT} " +
@@ -1311,7 +1311,7 @@ class FastbootProtocol(
                 while (true) {
                     if (cancelled) {
                         request.cancel()
-                        val message = "Операция отменена во время DATA-фазы на ${formatBytes(totalSent)}/${formatBytes(totalBytes)}"
+                        val message = "Operation cancelled during DATA phase at ${formatBytes(totalSent)}/${formatBytes(totalBytes)}"
                         markSessionBroken(message)
                         return TransferResult(false, cancelled = true, message = message, bytesTransferred = totalSent)
                     }
@@ -1324,7 +1324,7 @@ class FastbootProtocol(
                     while (usbBuffer.hasRemaining()) {
                         if (cancelled) {
                             request.cancel()
-                            val message = "Операция отменена во время DATA-фазы на offset=$totalSent"
+                            val message = "Operation cancelled during DATA phase at offset=$totalSent"
                             markSessionBroken(message)
                             return TransferResult(false, cancelled = true, message = message, bytesTransferred = totalSent)
                         }
@@ -1343,7 +1343,7 @@ class FastbootProtocol(
                         }
 
                         if (result.cancelled) {
-                            val message = result.message.ifBlank { "DATA-передача отменена на offset=$absoluteOffset" }
+                            val message = result.message.ifBlank { "DATA transfer cancelled at offset=$absoluteOffset" }
                             markSessionBroken(message)
                             return TransferResult(false, cancelled = true, message = message, bytesTransferred = totalSent)
                         }
@@ -1352,7 +1352,7 @@ class FastbootProtocol(
                             // неоднозначный async failure не доказывает, сколько байтов принял контроллер.
                             val message = result.message.ifBlank {
                                 "USB DATA UsbRequest failed at offset=$absoluteOffset: requested=$requested, elapsed=${elapsedMs}ms"
-                            } + ". Повторите операцию после новой Fastboot-сессии."
+                            } + ". Repeat the operation after starting a new Fastboot session."
                             markSessionBroken(message)
                             return TransferResult(false, message = message, bytesTransferred = totalSent)
                         }
@@ -1387,7 +1387,7 @@ class FastbootProtocol(
                         val instantWindowMs = (now - lastRateLogMs).coerceAtLeast(1L)
                         val instantBytesPerSec = ((totalSent - lastRateLogBytes) * 1000.0) / instantWindowMs.toDouble()
                         onLog(
-                            "Передано: $progress% " +
+                            "Transferred: $progress% " +
                                 "(${formatBytes(totalSent)}/${formatBytes(totalBytes)}), " +
                                 "speed=${formatBytesPerSecond(instantBytesPerSec)}, " +
                                 "avg=${formatBytesPerSecond(avgBytesPerSec)}, " +
@@ -1400,7 +1400,7 @@ class FastbootProtocol(
                 }
             }
         } catch (e: Exception) {
-            val message = "Ошибка чтения/UsbRequest-передачи файла: ${e.message ?: e.javaClass.simpleName}"
+            val message = "Read error during UsbRequest file transfer: ${e.message ?: e.javaClass.simpleName}"
             markSessionBroken(message)
             return TransferResult(false, message = message, bytesTransferred = totalSent)
         } finally {
@@ -1409,7 +1409,7 @@ class FastbootProtocol(
         }
 
         if (totalSent != totalBytes) {
-            val message = "Передача завершилась раньше конца файла (${formatBytes(totalSent)}/${formatBytes(totalBytes)})"
+            val message = "Transfer ended before the end of the file (${formatBytes(totalSent)}/${formatBytes(totalBytes)})"
             markSessionBroken(message)
             return TransferResult(false, message = message, bytesTransferred = totalSent)
         }
@@ -1443,7 +1443,7 @@ class FastbootProtocol(
         val pipelineDepth = NATIVE_USBFS_PIPELINE_DEPTH
         val profileLabel = NATIVE_USBFS_PROFILE_LABEL
         onLog(
-            "Передача $label: ${formatBytes(totalBytes)}. " +
+            "Transfer $label: ${formatBytes(totalBytes)}. " +
                 "transport=${profileLabel}, depth=$pipelineDepth, block=${formatBytes(blockBytes.toLong())}, " +
                 "stall-timeout=${formatDuration(NATIVE_USBFS_URB_TIMEOUT_MS.toLong())}, " +
                 "hard-timeout=${formatDuration(NATIVE_USBFS_HARD_TIMEOUT_MS.toLong())}."
@@ -1457,7 +1457,7 @@ class FastbootProtocol(
             NativeTransferProgress.calculate(0L, totalBytes, 0L),
             profileLabel
         ))
-        onLog("⏳ Native USBFS ожидает первый URB completion: передано 0 B/${formatBytes(totalBytes)}, speed=N/A")
+        onLog("⏳ Native USBFS is waiting for the first URB completion: transferred 0 B/${formatBytes(totalBytes)}, speed=N/A")
         val startedMs = System.currentTimeMillis()
         var lastNativeLoggedProgress = -1
         var lastNativeLogMs = startedMs
@@ -1515,7 +1515,7 @@ class FastbootProtocol(
                 elapsedMs = result.elapsedMs.takeIf { it > 0L } ?: elapsedMs
             )
             val speedLabel = if (result.bytesTransferred <= 0L) {
-                "speed=N/A (DATA не стартовала)"
+                "speed=N/A (DATA did not start)"
             } else {
                 "avg=${formatBytesPerSecond(speed)}"
             }
@@ -1524,13 +1524,13 @@ class FastbootProtocol(
                 NativeTransferProgress.formatDetail(failureMetrics, profileLabel) +
                     "  ·  stage=${NativeUsbfsBackend.stageLabel(result.stage)}"
             )
-            val message = result.message + ", $speedLabel, profile=${profileLabel}. Повтор/смена транспорта в этой DATA-сессии запрещены; выполните новый вход в Fastboot."
+            val message = result.message + ", $speedLabel, profile=${profileLabel}. Retry/transport switch in this DATA session is forbidden; enter Fastboot again."
             markSessionBroken(message)
             attemptEndpointResetRecovery("Native USBFS wedge (${NativeUsbfsBackend.stageLabel(result.stage)})")
             return TransferResult(false, message = message, bytesTransferred = result.bytesTransferred)
         }
         if (result.bytesTransferred != totalBytes) {
-            val message = "Native USBFS передал неожиданный размер: ${formatBytes(result.bytesTransferred)}/${formatBytes(totalBytes)}"
+            val message = "Native USBFS transferred an unexpected size: ${formatBytes(result.bytesTransferred)}/${formatBytes(totalBytes)}"
             markSessionBroken(message)
             return TransferResult(false, message = message, bytesTransferred = result.bytesTransferred)
         }
@@ -1552,7 +1552,7 @@ class FastbootProtocol(
         val conn = connection
         val out = endpointOut
         if (conn == null || out == null) {
-            val message = "USB DATA transport недоступен (sync): соединение или OUT endpoint отсутствует"
+            val message = "USB DATA transport unavailable (sync): connection or OUT endpoint is missing"
             markSessionBroken(message)
             return TransferResult(false, message = message, bytesTransferred = 0L)
         }
@@ -1566,8 +1566,8 @@ class FastbootProtocol(
         var lastUiUpdateMs = startedMs
 
         onLog(
-            "Передача $label (sync): ${formatBytes(totalBytes)}. " +
-                "transport=bulkTransfer, block=16 KB. Не сворачивайте приложение и не отключайте OTG/кабель."
+            "Transfer $label (sync): ${formatBytes(totalBytes)}. " +
+                "transport=bulkTransfer, block=16 KB. Do not background the app or disconnect OTG/cable."
         )
         onLogVerbose(
             "[fastboot-data-diag] mode=bulkTransfer sdk=${Build.VERSION.SDK_INT} " +
@@ -1578,7 +1578,7 @@ class FastbootProtocol(
             file.inputStream().use { input ->
                 while (true) {
                     if (cancelled) {
-                        val message = "Операция отменена во время sync DATA-фазы на ${formatBytes(totalSent)}/${formatBytes(totalBytes)}"
+                        val message = "Operation cancelled during sync DATA phase at ${formatBytes(totalSent)}/${formatBytes(totalBytes)}"
                         markSessionBroken(message)
                         return TransferResult(false, cancelled = true, message = message, bytesTransferred = totalSent)
                     }
@@ -1600,16 +1600,16 @@ class FastbootProtocol(
                             // Mid-stream retry is intentionally forbidden: after an ambiguous OUT
                             // failure we cannot prove whether the controller accepted bytes.
                             val message =
-                                "Sync bulkTransfer сбой: return=$sent, requested=$requested, " +
+                                "Sync bulkTransfer failure: return=$sent, requested=$requested, " +
                                     "elapsed=${formatMicros(elapsedUs)}, timeout=${SYNC_BULK_TIMEOUT_MS}ms, " +
                                     "offset=${totalSent + offset} (${formatBytes(totalSent + offset)}/${formatBytes(totalBytes)}), " +
-                                    "${endpointDescriptor(out)}. Повтор в той же DATA-сессии запрещён."
+                                    "${endpointDescriptor(out)}. Retry in the same DATA session is forbidden."
                             markSessionBroken(message)
                             return TransferResult(false, message = message, bytesTransferred = totalSent + offset)
                         }
                         if (sent > requested) {
                             val message =
-                                "Sync bulkTransfer вернул невозможный размер: return=$sent > requested=$requested, " +
+                                "Sync bulkTransfer returned an impossible size: return=$sent > requested=$requested, " +
                                     "offset=${totalSent + offset}, ${endpointDescriptor(out)}"
                             markSessionBroken(message)
                             return TransferResult(false, message = message, bytesTransferred = totalSent + offset)
@@ -1643,7 +1643,7 @@ class FastbootProtocol(
                         now - lastRateLogMs >= DiagnosticLogPolicy.progressLogIntervalMs(debugLogging)
                     if (shouldLog) {
                         onLog(
-                            "Передано (sync): $progress% (${formatBytes(totalSent)}/${formatBytes(totalBytes)}), " +
+                            "Transferred (sync): $progress% (${formatBytes(totalSent)}/${formatBytes(totalBytes)}), " +
                                 "avg=${formatBytesPerSecond(avgBytesPerSec)}, eta=${formatDuration(etaMs)}"
                         )
                         lastLoggedProgress = progress
@@ -1652,17 +1652,17 @@ class FastbootProtocol(
                 }
             }
         } catch (e: Exception) {
-            val message = "Ошибка sync-передачи файла: ${e.message ?: e.javaClass.simpleName}"
+            val message = "Sync file-transfer error: ${e.message ?: e.javaClass.simpleName}"
             markSessionBroken(message)
             return TransferResult(false, message = message, bytesTransferred = totalSent)
         }
 
         if (totalSent != totalBytes) {
-            val message = "Sync-передача завершилась раньше конца файла (${formatBytes(totalSent)}/${formatBytes(totalBytes)})"
+            val message = "Sync transfer ended before the end of the file (${formatBytes(totalSent)}/${formatBytes(totalBytes)})"
             markSessionBroken(message)
             return TransferResult(false, message = message, bytesTransferred = totalSent)
         }
-        onLog("✅ Sync-передача завершена: ${formatBytes(totalSent)}")
+        onLog("✅ Sync-transfer completed: ${formatBytes(totalSent)}")
         return TransferResult(true, bytesTransferred = totalBytes)
     }
 
@@ -1708,7 +1708,7 @@ class FastbootProtocol(
             request.cancel()
             return DataOutResult(
                 cancelled = true,
-                message = "DATA-передача отменена во время UsbRequest: offset=$absoluteOffset, requested=$requested, " +
+                message = "DATA transfer cancelled during UsbRequest: offset=$absoluteOffset, requested=$requested, " +
                     "elapsed=${formatMicros(elapsedUs)}, $endpointInfo"
             )
         }
@@ -1722,7 +1722,7 @@ class FastbootProtocol(
         if (completed !== request) {
             request.cancel()
             return DataOutResult(
-                message = "Получено завершение чужого UsbRequest: offset=$absoluteOffset, requested=$requested, " +
+                message = "Received completion for a foreign UsbRequest: offset=$absoluteOffset, requested=$requested, " +
                     "elapsed=${formatMicros(elapsedUs)}, $endpointInfo"
             )
         }
@@ -1734,7 +1734,7 @@ class FastbootProtocol(
         )
         if (sent <= 0 || sent > requested) {
             return DataOutResult(
-                message = "UsbRequest завершён с некорректным количеством байт: offset=$absoluteOffset, " +
+                message = "UsbRequest completed with an invalid byte count: offset=$absoluteOffset, " +
                     "requested=$requested, confirmed=$sent, elapsed=${formatMicros(elapsedUs)}, $endpointInfo"
             )
         }
@@ -1747,21 +1747,21 @@ class FastbootProtocol(
     private fun logFastbootFailure(context: String, payload: String) {
         val cleanPayload = payload.trim().ifBlank { "unknown fastboot failure" }
         onLog("❌ $context: $cleanPayload")
-        explainFastbootFailure(cleanPayload)?.let { onLog("ℹ️ Расшифровка: $it") }
+        explainFastbootFailure(cleanPayload)?.let { onLog("ℹ️ Explanation: $it") }
     }
 
     private fun explainFastbootFailure(payload: String): String? {
         val p = payload.lowercase(Locale.US)
         return when {
-            "locked" in p || "unlock" in p && "not" in p -> "загрузчик заблокирован или раздел запрещён к записи при текущем состоянии bootloader."
-            "not allowed" in p || "permission" in p || "denied" in p -> "OEM bootloader отказал в операции; проверьте unlocked=yes, режим fastbootd и разрешённость раздела."
-            "no such partition" in p || "unknown partition" in p || "partition" in p && "not found" in p -> "раздел отсутствует на этой модели/слоте или ROM не соответствует product устройства."
-            "too large" in p || "data too" in p || "max-download" in p -> "файл больше лимита max-download-size; нужен другой режим fastboot/fastbootd или раздельный/sparse-образ."
-            "sparse" in p -> "ошибка sparse/sparsechunk-образа; проверьте целостность ROM и наличие всех chunk-файлов."
-            "signature" in p || "verify" in p || "verification" in p || "vbmeta" in p -> "отказ проверки подписи/верификации; проверьте vbmeta/verity/verification и совместимость ROM."
-            "not support" in p || "unknown command" in p || "unrecognized" in p -> "команда не поддерживается этим bootloader/fastbootd; возможно нужен другой режим или OEM-специфичный скрипт."
-            "space" in p || "storage" in p || "allocation" in p -> "не хватает места/размера в dynamic partitions; проверьте update-super, super_empty.img и fastbootd."
-            "timeout" in p || "timed out" in p -> "таймаут USB/fastboot; проверьте кабель, OTG-питание и не блокируйте экран хоста."
+            "locked" in p || "unlock" in p && "not" in p -> "bootloader is locked or the partition is not writable in the current bootloader state."
+            "not allowed" in p || "permission" in p || "denied" in p -> "OEM bootloader rejected the operation; check unlocked=yes, fastbootd mode, and whether the partition may be written."
+            "no such partition" in p || "unknown partition" in p || "partition" in p && "not found" in p -> "partition is missing on this model/slot, or the ROM does not match the device product."
+            "too large" in p || "data too" in p || "max-download" in p -> "file exceeds the max-download-size limit; use another fastboot/fastbootd mode or a partition/sparse image."
+            "sparse" in p -> "sparse/sparsechunk image error; check ROM integrity and that all chunk files are present."
+            "signature" in p || "verify" in p || "verification" in p || "vbmeta" in p -> "signature/verification rejection; check vbmeta/verity/verification and ROM compatibility."
+            "not support" in p || "unknown command" in p || "unrecognized" in p -> "command is not supported by this bootloader/fastbootd; another mode or an OEM-specific script may be required."
+            "space" in p || "storage" in p || "allocation" in p -> "not enough space/size in dynamic partitions; check update-super, super_empty.img, and fastbootd."
+            "timeout" in p || "timed out" in p -> "USB/fastboot timeout; check cable, OTG power, and do not lock the host screen."
             else -> null
         }
     }
@@ -1821,7 +1821,7 @@ class FastbootProtocol(
         runCatching { activeDataRequest?.cancel() }
         val nativeCancelRequested = NativeUsbfsBackend.cancelActiveTransfer()
         if (!wasCancelled && nativeCancelRequested) {
-            onLog("⏳ Отмена Native USBFS запрошена. Завершаем pending URB через DISCARDURB → REAP; USB-сессия остаётся активной до фактического завершения очистки.")
+            onLog("⏳ Native USBFS cancellation requested. Finishing pending URB through DISCARDURB → REAP; USB session remains active until cleanup actually completes.")
         }
     }
 
@@ -1850,8 +1850,8 @@ class FastbootProtocol(
             )
         ) {
             onLog(
-                "⏳ Закрытие UsbDeviceConnection отложено: Native USBFS ещё выполняет " +
-                    "DISCARDURB → REAP. Интерфейс и file descriptor остаются открыты до подтверждённого drain."
+                "⏳ UsbDeviceConnection close deferred: Native USBFS is still running " +
+                    "DISCARDURB → REAP. Interface and file descriptor remain open until drain is confirmed."
             )
             return false
         }
@@ -1868,19 +1868,19 @@ class FastbootProtocol(
 
     private fun ensureSessionReady(operation: String): Boolean {
         if (sessionState == SessionState.BROKEN || sessionState == SessionState.CLOSED) {
-            onLog("⛔ Команда запрещена: Fastboot-сессия $sessionState. Требуется повторный вход устройства в Fastboot.")
+            onLog("⛔ Command blocked: Fastboot session $sessionState. Device must re-enter Fastboot.")
             return false
         }
         if (!isConnected) {
-            onLog("❌ Нет Fastboot-соединения для $operation")
+            onLog("❌ No Fastboot connection for $operation")
             return false
         }
         if (sessionState != SessionState.IDLE) {
-            markSessionBroken("Новая операция '$operation' запрошена в состоянии $sessionState")
+            markSessionBroken("New operation '$operation' requested in state $sessionState")
             return false
         }
         if (cancelled) {
-            onLog("⚠️ Операция отменена до отправки команды: $operation")
+            onLog("⚠️ Operation cancelled before sending the command: $operation")
             return false
         }
         return true
@@ -1896,9 +1896,9 @@ class FastbootProtocol(
             onLog("⛔ FASTBOOT SESSION BROKEN [${lastBrokenReasonCode.name}]: $reason")
             val closed = closeUsbTransport()
             if (closed) {
-                onLog("⛔ USB-соединение закрыто. Новые команды запрещены до полного повторного входа целевого устройства в Fastboot.")
+                onLog("⛔ USB connection is closed. New commands are blocked until the target device fully re-enters Fastboot.")
             } else {
-                onLog("⛔ Новые команды запрещены. Физическое закрытие USB будет выполнено только после подтверждённого Native USBFS drain.")
+                onLog("⛔ New commands are blocked. Physical USB close will be performed only after confirmed Native USBFS drain.")
             }
         }
     }
@@ -1907,18 +1907,18 @@ class FastbootProtocol(
     private fun classifyBrokenReason(reason: String): BrokenReasonCode {
         val lower = reason.lowercase(Locale.US)
         return when {
-            "первич" in lower && ("handshake" in lower || "getvar:product" in lower) -> BrokenReasonCode.FIRST_RESPONSE_TIMEOUT
-            "cancel" in lower || "отмен" in lower -> BrokenReasonCode.USER_CANCELLED_DURING_DATA
+            "initial" in lower && ("handshake" in lower || "getvar:product" in lower) -> BrokenReasonCode.FIRST_RESPONSE_TIMEOUT
+            "cancel" in lower || "cancel" in lower -> BrokenReasonCode.USER_CANCELLED_DURING_DATA
             "native usbfs" in lower || "urb" in lower -> BrokenReasonCode.NATIVE_USBFS_FAILURE
-            "short write" in lower || "неоднозначно" in lower || ("отправ" in lower && "/" in lower) -> BrokenReasonCode.SHORT_WRITE
+            "short write" in lower || "ambiguous" in lower || ("sent" in lower && "/" in lower) -> BrokenReasonCode.SHORT_WRITE
             "short read" in lower -> BrokenReasonCode.SHORT_READ
-            "read failed" in lower || "таймаут ответа" in lower || "ожидания" in lower -> BrokenReasonCode.USB_IN_TIMEOUT
+            "read failed" in lower || "response timeout" in lower || "wait" in lower -> BrokenReasonCode.USB_IN_TIMEOUT
             "write" in lower || "out" in lower -> BrokenReasonCode.USB_OUT_TIMEOUT
-            "disconnect" in lower || "отключ" in lower || "ушло с шины" in lower -> BrokenReasonCode.DEVICE_DISCONNECTED
-            "interface" in lower || "интерфейс" in lower -> BrokenReasonCode.INTERFACE_LOST
-            "неизвестный ответ" in lower || "unexpected" in lower -> BrokenReasonCode.UNEXPECTED_RESPONSE
-            "состояни" in lower || "state" in lower || "незаверш" in lower -> BrokenReasonCode.INVALID_STATE
-            "protocol" in lower || "синхронизац" in lower -> BrokenReasonCode.PROTOCOL_DESYNC
+            "disconnect" in lower || "disconnect" in lower || "left the bus" in lower -> BrokenReasonCode.DEVICE_DISCONNECTED
+            "interface" in lower || "interface" in lower -> BrokenReasonCode.INTERFACE_LOST
+            "unknown response" in lower || "unexpected" in lower -> BrokenReasonCode.UNEXPECTED_RESPONSE
+            "state" in lower || "state" in lower || "unfinished" in lower -> BrokenReasonCode.INVALID_STATE
+            "protocol" in lower || "sync" in lower -> BrokenReasonCode.PROTOCOL_DESYNC
             else -> BrokenReasonCode.UNKNOWN
         }
     }
@@ -1932,7 +1932,7 @@ class FastbootProtocol(
         if (!ensureSessionReady(command)) return false
         val cmdBytes = command.toByteArray(Charsets.US_ASCII)
         if (cmdBytes.isEmpty() || cmdBytes.size > 64) {
-            onLog("❌ Некорректный размер Fastboot-команды: ${cmdBytes.size} байт")
+            onLog("❌ Invalid Fastboot command size: ${cmdBytes.size} bytes")
             return false
         }
 
@@ -1953,8 +1953,8 @@ class FastbootProtocol(
                 "return=$sent elapsed_us=$elapsedUs timeout_ms=$timeout endpoint=${endpointDescriptor(endpointOut)}"
         )
         if (sent != cmdBytes.size) {
-            val message = "Команда отправлена неоднозначно: $sent/${cmdBytes.size} байт, elapsed=${formatMicros(elapsedUs)}"
-            onLog("ОШИБКА: $message")
+            val message = "Command send was ambiguous: $sent/${cmdBytes.size} bytes, elapsed=${formatMicros(elapsedUs)}"
+            onLog("ERROR: $message")
             markSessionBroken(message)
             return false
         }
@@ -2026,10 +2026,10 @@ class FastbootProtocol(
                 "OKAY", "FAIL" -> { sessionState = SessionState.IDLE; return packet }
                 "INFO", "TEXT" -> continue
                 "DATA"         -> { sessionState = SessionState.DATA_OUT; return packet }
-                else           -> onLog("⚠️ Неизвестный ответ Fastboot: ${packet.raw}")
+                else           -> onLog("⚠️ Unknown Fastboot response: ${packet.raw}")
             }
         }
-        onLog("⚠️ Операция отменена пользователем")
+        onLog("⚠️ Operation cancelled by user")
         return null
     }
 
@@ -2051,7 +2051,7 @@ class FastbootProtocol(
         while (!cancelled) {
             val elapsed = System.currentTimeMillis() - startTime
             if (elapsed >= maxTotalTimeMs) {
-                val message = "Превышен лимит ожидания (${maxTotalTimeMs / 1000} сек) в состоянии $sessionState"
+                val message = "Wait limit exceeded (${maxTotalTimeMs / 1000} sec) in state $sessionState"
                 onLog("❌ $message")
                 markSessionBroken(message)
                 return null
@@ -2062,7 +2062,7 @@ class FastbootProtocol(
                 // Таймаут одного пакета — нормально при записи, логируем каждые 10 сек
                 val elapsedSec = elapsed / 1000
                 if (elapsedSec / 10 != lastLogSec / 10) {
-                    onLog("⏳ Ожидание ответа устройства... ${elapsedSec} сек")
+                    onLog("⏳ Waiting for device response... ${elapsedSec} sec")
                     lastLogSec = elapsedSec
                 }
                 continue
@@ -2071,10 +2071,10 @@ class FastbootProtocol(
             when (packet.type) {
                 "OKAY", "FAIL" -> { sessionState = SessionState.IDLE; return packet }
                 "INFO", "TEXT" -> continue
-                else           -> onLog("⚠️ Неизвестный ответ: ${packet.raw}")
+                else           -> onLog("⚠️ Unknown response: ${packet.raw}")
             }
         }
-        onLog("⚠️ Операция отменена пользователем")
+        onLog("⚠️ Operation cancelled by user")
         return null
     }
 
@@ -2085,10 +2085,10 @@ class FastbootProtocol(
                 "DATA" -> { sessionState = SessionState.DATA_OUT; return packet }
                 "OKAY", "FAIL" -> { sessionState = SessionState.IDLE; return packet }
                 "INFO", "TEXT" -> continue
-                else                   -> onLog("⚠️ Неизвестный ответ Fastboot: ${packet.raw}")
+                else                   -> onLog("⚠️ Unknown Fastboot response: ${packet.raw}")
             }
         }
-        onLog("⚠️ Операция отменена пользователем")
+        onLog("⚠️ Operation cancelled by user")
         return null
     }
 
@@ -2102,8 +2102,8 @@ class FastbootProtocol(
             val remainingMs = timeout.toLong() - elapsedMs
             if (remainingMs <= 0L) {
                 markSessionBroken(
-                    "Таймаут ответа getvar:$name после подтверждённой отправки команды " +
-                        "($emptyReads пустых/неудачных чтений)"
+                    "getvar response timeout:$name after confirmed command send " +
+                        "($emptyReads empty/failed reads)"
                 )
                 return null
             }
@@ -2114,7 +2114,7 @@ class FastbootProtocol(
                 emptyReads += 1
                 if (debugLogging) {
                     onLog(
-                        "[debug] getvar:$name: чтение ответа не завершено, " +
+                        "[debug] getvar:$name: response read did not complete, " +
                             "failedRead=$emptyReads/$GETVAR_MAX_FAILED_READS remaining=${remainingMs}ms"
                     )
                 }
@@ -2126,7 +2126,7 @@ class FastbootProtocol(
                 // остаётся жёстким верхним пределом для реально мёртвой сессии.
                 if (emptyReads >= GETVAR_MAX_FAILED_READS && elapsedMs >= GETVAR_MIN_PATIENCE_MS) {
                     markSessionBroken(
-                        "Fastboot read failed $emptyReads раза для getvar:$name после подтверждённой отправки команды"
+                        "Fastboot read failed $emptyReads times for getvar:$name after confirmed command send"
                     )
                     return null
                 }
@@ -2154,10 +2154,10 @@ class FastbootProtocol(
                 }
                 "FAIL" -> {
                     sessionState = SessionState.IDLE
-                    if (debugLogging) onLog("⚠️ getvar:$name не поддерживается: ${packet.payload}")
+                    if (debugLogging) onLog("⚠️ getvar:$name is not supported: ${packet.payload}")
                     return null
                 }
-                else -> onLog("⚠️ Неизвестный ответ Fastboot: ${packet.raw}")
+                else -> onLog("⚠️ Unknown Fastboot response: ${packet.raw}")
             }
         }
         return null
@@ -2173,8 +2173,8 @@ class FastbootProtocol(
             val remainingMs = timeout.toLong() - elapsedMs
             if (remainingMs <= 0L) {
                 markSessionBroken(
-                    "Таймаут ответа getvar:all после подтверждённой отправки команды " +
-                        "($emptyReads пустых/неудачных чтений, lines=${lines.size})"
+                    "getvar response timeout:all after confirmed command send " +
+                        "($emptyReads empty/failed reads, lines=${lines.size})"
                 )
                 return null
             }
@@ -2184,7 +2184,7 @@ class FastbootProtocol(
                 emptyReads += 1
                 if (emptyReads >= GETVAR_ALL_MAX_FAILED_READS && elapsedMs >= GETVAR_MIN_PATIENCE_MS) {
                     markSessionBroken(
-                        "Fastboot read failed $emptyReads раза для getvar:all после подтверждённой отправки команды"
+                        "Fastboot read failed $emptyReads times for getvar:all after confirmed command send"
                     )
                     return null
                 }
@@ -2216,7 +2216,7 @@ class FastbootProtocol(
                     sessionState = SessionState.IDLE
                     val message = packet.payload.ifBlank { packet.raw }
                     if (lines.isEmpty()) {
-                        onLog("⚠️ getvar:all не поддерживается: $message")
+                        onLog("⚠️ getvar:all is not supported: $message")
                         return null
                     }
                     val snapshot = FastbootGetVarAllParser.parse(
@@ -2226,12 +2226,12 @@ class FastbootProtocol(
                         finalMessage = message
                     )
                     onLog(
-                        "⚠️ getvar:all вернул частичный inventory: variables=${snapshot.variables.size}, " +
+                        "⚠️ getvar:all returned partial inventory: variables=${snapshot.variables.size}, " +
                             "partitions=${snapshot.partitions.size}, final=$message"
                     )
                     return snapshot
                 }
-                else -> onLog("⚠️ Неизвестный ответ getvar:all: ${packet.raw}")
+                else -> onLog("⚠️ Unknown getvar:all response: ${packet.raw}")
             }
         }
         return null
@@ -2248,8 +2248,8 @@ class FastbootProtocol(
         if (cleanCommand.startsWith("getvar:", ignoreCase = true)) {
             val name = cleanCommand.substringAfter(':').trim()
             if (name.equals("all", ignoreCase = true)) {
-                val suffix = cleanPayload.ifBlank { "$infoLines строк" }
-                onLog("✅ getvar:all завершён: $suffix")
+                val suffix = cleanPayload.ifBlank { "$infoLines lines" }
+                onLog("✅ getvar:all completed: $suffix")
                 return
             }
             val value = normalizeGetVarValue(name, cleanPayload).orEmpty()
@@ -2295,7 +2295,7 @@ class FastbootProtocol(
     private fun normalizePartitionName(partition: String): String? {
         val normalized = partition.trim().lowercase()
         if (normalized.isBlank() || !normalized.matches(Regex("[A-Za-z0-9._:-]+"))) {
-            onLog("❌ ОШИБКА: некорректное имя раздела: $partition")
+            onLog("❌ ERROR: invalid partition name: $partition")
             return null
         }
         return normalized
@@ -2311,18 +2311,18 @@ class FastbootProtocol(
 
     private fun fetchChunk(command: String, out: java.io.OutputStream, alreadyFetched: Long, totalSize: Long): Long? {
         if (!writeCommand(command, 5000)) {
-            onLog("ОШИБКА: Сбой отправки команды $command")
+            onLog("ERROR: Failed to send command $command")
             return null
         }
         val dataPacket = readUntilDataOrFinal(10000) ?: return null
         when (dataPacket.type) {
             "DATA" -> Unit
-            "FAIL" -> { onLog("❌ ОШИБКА fetch: ${dataPacket.payload}"); return null }
-            else -> { onLog("❌ ОШИБКА fetch: ожидался DATA, получено ${dataPacket.raw}"); return null }
+            "FAIL" -> { onLog("❌ ERROR fetch: ${dataPacket.payload}"); return null }
+            else -> { onLog("❌ ERROR fetch: expected DATA, got ${dataPacket.raw}"); return null }
         }
         val dataSize = parseFastbootDataSize(dataPacket.payload)
         if (dataSize == null || dataSize < 0L) {
-            onLog("❌ ОШИБКА fetch: некорректный DATA размер: ${dataPacket.payload}")
+            onLog("❌ ERROR fetch: invalid DATA size: ${dataPacket.payload}")
             return null
         }
         if (!readRawDataTo(out, dataSize, alreadyFetched, totalSize)) return null
@@ -2330,7 +2330,7 @@ class FastbootProtocol(
         return if (done.type == "OKAY") {
             dataSize
         } else {
-            onLog("❌ ОШИБКА fetch после data phase: ${done.payload}")
+            onLog("❌ ERROR fetch after data phase: ${done.payload}")
             null
         }
     }
@@ -2348,7 +2348,7 @@ class FastbootProtocol(
             val toRead = minOf(buffer.size.toLong(), expectedBytes - received, 16384L).toInt()
             val bytesRead = conn.bulkTransfer(input, buffer, toRead, 10000)
             if (bytesRead <= 0) {
-                onLog("❌ ОШИБКА fetch: таймаут/сбой чтения raw data ($received/$expectedBytes байт)")
+                onLog("❌ ERROR fetch: raw data read timeout/failure ($received/$expectedBytes bytes)")
                 return false
             }
             out.write(buffer, 0, bytesRead)
@@ -2357,15 +2357,15 @@ class FastbootProtocol(
             if (totalSize > 0L) {
                 val progress = ((absolute * 100) / totalSize).toInt()
                 if (progress % 10 == 0 && progress != lastLoggedProgress) {
-                    onLog("Fetch: $progress% ($absolute/$totalSize байт)")
+                    onLog("Fetch: $progress% ($absolute/$totalSize bytes)")
                     lastLoggedProgress = progress
                 }
             } else if (received % (1024L * 1024L) < bytesRead) {
-                onLog("Fetch принято: ${alreadyFetched + received} байт")
+                onLog("Fetch received: ${alreadyFetched + received} bytes")
             }
         }
         if (cancelled) {
-            onLog("⚠️ Fetch отменён пользователем")
+            onLog("⚠️ Fetch cancelled by user")
             return false
         }
         return true
