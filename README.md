@@ -1,5 +1,53 @@
 # NekoFlash
 
+<!-- NEKOFLASH_DOWNLOAD_START -->
+## Download
+
+Latest release:
+
+- [NekoFlash v6.0.0-alpha10.1 APK](https://github.com/Ncorror/NekoFlash/releases/download/v6.0.0-alpha10.1/NekoFlash-v6.0.0-alpha10.1-release.apk)
+- [APK SHA-256](https://github.com/Ncorror/NekoFlash/releases/download/v6.0.0-alpha10.1/APK-SHA256.txt)
+
+The APK is distributed through GitHub Releases assets, not GitHub Packages.
+<!-- NEKOFLASH_DOWNLOAD_END -->
+<!-- NEKOFLASH_USB_NOTE_START -->
+## USB-C / ADB connection note
+
+When using a direct USB-C to USB-C cable, Android may sometimes negotiate the wrong USB role or expose the wrong device first.
+
+Correct state:
+
+- the phone running NekoFlash acts as the USB host;
+- the target phone appears as the connected USB device.
+
+Wrong state:
+
+- the NekoFlash host phone shows that it is charging from the target device;
+- an unexpected device appears first;
+- normal Android ADB `DEVICE` mode does not attach to the intended target.
+
+If this happens, unplug and reconnect the cable, swap cable ends, rotate the connector, or try another data-capable USB-C cable until the intended target device is detected.
+
+Do not start flash, sideload or shell operations while the detected device is not the intended target.
+
+This has been observed in normal Android ADB `DEVICE` mode. Fastboot and Recovery/SIDELOAD are separate modes and remain covered by their own validation tests.
+<!-- NEKOFLASH_USB_NOTE_END -->
+<!-- NEKOFLASH_LEGAL_SUMMARY_START -->
+## License and independence
+
+NekoFlash is licensed under the Apache License 2.0.
+
+NekoFlash is an independent project and is not affiliated with or endorsed by Google, Xiaomi, MiForge, Termux or any referenced open-source project.
+
+NekoFlash does not require Termux, desktop adb/fastboot, MiFlash, MiForge, Google Play Services or vendor cloud services for the documented USB workflows. Android platform APIs, build tools and declared open-source dependencies remain under their own licenses.
+
+See also:
+
+- [USB connection troubleshooting](docs/USB_CONNECTION_TROUBLESHOOTING.md)
+- [Legal review](docs/LEGAL_REVIEW.md)
+- [Third-party notices](THIRD_PARTY_NOTICES.md)
+<!-- NEKOFLASH_LEGAL_SUMMARY_END -->
+
 NekoFlash is an Android USB Host utility for working with a second Android device directly from a phone or tablet. The host connects over USB OTG (including Type-C to Type-C), uses Android USB Host APIs, and does not require root on the host.
 
 **Current source:** `6.0.0-alpha10` (`versionCode 232`). This is a pre-release build.
