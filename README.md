@@ -13,24 +13,27 @@ The APK is distributed through GitHub Releases assets, not GitHub Packages.
 <!-- NEKOFLASH_USB_NOTE_START -->
 ## USB-C / ADB connection note
 
-When using a direct USB-C to USB-C cable, Android may sometimes negotiate the wrong USB role or expose the wrong device first.
+When using a direct USB-C to USB-C cable, Android may sometimes negotiate the wrong USB data role or USB power role.
 
-Correct state:
+Expected connection:
 
 - the phone running NekoFlash acts as the USB host;
-- the target phone appears as the connected USB device.
+- the phone running NekoFlash provides bus power;
+- the target/patient phone appears as the connected USB device;
+- power flows from the NekoFlash host phone to the target/patient phone.
 
-Wrong state:
+Incorrect USB role:
 
-- the NekoFlash host phone shows that it is charging from the target device;
+- the NekoFlash host phone shows that it is charging from the target/patient device;
+- the target/patient device behaves as the USB host;
 - an unexpected device appears first;
 - normal Android ADB `DEVICE` mode does not attach to the intended target.
 
-If this happens, unplug and reconnect the cable, swap cable ends, rotate the connector, or try another data-capable USB-C cable until the intended target device is detected.
+If this happens, unplug and reconnect the cable, swap cable ends, rotate the USB-C connector, or try another data-capable USB-C cable until the intended target device is detected.
 
 Do not start flash, sideload or shell operations while the detected device is not the intended target.
 
-This has been observed in normal Android ADB `DEVICE` mode. Fastboot and Recovery/SIDELOAD are separate modes and remain covered by their own validation tests.
+This issue is documented for normal Android ADB `DEVICE` mode. Fastboot and Recovery/SIDELOAD are separate modes and remain covered by their own validation tests.
 <!-- NEKOFLASH_USB_NOTE_END -->
 <!-- NEKOFLASH_LEGAL_SUMMARY_START -->
 ## License and independence
