@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://ncorror.github.io/NekoFlash/</loc>
+    <lastmod>2026-08-10</lastmod>
+  </url>
+  <url>
+    <loc>https://ncorror.github.io/NekoFlash/ru/</loc>
+    <lastmod>2026-08-10</lastmod>
+  </url>
+  <url>
+    <loc>https://ncorror.github.io/NekoFlash/guides/</loc>
+    <lastmod>2026-08-10</lastmod>
+  </url>
+  <url>
+    <loc>https://ncorror.github.io/NekoFlash/guides/fastboot-from-android/</loc>
+    <lastmod>2026-08-10</lastmod>
+  </url>
+  <url>
+    <loc>https://ncorror.github.io/NekoFlash/guides/flash-recovery-twrp/</loc>
+    <lastmod>2026-08-10</lastmod>
+  </url>
+  <url>
+    <loc>https://ncorror.github.io/NekoFlash/guides/adb-sideload/</loc>
+    <lastmod>2026-08-10</lastmod>
+  </url>
+</urlset>

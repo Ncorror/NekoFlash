@@ -1,0 +1,10 @@
+{
+  "name": "NekoFlash",
+  "short_name": "NekoFlash",
+  "description": "Android USB OTG flashing tool for ADB, Fastboot, Recovery, ADB Sideload and Xiaomi Mi Unlock without a PC.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#081018",
+  "theme_color": "#ff7a1a",
+  "icons": []
+}
