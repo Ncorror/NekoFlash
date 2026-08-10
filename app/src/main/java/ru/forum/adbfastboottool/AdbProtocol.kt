@@ -1803,7 +1803,8 @@ class AdbProtocol(
         var remoteId: Int,
         val pending: ArrayDeque<ByteArray> = ArrayDeque(),
         var pendingOffset: Int = 0,
-        var closed: Boolean = false
+        var closed: Boolean = false,
+        var closeSent: Boolean = false
     )
 
     private data class ShellPacketHeader(val id: Int, val length: Int)
@@ -1850,15 +1851,30 @@ class AdbProtocol(
             when (header.command) {
                 A_OKAY -> {
                     if (header.dataLength > 0) readData(header.dataLength)
+                    if (!packetTargetsLocalStream(header, localId)) {
+                        onLog("ℹ️ ADB open: проигнорирован stale OKAY для local=${header.arg1}, ожидается local=$localId")
+                        continue
+                    }
                     return AdbStream(localId, header.arg0)
                 }
                 A_CLSE -> {
                     if (header.dataLength > 0) readData(header.dataLength)
+                    if (!packetTargetsLocalStream(header, localId)) {
+                        acknowledgeRemoteClose(header.arg1, header.arg0)
+                        onLog("ℹ️ ADB open: проигнорирован stale CLSE для local=${header.arg1}, ожидается local=$localId")
+                        continue
+                    }
+                    acknowledgeRemoteClose(localId, header.arg0)
                     onLog("❌ ADB stream закрыт устройством: $service")
                     return null
                 }
                 A_WRTE -> {
                     val data = readData(header.dataLength)
+                    if (!packetTargetsLocalStream(header, localId)) {
+                        acknowledgeRemoteClose(header.arg1, header.arg0)
+                        onLog("ℹ️ ADB open: проигнорирован stale WRTE для local=${header.arg1}, ожидается local=$localId")
+                        continue
+                    }
                     sendMessageInternal(A_OKAY, localId, header.arg0, EMPTY_PAYLOAD)
                     if (data != null && data.isNotEmpty()) logServiceOutput(data)
                 }
@@ -1871,10 +1887,21 @@ class AdbProtocol(
         return null
     }
 
+    private fun packetTargetsLocalStream(header: AdbHeader, localId: Int): Boolean = header.arg1 == localId
+
+    private fun acknowledgeRemoteClose(localId: Int, remoteId: Int) {
+        if (localId <= 0 || remoteId <= 0) return
+        runCatching { sendMessageInternal(A_CLSE, localId, remoteId, EMPTY_PAYLOAD) }
+    }
+
     private fun closeAdbStream(stream: AdbStream) {
-        if (stream.closed) return
+        if (stream.closeSent) {
+            stream.closed = true
+            return
+        }
         runCatching {
             sendMessageInternal(A_CLSE, stream.localId, stream.remoteId, EMPTY_PAYLOAD)
+            stream.closeSent = true
         }.onFailure { error ->
             // Transport может уже исчезнуть; локально stream всё равно закрывается ниже.
             onLog("ℹ️ ADB stream close packet не отправлен (${error.javaClass.simpleName})")
@@ -1893,17 +1920,27 @@ class AdbProtocol(
             when (header.command) {
                 A_OKAY -> {
                     if (header.dataLength > 0) readData(header.dataLength)
+                    if (!packetTargetsLocalStream(header, stream.localId)) continue
                     stream.remoteId = header.arg0
                     return true
                 }
                 A_WRTE -> {
                     val data = readData(header.dataLength)
+                    if (!packetTargetsLocalStream(header, stream.localId)) {
+                        acknowledgeRemoteClose(header.arg1, header.arg0)
+                        continue
+                    }
                     sendMessageInternal(A_OKAY, stream.localId, header.arg0, EMPTY_PAYLOAD)
                     if (data != null && data.isNotEmpty()) stream.pending.add(data)
                 }
                 A_CLSE -> {
                     if (header.dataLength > 0) readData(header.dataLength)
-                    stream.closed = true
+                    if (!packetTargetsLocalStream(header, stream.localId)) {
+                        acknowledgeRemoteClose(header.arg1, header.arg0)
+                        continue
+                    }
+                    stream.remoteId = header.arg0
+                    closeAdbStream(stream)
                     onLog("❌ ADB stream закрыт во время записи")
                     return false
                 }
@@ -1944,16 +1981,26 @@ class AdbProtocol(
             when (header.command) {
                 A_WRTE -> {
                     val data = readData(header.dataLength) ?: return null
+                    if (!packetTargetsLocalStream(header, stream.localId)) {
+                        acknowledgeRemoteClose(header.arg1, header.arg0)
+                        continue
+                    }
                     sendMessageInternal(A_OKAY, stream.localId, header.arg0, EMPTY_PAYLOAD)
                     if (data.isNotEmpty()) stream.pending.add(data)
                 }
                 A_OKAY -> {
                     if (header.dataLength > 0) readData(header.dataLength)
+                    if (!packetTargetsLocalStream(header, stream.localId)) continue
                     stream.remoteId = header.arg0
                 }
                 A_CLSE -> {
                     if (header.dataLength > 0) readData(header.dataLength)
-                    stream.closed = true
+                    if (!packetTargetsLocalStream(header, stream.localId)) {
+                        acknowledgeRemoteClose(header.arg1, header.arg0)
+                        continue
+                    }
+                    stream.remoteId = header.arg0
+                    closeAdbStream(stream)
                     return null
                 }
                 else -> {
