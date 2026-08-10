@@ -1,6 +1,5 @@
 # NekoFlash
 
-<!-- NEKOFLASH_OVERVIEW_START -->
 **NekoFlash** is an Android USB OTG flashing tool for controlling, servicing, and flashing another Android device directly from a phone or tablet — **without a PC** and without root on the host device.
 
 It implements **ADB and Fastboot directly over Android USB Host** and supports recovery/boot image flashing, ADB Sideload, device diagnostics, and Xiaomi Mi Unlock workflows.
@@ -9,7 +8,7 @@ It implements **ADB and Fastboot directly over Android USB Host** and supports r
 
 - Connect **Android-to-Android over USB OTG / USB-C**.
 - Use **ADB** shell, push/pull, APK installation, reboot commands, and ADB Sideload.
-- Use **Fastboot** for device diagnostics, partition discovery, flashing, booting, erasing, formatting, slot switching, and supported OEM commands.
+- Use **Fastboot** for diagnostics, partition discovery, flashing, booting, erasing, formatting, slot switching, and supported OEM commands.
 - Flash `recovery`, `boot`, `init_boot`, `vendor_boot`, `dtbo`, `vbmeta`, or another selected partition with **Quick Flash**.
 - Flash compatible custom recovery images such as **TWRP** directly from an Android phone.
 - Perform supported **Xiaomi Mi Unlock** workflows using Fastboot over USB.
@@ -17,32 +16,39 @@ It implements **ADB and Fastboot directly over Android USB Host** and supports r
 
 > [!WARNING]
 > Flashing, erasing, formatting, changing slots, or unlocking a bootloader can cause data loss or make a device unbootable. Always verify the target device, image, partition, and slot before writing.
-<!-- NEKOFLASH_OVERVIEW_END -->
 
 
 <!-- NEKOFLASH_DOWNLOAD_START -->
 ## Download
 
-Latest release:
+Latest release: **v6.0.0-alpha10.2**
 
-- [NekoFlash v6.0.0-alpha10.1 APK](https://github.com/Ncorror/NekoFlash/releases/download/v6.0.0-alpha10.1/NekoFlash-v6.0.0-alpha10.1-release.apk)
-- [APK SHA-256](https://github.com/Ncorror/NekoFlash/releases/download/v6.0.0-alpha10.1/APK-SHA256.txt)
+- [NekoFlash v6.0.0-alpha10.2 APK](https://github.com/Ncorror/NekoFlash/releases/download/v6.0.0-alpha10.2/NekoFlash-6.0.0-alpha10.2.apk)
+- [APK SHA-256](https://github.com/Ncorror/NekoFlash/releases/download/v6.0.0-alpha10.2/NekoFlash-6.0.0-alpha10.2.apk.sha256)
 
-The APK is distributed through GitHub Releases assets, not GitHub Packages.
+The APK is distributed through GitHub Releases assets, not GitHub Packages. Official release assets also include signing and build metadata.
 <!-- NEKOFLASH_DOWNLOAD_END -->
-
-<!-- NEKOFLASH_INSTALL_START -->
 ## Installation
 
 1. Download the latest NekoFlash APK from the **Download** section above.
-2. Optionally download the published SHA-256 checksum and verify the APK before installation.
+2. Optionally verify the APK with the published SHA-256 checksum.
 3. Allow your browser or file manager to install apps from unknown sources when Android asks.
-4. Install the APK on the Android phone or tablet that will act as the USB host.
+4. Install NekoFlash on the Android phone or tablet that will act as the USB host.
 5. Connect the target Android device using a data-capable USB OTG / USB-C cable.
 6. Select the required mode in NekoFlash: **ADB**, **Recovery / ADB Sideload**, or **Fastboot**.
 
 No PC is required for the documented USB flashing workflows.
-<!-- NEKOFLASH_INSTALL_END -->
+
+## Screenshots
+
+| Welcome | Device / Home | Quick Flash |
+|---|---|---|
+| <img src="docs/screenshots/welcome.png" width="220" alt="NekoFlash welcome screen on Android"> | <img src="docs/screenshots/home.png" width="220" alt="NekoFlash Android USB OTG device home screen"> | <img src="docs/screenshots/quick-flash.png" width="220" alt="NekoFlash Quick Flash recovery and boot image interface"> |
+
+| ADB Sideload | Terminal & Logs | Xiaomi Mi Unlock |
+|---|---|---|
+| <img src="docs/screenshots/sideload.png" width="220" alt="NekoFlash ADB Sideload interface"> | <img src="docs/screenshots/terminal.png" width="220" alt="NekoFlash built-in ADB Fastboot terminal and logs"> | <img src="docs/screenshots/unlock.png" width="220" alt="NekoFlash Xiaomi Mi Unlock interface"> |
+
 <!-- NEKOFLASH_USB_NOTE_START -->
 ## USB-C / ADB connection note
 
@@ -84,8 +90,9 @@ See also:
 - [Third-party notices](THIRD_PARTY_NOTICES.md)
 <!-- NEKOFLASH_LEGAL_SUMMARY_END -->
 
+NekoFlash is an Android USB Host utility for working with a second Android device directly from a phone or tablet. The host connects over USB OTG (including Type-C to Type-C), uses Android USB Host APIs, and does not require root on the host.
 
-**Current source version:** `6.0.0-alpha10` (`versionCode 232`). The published GitHub hotfix release is `v6.0.0-alpha10.1`; its APK still reports the embedded `versionName` `6.0.0-alpha10`. The `.1` suffix identifies the published hotfix release, not a different embedded app version.
+**Current source version:** `6.0.0-alpha10.2` (`versionCode 233`). The published GitHub release is `v6.0.0-alpha10.2`.
 
 ## Features
 
@@ -203,7 +210,7 @@ Before tagging a release candidate:
 4. verify the release version and signing identity;
 5. create and push the annotated tag matching `versionName`.
 
-The already-published `v6.0.0-alpha10.1` hotfix release must not be recreated or retagged. Its APK was built from the `6.0.0-alpha10` source version line.
+The published `v6.0.0-alpha10.2` release corresponds to `versionName` `6.0.0-alpha10.2` and `versionCode 233`. Do not recreate or retag an existing release.
 
 For the **next** tag-driven release, bump `versionName` / `versionCode` first, validate the exact merged commit, and then create a tag that exactly matches `v${versionName}` as required by `release.yml`.
 
