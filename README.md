@@ -53,7 +53,7 @@ See also:
 
 NekoFlash is an Android USB Host utility for working with a second Android device directly from a phone or tablet. The host connects over USB OTG (including Type-C to Type-C), uses Android USB Host APIs, and does not require root on the host.
 
-**Current source:** `6.0.0-alpha10` (`versionCode 232`). This is a pre-release build.
+**Current source version:** `6.0.0-alpha10` (`versionCode 232`). The published GitHub hotfix release is `v6.0.0-alpha10.1`; its APK still reports the embedded `versionName` `6.0.0-alpha10`. The `.1` suffix identifies the published hotfix release, not a different embedded app version.
 
 ## Features
 
@@ -171,14 +171,14 @@ Before tagging a release candidate:
 4. verify the release version and signing identity;
 5. create and push the annotated tag matching `versionName`.
 
-For the current source, the tag format is:
+The already-published `v6.0.0-alpha10.1` hotfix release must not be recreated or retagged. Its APK was built from the `6.0.0-alpha10` source version line.
 
-```bash
-git tag -a v6.0.0-alpha10 -m "NekoFlash 6.0.0-alpha10"
-git push origin v6.0.0-alpha10
-```
+For the **next** tag-driven release, bump `versionName` / `versionCode` first, validate the exact merged commit, and then create a tag that exactly matches `v${versionName}` as required by `release.yml`.
 
-Physical-device evidence retained by the project is in [docs/HARDWARE_VALIDATION.md](docs/HARDWARE_VALIDATION.md).
+Physical-device evidence retained by the project is indexed in [docs/HARDWARE_VALIDATION.md](docs/HARDWARE_VALIDATION.md), with device-specific reports for:
+
+- [POCO X7 Pro (`rodin`)](docs/evidence/POCO_X7_PRO_ALPHA10.md);
+- [POCO X3 Pro (`vayu`)](docs/evidence/POCO_X3_PRO_ALPHA10_1.md).
 
 ## Termux-only maintainer workflow
 

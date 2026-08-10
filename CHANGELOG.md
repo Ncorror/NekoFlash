@@ -2,7 +2,16 @@
 
 Release-level changes only. Commit-by-commit development notes, temporary plans and maintainer workflow history belong in Git history.
 
-## 6.0.0-alpha10 (232) — current release candidate
+## v6.0.0-alpha10.1 — published hotfix release
+
+- Fixed the Quick Flash slot-selection dialog so slotted partitions expose explicit active-slot and all-slots choices on hardware.
+- Fixed ADB one-shot shell stream close handling so stale `CLSE` packets from older stream IDs do not break subsequent shell commands.
+- Physically qualified the late alpha10 hotfix paths on POCO X7 Pro (`rodin`), including the Quick Flash slot selector, real `vendor_boot_a` / `vendor_boot_b` flashing, P3 Sideload classification, final Android boot and post-fix H13 ADB shell lifecycle.
+- Ran an exact merged release-base regression on POCO X3 Pro (`vayu`) across ADB, bootloader Fastboot, real Recovery flashing, Recovery/Sideload, Fastbootd and final Android boot.
+- Retained the POCO X3 Pro Sideload `verificationPending` counter and one post-success stream-close log as reporting/severity cleanup notes rather than misreporting them as installation failures.
+- Published GitHub release assets under `v6.0.0-alpha10.1`; the APK embedded version remains `versionName=6.0.0-alpha10`, `versionCode=232`.
+
+## 6.0.0-alpha10 (232) — source line
 
 - Added Quick Flash slot-target selection: when a partition reports `has-slot=yes`, the user can choose the current slot or all reported slots; explicitly suffixed `_a` / `_b` targets remain concrete.
 - Added desktop-fastboot-compatible `--slot` parsing for terminal `flash`, `erase` and `format`, including `--slot=all` expansion from device-reported slot information.
