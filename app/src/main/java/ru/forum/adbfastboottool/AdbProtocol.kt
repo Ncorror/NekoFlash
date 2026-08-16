@@ -99,7 +99,6 @@ class AdbProtocol(
     private val inboundHeaderBuffer = ByteArray(24)
 
     private val MAX_RECOVERY_INSTALL_LOG_CHARS = 512 * 1024
-    private val SIDELOAD_CLOSE_VERIFY_PENDING_PERCENT = 95
 
     private val RECOVERY_INSTALL_LOG_PATHS = listOf(
         "/cache/recovery/last_install",
@@ -488,11 +487,14 @@ class AdbProtocol(
             }
 
             fun servedPercent(): Int =
-                ((servedBytes * 100L) / fileSize).toInt().coerceIn(0, 100)
+                SideloadCompletionPolicy.servedPercent(servedBytes, fileSize)
 
             fun closeBeforeDoneDone(kind: SideloadFailureKind, message: String): SideloadResult {
                 val percent = servedPercent()
-                return if (percent >= SIDELOAD_CLOSE_VERIFY_PENDING_PERCENT) {
+                return if (
+                    SideloadCompletionPolicy.classifyCloseBeforeDoneDone(servedBytes, fileSize) ==
+                    SideloadCompletionPolicy.CloseClassification.VERIFY_PENDING
+                ) {
                     val detail = "$message after ≈$percent% transfer. Recovery may have already moved to the post-install/reboot flow; check the final result on the Recovery screen."
                     onProgress(100, "ADB Sideload · waiting for Recovery verification")
                     onLog("⚠️ ADB Sideload: $detail")

@@ -113,6 +113,8 @@ dependencies {
 
     // Palette API — динамическое извлечение цветов из bg_welcome.jpg
     implementation('androidx.palette:palette-ktx:1.0.0')
+
+    testImplementation('junit:junit:4.13.2')
 }
 
 

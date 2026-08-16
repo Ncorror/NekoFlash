@@ -46,6 +46,16 @@ jobs:
       - name: Print Gradle version
         run: ./gradlew --version
 
+      - name: Unit tests
+        timeout-minutes: 15
+        run: |
+          set -o pipefail
+          ./gradlew :app:testDebugUnitTest \
+            --no-daemon \
+            --stacktrace \
+            --warning-mode all \
+            --console=plain 2>&1 | tee unit_test_log.txt
+
       - name: Android lint
         timeout-minutes: 15
         run: |
