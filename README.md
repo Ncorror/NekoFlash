@@ -221,6 +221,8 @@ Physical-device evidence retained by the project is indexed in [docs/HARDWARE_VA
 
 ## Termux-only maintainer workflow
 
+Termux is used for Git/GitHub/SSH and GitHub Actions control only; it is not the Android build system. See [docs/TERMUX_SETUP.md](docs/TERMUX_SETUP.md) for the from-zero setup, SSH authentication, daily branch workflow, CI inspection and artifact download.
+
 Initial setup:
 
 ```bash
@@ -282,6 +284,7 @@ The public documentation is intentionally small:
 
 - [CHANGELOG.md](CHANGELOG.md) — release-level history;
 - [docs/HARDWARE_VALIDATION.md](docs/HARDWARE_VALIDATION.md) — retained physical-device evidence and release hardware boundary;
+- [docs/TERMUX_SETUP.md](docs/TERMUX_SETUP.md) — from-zero Termux Git/GitHub/SSH and CI-control workflow;
 - [PRIVACY.md](PRIVACY.md) — privacy/network behavior;
 - [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) — bundled dependencies, attribution and non-bundled reference acknowledgements;
 - [ASSETS_LICENSE.md](ASSETS_LICENSE.md) — branded artwork licensing.

@@ -1,5 +1,6 @@
 #!/data/data/com.termux/files/usr/bin/bash
 # Prepare a clean Termux installation for NekoFlash source work and GitHub CI.
+# Termux is intentionally not the Android build system for this project.
 set -euo pipefail
 
 pkg update -y
@@ -9,33 +10,22 @@ pkg install -y \
   git \
   gh \
   openssh \
-  curl \
-  wget \
   unzip \
   zip \
   rsync \
-  python \
   jq \
   coreutils \
   findutils \
   grep \
   sed \
-  gawk \
-  tar \
-  xz-utils \
-  openjdk-17 \
-  kotlin \
-  clang \
-  make \
-  cmake \
-  ninja
+  gawk
 
 if [ ! -d "$HOME/storage/downloads" ]; then
   termux-setup-storage
 fi
 
 printf '\nInstalled command check:\n'
-for cmd in git gh ssh curl wget unzip zip rsync python python3 java javac kotlinc jq sha256sum find grep sed awk tar clang make cmake ninja; do
+for cmd in git gh ssh ssh-keygen unzip zip rsync jq sha256sum find grep sed awk; do
   if command -v "$cmd" >/dev/null 2>&1; then
     printf '%-12s OK  %s\n' "$cmd" "$(command -v "$cmd")"
   else
@@ -45,10 +35,18 @@ done
 
 cat <<'NEXT'
 
+Termux is ready for source-control and GitHub CI work.
+Android SDK, Gradle build tooling, desktop adb/fastboot and native build toolchains
+are intentionally not installed by this script.
+
 Next steps:
   gh auth login
+  gh auth status
   gh auth setup-git
   git config --global user.name "YOUR_GITHUB_LOGIN"
   git config --global user.email "YOUR_EMAIL"
   git config --global init.defaultBranch main
+
+Full setup, SSH and CI instructions:
+  docs/TERMUX_SETUP.md
 NEXT
