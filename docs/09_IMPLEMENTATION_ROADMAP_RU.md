@@ -13,6 +13,8 @@
 
 ## Phase 1 — bootstrap нового repository — CURRENT
 
+Bootstrap CI baseline: **VERIFIED / PASS** (2026-08-28): 7 core unit tests, Android Lint 0 errors, debug APK assembled. Официальный Gradle Wrapper переносится из CI artifact в tracked repository infrastructure.
+
 - package/application identity;
 - Gradle/Compose baseline;
 - canonical docs из этого пакета;

@@ -35,6 +35,7 @@ Legacy package `ru.forum.adbfastboottool` и A2 package
 
 - Android Gradle Plugin `9.3.0`;
 - Gradle `9.5.0`;
+- checked-in official Gradle Wrapper `9.5.0`;
 - Kotlin `2.4.10`;
 - JDK `17` в CI;
 - Compose BOM `2026.08.00`;
@@ -60,6 +61,8 @@ USB/ADB/Fastboot/Recovery/vendor modules не создаются пустыми 
 GitHub Actions выполняет `test`, `lint`, `assembleDebug` и публикует APK/reports.
 Termux остаётся Git/worktree/edit/commit/push environment и не является
 обязательной Android build machine.
+
+Первый CI bootstrap подтвердил baseline 2026-08-28: core unit tests PASS, Android Lint — 0 errors, debug APK собран. Официально сгенерированный Gradle Wrapper `9.5.0` принят в repository после проверки SHA-256 wrapper JAR против опубликованного Gradle checksum. Distribution checksum также фиксируется в wrapper properties.
 
 ## Последствия
 

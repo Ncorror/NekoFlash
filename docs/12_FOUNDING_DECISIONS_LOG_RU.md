@@ -76,3 +76,6 @@ Phase 1 baseline: `minSdk 26`, `targetSdk 36`, `compileSdk 37`, AGP `9.3.0`, Gra
 
 ## D025 — Modules require real ownership
 Первый bootstrap создаёт только `:app`, `:core:model`, `:core:diagnostics`, `:core:operation`. Пустые USB/ADB/Fastboot/Recovery/vendor modules заранее не создаются.
+
+## D026 — Gradle Wrapper is tracked and verified
+Официальный Gradle Wrapper хранится в repository и является единственным build entrypoint для CI/developer environments. Bootstrap wrapper `9.5.0` получен из authoritative GitHub Actions run; wrapper JAR принимается только после сверки SHA-256 с официальным Gradle checksum, а distribution ZIP checksum фиксируется в `gradle-wrapper.properties`. CI больше не генерирует wrapper заново на каждом run.

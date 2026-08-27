@@ -91,6 +91,18 @@ USB-unstable stress patient. Не использовать как единств
 - build identity embedded/exportable in diagnostics;
 - canonical documentation updated in the same changeset when behavior, architecture, gates or project status changes.
 
+## 5.1. Phase 1 bootstrap CI evidence — 2026-08-28
+
+Первый успешный bootstrap run подтвердил:
+- `:core:model`: 3 tests, 0 failures/errors;
+- `:core:diagnostics`: 1 test, 0 failures/errors;
+- `:core:operation`: 3 tests, 0 failures/errors;
+- Android Lint: 0 errors;
+- `assembleDebug`: PASS, debug APK собран;
+- Gradle Wrapper `9.5.0` сгенерирован authoritative CI и принят для commit только после сверки wrapper JAR SHA-256 с официальным Gradle checksum.
+
+Наличие warning не превращается в failure автоматически: intentional compatibility/tooling warnings документируются, а actionable warnings устраняются отдельными проверяемыми changesets.
+
 ## 6. Hygiene CI
 
 CI должен запрещать production tree leftovers:

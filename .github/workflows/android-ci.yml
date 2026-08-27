@@ -28,30 +28,14 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - name: Set up Gradle 9.5.0
+      - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
-        with:
-          gradle-version: "9.5.0"
 
-      - name: Generate official Gradle wrapper
-        run: gradle wrapper --gradle-version 9.5.0 --distribution-type bin
-
-      - name: Verify generated wrapper
+      - name: Verify checked-in Gradle wrapper
         run: ./gradlew --version
 
       - name: Test, lint and build debug APK
         run: ./gradlew test lint assembleDebug --no-daemon --stacktrace
-
-      - name: Upload generated Gradle wrapper
-        uses: actions/upload-artifact@v5
-        with:
-          name: gradle-wrapper-bootstrap
-          path: |
-            gradlew
-            gradlew.bat
-            gradle/wrapper/gradle-wrapper.jar
-            gradle/wrapper/gradle-wrapper.properties
-          if-no-files-found: error
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v5
