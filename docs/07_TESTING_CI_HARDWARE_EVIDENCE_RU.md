@@ -76,7 +76,16 @@ USB-unstable stress patient. Не использовать как единств
 - Sideload verifier reconnect/correlation;
 - Mi Unlock staging на безопасных этапах и отдельно destructive/server-sensitive gate.
 
-## 5. CI minimum
+## 5. Localization quality gate
+
+English и Russian являются first-class UI locales. Для каждого changeset, меняющего пользовательский интерфейс:
+- default English resources и `values-ru` должны оставаться согласованными;
+- Android Lint `MissingTranslation`/resource format failures являются блокирующими;
+- user-facing Compose strings не должны возвращаться в hardcoded literals;
+- protocol/raw/evidence data не переводятся на уровне core;
+- при существенном UI изменении проверяется, что русский текст не ломает adaptive layout.
+
+## 6. CI minimum
 
 **Authoritative build/test environment нового NekoFlash — GitHub Actions.** Termux используется как Git/worktree environment и не обязан быть полноценной Android/Gradle build machine.
 
@@ -91,7 +100,7 @@ USB-unstable stress patient. Не использовать как единств
 - build identity embedded/exportable in diagnostics;
 - canonical documentation updated in the same changeset when behavior, architecture, gates or project status changes.
 
-## 5.1. Phase 1 bootstrap CI evidence — 2026-08-28
+## 6.1. Phase 1 bootstrap CI evidence — 2026-08-28
 
 Первый успешный bootstrap run подтвердил:
 - `:core:model`: 3 tests, 0 failures/errors;
@@ -103,7 +112,7 @@ USB-unstable stress patient. Не использовать как единств
 
 Наличие warning не превращается в failure автоматически: intentional compatibility/tooling warnings документируются, а actionable warnings устраняются отдельными проверяемыми changesets.
 
-## 6. Hygiene CI
+## 7. Hygiene CI
 
 CI должен запрещать production tree leftovers:
 - `*.orig`;
@@ -116,7 +125,7 @@ CI должен запрещать production tree leftovers:
 
 Не превращать это в тупой regex, который ломает legit test fixtures: правила должны быть узкими и объяснимыми.
 
-## 7. Definition of Done для core capability
+## 8. Definition of Done для core capability
 
 1. Один production path.
 2. Public/internal API определён.

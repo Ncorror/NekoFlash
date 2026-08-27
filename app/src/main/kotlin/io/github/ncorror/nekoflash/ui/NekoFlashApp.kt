@@ -18,7 +18,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import io.github.ncorror.nekoflash.R
 import io.github.ncorror.nekoflash.core.model.TargetMode
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -29,9 +31,9 @@ fun NekoFlashApp() {
             TopAppBar(
                 title = {
                     Column {
-                        Text("NekoFlash")
+                        Text(stringResource(R.string.app_name))
                         Text(
-                            text = "Professional Android host toolkit",
+                            text = stringResource(R.string.app_tagline),
                             style = MaterialTheme.typography.labelMedium,
                         )
                     }
@@ -67,11 +69,11 @@ private fun ProjectNavigation(modifier: Modifier = Modifier) {
             modifier = Modifier.padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text("Workspace", style = MaterialTheme.typography.titleMedium)
-            Text("Device")
-            Text("Terminal")
-            Text("Operations")
-            Text("Diagnostics")
+            Text(stringResource(R.string.nav_workspace), style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.nav_device))
+            Text(stringResource(R.string.nav_terminal))
+            Text(stringResource(R.string.nav_operations))
+            Text(stringResource(R.string.nav_diagnostics))
         }
     }
 }
@@ -85,13 +87,11 @@ private fun Workspace(modifier: Modifier = Modifier) {
         TargetBar()
 
         Text(
-            text = "Clean foundation",
+            text = stringResource(R.string.foundation_title),
             style = MaterialTheme.typography.headlineMedium,
         )
         Text(
-            text = "Phase 1 establishes the application shell and core contracts. " +
-                "USB ownership begins in Phase 2; ADB, Fastboot and Recovery are built " +
-                "as protocol engines rather than screen-specific implementations.",
+            text = stringResource(R.string.foundation_description),
             style = MaterialTheme.typography.bodyLarge,
         )
 
@@ -100,9 +100,12 @@ private fun Workspace(modifier: Modifier = Modifier) {
                 modifier = Modifier.padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text("Current build baseline", style = MaterialTheme.typography.titleMedium)
-                Text("compileSdk 37 · targetSdk 36 · minSdk 26")
-                Text("No novice/expert permission profiles. No artificial capability gates.")
+                Text(
+                    stringResource(R.string.build_baseline_title),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Text(stringResource(R.string.build_baseline_values))
+                Text(stringResource(R.string.professional_capability_policy))
             }
         }
     }
@@ -122,14 +125,32 @@ private fun TargetBar() {
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Column {
-                Text("Target", style = MaterialTheme.typography.labelMedium)
-                Text("No device attached", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.target_label), style = MaterialTheme.typography.labelMedium)
+                Text(
+                    stringResource(R.string.target_none_attached),
+                    style = MaterialTheme.typography.titleMedium,
+                )
             }
             Spacer(modifier = Modifier.width(24.dp))
             Column {
-                Text("Mode", style = MaterialTheme.typography.labelMedium)
-                Text(TargetMode.UNKNOWN.name, style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.mode_label), style = MaterialTheme.typography.labelMedium)
+                Text(
+                    localizedTargetMode(TargetMode.UNKNOWN),
+                    style = MaterialTheme.typography.titleMedium,
+                )
             }
         }
     }
 }
+
+@Composable
+private fun localizedTargetMode(mode: TargetMode): String = stringResource(
+    when (mode) {
+        TargetMode.ADB -> R.string.target_mode_adb
+        TargetMode.RECOVERY -> R.string.target_mode_recovery
+        TargetMode.SIDELOAD -> R.string.target_mode_sideload
+        TargetMode.BOOTLOADER_FASTBOOT -> R.string.target_mode_bootloader_fastboot
+        TargetMode.FASTBOOTD -> R.string.target_mode_fastbootd
+        TargetMode.UNKNOWN -> R.string.target_mode_unknown
+    },
+)

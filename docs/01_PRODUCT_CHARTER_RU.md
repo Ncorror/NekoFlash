@@ -70,7 +70,20 @@ NekoFlash должен честно соблюдать/отображать:
 - отказоустойчивости при USB detach/process death;
 - чистой архитектуры без второго скрытого engine.
 
-## 6. First-class product areas
+## 6. Языки продукта
+
+NekoFlash поддерживает **два first-class языка интерфейса: English и Русский**.
+
+Правила:
+- default/unqualified Android resources — English;
+- `values-ru` — полный русский UI без урезания capability surface;
+- новый пользовательский UI не принимается с hardcoded display strings в Kotlin, если строка не является точным protocol/device datum;
+- названия protocol commands, partition names, raw peer responses, wire tokens и stable diagnostic event codes не переводятся и не переписываются ядром;
+- локализация меняет представление, но не operation semantics, protocol behavior или evidence.
+
+На Android 13+ приложение должно объявляться системе как bilingual app для per-app language preferences. На более старых Android корректная системная locale fallback остаётся обязательной; собственный language picker, когда появится Settings UI, должен использовать platform/AndroidX locale APIs, а не кастомную подмену `Locale`.
+
+## 7. First-class product areas
 
 ### Device Workspace
 Физический target, identity, mode, capabilities, slots, connection/session и быстрые действия.
@@ -96,7 +109,7 @@ USB/protocol/session/transcript/evidence без необходимости debug
 ### Mi Unlock
 Самостоятельный важный workflow с хорошим UX, но реализованный поверх общих core APIs и отдельного vendor/network слоя.
 
-## 7. Не-цели
+## 8. Не-цели
 
 - не изображать bypass реальных security controls устройства;
 - не строить exploit framework как основу продукта;
@@ -104,7 +117,7 @@ USB/protocol/session/transcript/evidence без необходимости debug
 - не скрывать protocol failures ради красивого UX;
 - не делать две разные системы прав: «GUI» и «Expert».
 
-## 8. Критерий любого будущего ограничения
+## 9. Критерий любого будущего ограничения
 
 Любой новый hard-block должен отвечать на вопрос:
 

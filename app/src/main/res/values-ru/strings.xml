@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_tagline">Профессиональный инструментарий Android-хоста</string>
+
+    <string name="nav_workspace">Рабочая область</string>
+    <string name="nav_device">Устройство</string>
+    <string name="nav_terminal">Терминал</string>
+    <string name="nav_operations">Операции</string>
+    <string name="nav_diagnostics">Диагностика</string>
+
+    <string name="foundation_title">Чистая основа</string>
+    <string name="foundation_description">Этап 1 формирует оболочку приложения и базовые контракты. Владение USB начинается на этапе 2; ADB, Fastboot и Recovery строятся как протокольные движки, а не реализации, привязанные к отдельным экранам.</string>
+
+    <string name="build_baseline_title">Текущая базовая конфигурация сборки</string>
+    <string name="professional_capability_policy">Нет профилей разрешений «Новичок / Эксперт». Нет искусственных ограничителей возможностей.</string>
+
+    <string name="target_label">Целевое устройство</string>
+    <string name="target_none_attached">Устройство не подключено</string>
+    <string name="mode_label">Режим</string>
+
+    <string name="target_mode_recovery">Recovery</string>
+    <string name="target_mode_sideload">Sideload</string>
+    <string name="target_mode_bootloader_fastboot">Fastboot (bootloader)</string>
+    <string name="target_mode_unknown">Неизвестно</string>
+</resources>

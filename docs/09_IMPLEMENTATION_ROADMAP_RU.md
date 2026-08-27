@@ -23,7 +23,8 @@ Bootstrap CI baseline: **VERIFIED / PASS** (2026-08-28): 7 core unit tests, Andr
 - structured logging/evidence skeleton;
 - clean module boundaries;
 - NekoFlash icon/Welcome references;
-- минимальный adaptive app shell.
+- минимальный adaptive app shell;
+- bilingual resource foundation: English default + Russian `values-ru`, generated per-app locale config, без hardcoded user-facing strings.
 
 Сразу сделать Home/Target Bar skeleton, чтобы core развивался внутри реального product shell.
 

@@ -17,6 +17,11 @@ android {
         versionName = "0.1.0-dev"
     }
 
+    androidResources {
+        generateLocaleConfig = true
+        localeFilters += listOf("en", "ru")
+    }
+
     buildFeatures {
         compose = true
         buildConfig = false

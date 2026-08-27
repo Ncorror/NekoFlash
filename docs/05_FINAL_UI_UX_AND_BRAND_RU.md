@@ -309,6 +309,19 @@ UI с самого начала должен жить на:
 
 Одна information architecture, разные pane/navigation presentations. Никакого отдельного «tablet app».
 
-## 18. UX principle
+## 18. Localization / bilingual UI
+
+NekoFlash UI поддерживается на **English и Русском** с одинаковой capability surface. English — default resource locale, Русский — first-class `values-ru` translation.
+
+Обязательные правила:
+- никаких user-facing hardcoded strings в Compose/Kotlin;
+- навигация, confirmations, operation states, warnings, accessibility labels и Settings локализуются;
+- ADB/Fastboot command text, partition names, serials, paths, hashes, protocol tokens и raw device/server responses отображаются точно и не переводятся;
+- structured diagnostic event code остаётся locale-neutral, а человекочитаемый label может локализоваться;
+- длина русского текста учитывается в adaptive layout: перевод не должен обрезать критичную информацию или менять доступность action.
+
+Android 13+ использует системные per-app language preferences через generated locale config. Когда появится собственный Language control в Settings, он должен синхронизироваться с platform/AndroidX application locales.
+
+## 19. UX principle
 
 **Typed GUI и raw professional access — два представления одного и того же ядра, а не два уровня разрешений.**

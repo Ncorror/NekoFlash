@@ -49,4 +49,5 @@ Legacy и A2 заморожены как **reference/evidence**. Ни один �
 - Current work: **Phase 1 — clean repository bootstrap**. Bootstrap build baseline: **CI VERIFIED / PASS**; wrapper adoption and remaining CI hygiene are current work.
 - Termux: Git/worktree/edit/commit/push.
 - GitHub Actions: authoritative build/test/lint/CI environment.
+- UI languages: **English (default) + Русский (first-class)**.
 - Canonical docs обновляются вместе с кодом и решениями.

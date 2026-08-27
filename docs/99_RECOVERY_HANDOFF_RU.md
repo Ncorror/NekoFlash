@@ -28,6 +28,7 @@
 - Canonical docs обновляются одновременно с behavior/architecture/status.
 - Termux — рабочий Git/worktree; GitHub Actions — authoritative build/test CI.
 - `reference/archives/` — immutable historical snapshots, не production source.
+- UI bilingual: English default + Русский; user-facing strings — resources, protocol/raw/evidence data не переводятся ядром.
 
 ## Текущий статус
 

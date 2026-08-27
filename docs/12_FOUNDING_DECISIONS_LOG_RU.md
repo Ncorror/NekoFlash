@@ -79,3 +79,6 @@ Phase 1 baseline: `minSdk 26`, `targetSdk 36`, `compileSdk 37`, AGP `9.3.0`, Gra
 
 ## D026 — Gradle Wrapper is tracked and verified
 Официальный Gradle Wrapper хранится в repository и является единственным build entrypoint для CI/developer environments. Bootstrap wrapper `9.5.0` получен из authoritative GitHub Actions run; wrapper JAR принимается только после сверки SHA-256 с официальным Gradle checksum, а distribution ZIP checksum фиксируется в `gradle-wrapper.properties`. CI больше не генерирует wrapper заново на каждом run.
+
+## D027 — English and Russian are first-class UI languages
+NekoFlash поддерживает English и Русский как равноправные языки интерфейса. English — default Android resource locale, Russian — `values-ru`. Пользовательские строки не хардкодятся в Compose/Kotlin. Protocol commands, partition names, raw peer responses, wire tokens и stable diagnostic codes остаются точными locale-neutral данными; перевод применяется только к presentation layer. Android 13+ использует generated per-app locale configuration.

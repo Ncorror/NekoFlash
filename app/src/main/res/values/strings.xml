@@ -1,4 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">NekoFlash</string>
+    <string name="app_name" translatable="false">NekoFlash</string>
+    <string name="app_tagline">Professional Android host toolkit</string>
+
+    <string name="nav_workspace">Workspace</string>
+    <string name="nav_device">Device</string>
+    <string name="nav_terminal">Terminal</string>
+    <string name="nav_operations">Operations</string>
+    <string name="nav_diagnostics">Diagnostics</string>
+
+    <string name="foundation_title">Clean foundation</string>
+    <string name="foundation_description">Phase 1 establishes the application shell and core contracts. USB ownership begins in Phase 2; ADB, Fastboot and Recovery are built as protocol engines rather than screen-specific implementations.</string>
+
+    <string name="build_baseline_title">Current build baseline</string>
+    <string name="build_baseline_values" translatable="false">compileSdk 37 · targetSdk 36 · minSdk 26</string>
+    <string name="professional_capability_policy">No novice/expert permission profiles. No artificial capability gates.</string>
+
+    <string name="target_label">Target</string>
+    <string name="target_none_attached">No device attached</string>
+    <string name="mode_label">Mode</string>
+
+    <string name="target_mode_adb" translatable="false">ADB</string>
+    <string name="target_mode_recovery">Recovery</string>
+    <string name="target_mode_sideload">Sideload</string>
+    <string name="target_mode_bootloader_fastboot">Fastboot (bootloader)</string>
+    <string name="target_mode_fastbootd" translatable="false">Fastbootd</string>
+    <string name="target_mode_unknown">Unknown</string>
 </resources>

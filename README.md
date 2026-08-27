@@ -22,6 +22,18 @@ Correctness remains strict: transport framing, ownership, session generation,
 mutation boundaries, byte accounting, peer responses and `UNKNOWN` outcomes are
 core invariants.
 
+## Languages
+
+The product UI is maintained in **English and Russian**. English is the default
+resource locale and Russian is a first-class translation with feature parity.
+User-facing Compose text must come from Android string resources rather than
+hardcoded Kotlin literals. Protocol commands, peer responses, partition names
+and machine-readable diagnostic codes remain exact and are not rewritten by
+localization.
+
+On Android 13+ the supported locales are exposed through the platform per-app
+language settings via AGP-generated locale configuration.
+
 ## Build model
 
 The authoritative build/test environment is GitHub Actions. Termux is used for
