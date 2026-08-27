@@ -1,0 +1,78 @@
+# NekoFlash — Founding Decisions Log
+
+Короткий журнал решений, которые нельзя потерять между чатами/итерациями.
+
+## D001 — Clean repository
+Новая кодовая база строится отдельно. Legacy/A2 — reference/evidence, не фундамент целиком.
+
+## D002 — Product identity
+Продукт остаётся **NekoFlash**. Сохраняем бренд, Legacy Welcome identity и иконку как visual reference.
+
+## D003 — Professional capabilities
+Нет искусственного урезания ADB/Fastboot/Recovery/Terminal capabilities. Risk warnings не являются authorization системой.
+
+## D004 — Correctness is strict
+Transport/protocol invariants, ownership, exact byte accounting, stale generation protection и честный Unknown не ослабляются ради «полной свободы».
+
+## D005 — One generic core
+GUI, raw terminal, Quick Flash и Mi Unlock используют общие ADB/Fastboot/USB engines.
+
+## D006 — ADB is multi-stream
+Новый ADB foundation сразу проектируется с настоящим stream router/demux. Не допускается single-stream architecture как permanent base.
+
+## D007 — Fastboot is one transaction engine
+Raw и typed commands проходят через один engine. Host preflight — advisory, если wire operation валидна.
+
+## D008 — Mi Unlock is first-class
+Mi Unlock не забывается в «потом vendor tools». Это значимая часть финального NekoFlash, реализуемая после стабильного generic core.
+
+## D009 — Welcome remains
+Welcome не удаляется. Убирается только старая модель «accept risks / permissions = authorization to use app».
+
+## D010 — Device-centered UI
+Главный UX объект — target device/session. Target identity видна постоянно во время работы.
+
+## D011 — Terminal is real
+Нужен настоящий terminal emulator и полноценный shell/raw console, а не TextField-симуляция.
+
+## D012 — Operations outlive screens
+Flash/Sideload/transfers принадлежат application-scoped operation layer/foreground service, не Activity/ViewModel.
+
+## D013 — Large files are streaming
+64-bit sizes, ArtifactSource/Sink, никакого whole-file buffering. SAF seekability не предполагается.
+
+## D014 — Clean tree
+Никаких `.orig`, parallel old/new paths, production stubs и obsolete normative docs.
+
+## D015 — Hardware evidence
+Hardware-sensitive core changes закрываются реальным evidence, а не только unit tests.
+
+## D016 — A2 final gate is closed
+`vayu` inbound framing gate завершён: **PASS**. A2 development CLOSED; Legacy/A2 — frozen reference/evidence only.
+
+## D017 — No novice/expert permission profiles
+В продукте нет профиля «Новичок / Эксперт», unlock Expert Mode, hidden capability tier или onboarding-gate для профессиональных функций. Progressive disclosure допустим только как UX, не как authorization.
+
+## D018 — Documentation changes with the project
+Canonical docs обновляются в том же changeset, где меняются behavior, architecture, gates, CI/process rules или project status. Документация — часть Definition of Done.
+
+## D019 — GitHub Actions is authoritative CI
+Полноценные build/test/lint/static checks и APK artifacts выполняются в GitHub Actions. Green CI — обязательный integration signal.
+
+## D020 — Termux is the working Git environment
+Termux используется для worktree, editing, Git commit/push и repository operations. Полноценная Android/Gradle сборка в Termux не является требованием проекта.
+
+## D021 — Reference archives are immutable
+Legacy, A2 и founding canonical snapshots хранятся отдельно в `reference/archives/`, проверяются SHA-256 и после commit не заменяются. Active code/docs не строятся из этих ZIP.
+
+## D022 — Current repository identity
+`https://github.com/Ncorror/NekoFlash` остаётся официальным URL нового clean NekoFlash repository. Legacy source сохраняется как `reference/archives/NekoFlash-main-legacy.zip` и не должен идентифицироваться по текущему URL нового repository.
+
+## D023 — Application identity is fixed
+Новый production `applicationId` и Android `namespace`: `io.github.ncorror.nekoflash`. Текущий repository остаётся `https://github.com/Ncorror/NekoFlash`.
+
+## D024 — Build baseline is explicit
+Phase 1 baseline: `minSdk 26`, `targetSdk 36`, `compileSdk 37`, AGP `9.3.0`, Gradle `9.5.0`, Kotlin `2.4.10`, Compose BOM `2026.08.00`, Material 3 Adaptive `1.3.0`, JDK 17 в CI. Повышение `targetSdk` выполняется отдельным проверяемым changeset.
+
+## D025 — Modules require real ownership
+Первый bootstrap создаёт только `:app`, `:core:model`, `:core:diagnostics`, `:core:operation`. Пустые USB/ADB/Fastboot/Recovery/vendor modules заранее не создаются.

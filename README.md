@@ -1,0 +1,57 @@
+# NekoFlash
+
+[![Android CI](https://github.com/Ncorror/NekoFlash/actions/workflows/android-ci.yml/badge.svg)](https://github.com/Ncorror/NekoFlash/actions/workflows/android-ci.yml)
+
+NekoFlash is a clean-room professional Android host toolkit for ADB, Fastboot,
+Recovery and vendor workflows.
+
+## Project status
+
+- Phase 0: complete; A2 final inbound framing gate passed and A2 is frozen.
+- Phase 1: active; clean application/bootstrap foundation.
+- Legacy and A2 are reference/evidence only.
+
+## Product rule
+
+NekoFlash does not use novice/expert permission profiles, hidden capability tiers
+or product whitelists as an authorization model. The UI may warn and confirm,
+but valid professional protocol capabilities are not removed because they are
+powerful.
+
+Correctness remains strict: transport framing, ownership, session generation,
+mutation boundaries, byte accounting, peer responses and `UNKNOWN` outcomes are
+core invariants.
+
+## Build model
+
+The authoritative build/test environment is GitHub Actions. Termux is used for
+repository work, editing, commits and pushes; it is not required to be a full
+Android build machine.
+
+Current baseline:
+
+- applicationId / namespace: `io.github.ncorror.nekoflash`
+- minSdk: 26
+- targetSdk: 36
+- compileSdk: 37
+- Android Gradle Plugin: 9.3.0
+- Gradle: 9.5.0
+- Kotlin: 2.4.10
+- Compose BOM: 2026.08.00
+- Material 3 Adaptive: 1.3.0
+
+## Initial modules
+
+- `:app` — adaptive product shell.
+- `:core:model` — target/session identity contracts.
+- `:core:diagnostics` — structured diagnostics foundation.
+- `:core:operation` — operation identity, mutation boundary and outcome contracts.
+
+Modules are added only when they represent a real ownership boundary. USB, ADB,
+Fastboot, Recovery and vendor modules are introduced in their roadmap phases,
+not as empty placeholders.
+
+## Documentation
+
+Active canonical documentation lives in [`docs/`](docs/). Historical founding
+snapshots live in [`reference/archives/`](reference/archives/) and are immutable.
