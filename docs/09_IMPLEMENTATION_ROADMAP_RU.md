@@ -11,9 +11,9 @@
 
 Примечание: финальный diagnostics bundle gate отсутствует внутри frozen A2 archive; PASS зафиксирован как project status по подтверждению владельца.
 
-## Phase 1 — bootstrap нового repository — CURRENT
+## Phase 1 — bootstrap нового repository — COMPLETE / PASS
 
-Bootstrap CI baseline: **VERIFIED / PASS** (2026-08-28): 7 core unit tests, Android Lint 0 errors, debug APK assembled. Официальный Gradle Wrapper `9.5.0` уже tracked и verified. Текущий closure changeset добавляет launcher identity, explicit no-backup/D2D policy, AGP `9.3.2` и executable repository/localization hygiene checks; Phase 1 закрывается только после его green CI.
+Phase 1 closure CI: **VERIFIED / PASS** (2026-08-28). Подтверждены 7 core unit tests, Android Lint `0 errors`, debug APK assembly, checked-in verified Gradle Wrapper `9.5.0`, AGP `9.3.2`, launcher/adaptive/monochrome icon, explicit no-backup/D2D policy и executable repository/localization hygiene checks. Остались только два осознанных informational lint warnings: `targetSdk 36` при `compileSdk 37` и наличие более новой Gradle версии; они не подавляются без отдельного behavior/toolchain review.
 
 - package/application identity;
 - Gradle/Compose baseline;
@@ -32,7 +32,7 @@ Bootstrap CI baseline: **VERIFIED / PASS** (2026-08-28): 7 core unit tests, Andr
 
 Сразу сделать Home/Target Bar skeleton, чтобы core развивался внутри реального product shell.
 
-## Phase 2 — USB + Target/Session vertical slice
+## Phase 2 — USB + Target/Session vertical slice — CURRENT
 
 - descriptor discovery;
 - permission;

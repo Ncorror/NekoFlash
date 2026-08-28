@@ -76,4 +76,6 @@ Legacy и A2 считаются **FROZEN / REFERENCE ONLY**. Новые product 
 
 В frozen A2 archive нет сохранённого финального diagnostics bundle этого gate; статус PASS зафиксирован по подтверждению владельца проекта и согласуется с кодом/тестовой моделью A2.
 
-Текущая работа: **Phase 1 — closure candidate**. Bootstrap baseline и tracked wrapper уже подтверждены CI; launcher/backup policy, AGP `9.3.2` и executable hygiene checks должны пройти финальный green CI перед переходом к Phase 2 USB + Target/Session.
+**Phase 1 завершена: COMPLETE / PASS.** Authoritative GitHub Actions подтвердил clean bootstrap, tracked Gradle Wrapper, AGP `9.3.2`, launcher/adaptive/monochrome icon, explicit no-backup/D2D policy, executable repository/localization hygiene, 7 core unit tests, Android Lint `0 errors` и debug APK assembly.
+
+Текущая работа: **Phase 2 — USB + Target/Session vertical slice**. Первый production path строится от descriptor discovery и permission lifecycle к `TargetId`, `SessionGeneration`, application-scoped ownership, detach/re-enumeration, diagnostics и hardware evidence.

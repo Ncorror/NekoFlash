@@ -8,7 +8,8 @@ Recovery and vendor workflows.
 ## Project status
 
 - Phase 0: complete; A2 final inbound framing gate passed and A2 is frozen.
-- Phase 1: active; clean application/bootstrap foundation.
+- Phase 1: complete; clean application/bootstrap foundation verified by CI.
+- Phase 2: active; USB + Target/Session ownership foundation.
 - Legacy and A2 are reference/evidence only.
 
 ## Product rule

@@ -112,18 +112,21 @@ English и Russian являются first-class UI locales. Для каждог�
 
 Наличие warning не превращается в failure автоматически: intentional compatibility/tooling warnings документируются, а actionable warnings устраняются отдельными проверяемыми changesets.
 
-## 6.2. Phase 1 closure candidate
+## 6.2. Phase 1 closure evidence — 2026-08-28
 
-Closure changeset обязан подтвердить тем же authoritative CI:
+Authoritative CI подтвердил Phase 1 closure:
 - checked-in Gradle Wrapper остаётся build entrypoint;
 - AGP `9.3.2` собирает проект на JDK 17 / Gradle `9.5.0`;
-- launcher resource устраняет `MissingApplicationIcon`;
-- explicit `dataExtractionRules` устраняет actionable backup-policy warning;
-- `scripts/ci/check_repository_hygiene.sh` проходит на tracked tree;
-- `scripts/ci/check_localization.py` подтверждает EN/RU parity и отсутствие очевидного hardcoded Compose text;
-- unit tests, Android Lint и `assembleDebug` остаются PASS.
+- launcher/adaptive icon wired из NekoFlash brand reference;
+- monochrome themed icon присутствует, `MonochromeLauncherIcon` устранён;
+- explicit `dataExtractionRules`/backup policy устраняет actionable backup warning;
+- `scripts/ci/check_repository_hygiene.sh` PASS;
+- `scripts/ci/check_localization.py` PASS;
+- 7 core unit tests PASS;
+- Android Lint: **0 errors, 2 warnings**;
+- `assembleDebug`: PASS.
 
-`OldTargetApi` для осознанного `targetSdk 36` и available Gradle major/minor update не подавляются только ради нулевого счётчика warnings: их изменение требует отдельного behavior/toolchain review.
+Оставшиеся warnings осознанные и не подавляются ради нулевого счётчика: `OldTargetApi` для `targetSdk 36` при `compileSdk 37` и наличие более новой Gradle версии. Их изменение требует отдельного Android behavior/toolchain review.
 
 ## 7. Hygiene CI
 

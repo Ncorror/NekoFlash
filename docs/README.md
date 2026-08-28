@@ -46,7 +46,8 @@ Legacy и A2 заморожены как **reference/evidence**. Ни один �
 
 - Phase 0: **COMPLETE / PASS**.
 - Legacy/A2: **FROZEN / REFERENCE ONLY**.
-- Current work: **Phase 1 — closure candidate**. Bootstrap baseline and tracked wrapper: **CI VERIFIED / PASS**; launcher/backup policy, AGP `9.3.2` and executable hygiene checks await final green CI before Phase 1 is marked COMPLETE.
+- Phase 1: **COMPLETE / PASS** — clean bootstrap, verified tracked wrapper, AGP `9.3.2`, bilingual resource foundation, launcher/adaptive/monochrome icon, explicit no-backup/D2D policy, executable hygiene checks, 7 unit tests, Lint `0 errors`, debug APK assembly.
+- Current work: **Phase 2 — USB + Target/Session vertical slice**.
 - Termux: Git/worktree/edit/commit/push.
 - GitHub Actions: authoritative build/test/lint/CI environment.
 - UI languages: **English (default) + Русский (first-class)**.
