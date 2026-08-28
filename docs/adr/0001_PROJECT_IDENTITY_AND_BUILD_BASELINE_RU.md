@@ -33,7 +33,7 @@ Legacy package `ru.forum.adbfastboottool` и A2 package
 
 ### Build toolchain
 
-- Android Gradle Plugin `9.3.0`;
+- Android Gradle Plugin `9.3.2` (patch update from the initial `9.3.0` baseline);
 - Gradle `9.5.0`;
 - checked-in official Gradle Wrapper `9.5.0`;
 - Kotlin `2.4.10`;
@@ -42,7 +42,9 @@ Legacy package `ru.forum.adbfastboottool` и A2 package
 - Material 3 Adaptive `1.3.0`.
 
 AGP 9 built-in Kotlin является основным Android Kotlin integration path; старый
-`kotlin-android` plugin не используется.
+`kotlin-android` plugin не используется. Patch-level AGP update до `9.3.2` принят
+без смены minor line; Gradle `9.5.0` сохраняется как официальный minimum/default
+для AGP 9.3 и обновляется только отдельным проверяемым changeset.
 
 ### Initial modules
 

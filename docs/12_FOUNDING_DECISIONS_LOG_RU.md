@@ -72,7 +72,7 @@ Legacy, A2 и founding canonical snapshots хранятся отдельно в 
 Новый production `applicationId` и Android `namespace`: `io.github.ncorror.nekoflash`. Текущий repository остаётся `https://github.com/Ncorror/NekoFlash`.
 
 ## D024 — Build baseline is explicit
-Phase 1 baseline: `minSdk 26`, `targetSdk 36`, `compileSdk 37`, AGP `9.3.0`, Gradle `9.5.0`, Kotlin `2.4.10`, Compose BOM `2026.08.00`, Material 3 Adaptive `1.3.0`, JDK 17 в CI. Повышение `targetSdk` выполняется отдельным проверяемым changeset.
+Phase 1 baseline: `minSdk 26`, `targetSdk 36`, `compileSdk 37`, AGP `9.3.2` (patch update from initial `9.3.0`), Gradle `9.5.0`, Kotlin `2.4.10`, Compose BOM `2026.08.00`, Material 3 Adaptive `1.3.0`, JDK 17 в CI. Повышение `targetSdk` и смена Gradle line выполняются отдельными проверяемыми changesets.
 
 ## D025 — Modules require real ownership
 Первый bootstrap создаёт только `:app`, `:core:model`, `:core:diagnostics`, `:core:operation`. Пустые USB/ADB/Fastboot/Recovery/vendor modules заранее не создаются.
@@ -82,3 +82,9 @@ Phase 1 baseline: `minSdk 26`, `targetSdk 36`, `compileSdk 37`, AGP `9.3.0`, Gra
 
 ## D027 — English and Russian are first-class UI languages
 NekoFlash поддерживает English и Русский как равноправные языки интерфейса. English — default Android resource locale, Russian — `values-ru`. Пользовательские строки не хардкодятся в Compose/Kotlin. Protocol commands, partition names, raw peer responses, wire tokens и stable diagnostic codes остаются точными locale-neutral данными; перевод применяется только к presentation layer. Android 13+ использует generated per-app locale configuration.
+
+## D028 — App-managed state is not automatically backed up or migrated
+NekoFlash использует fail-closed policy для Android Auto Backup и device-to-device migration: все app-managed backup domains исключены и для legacy `fullBackupContent`, и для Android 12+ `dataExtractionRules`. Причина — будущие ADB host keys, vendor auth state, diagnostics и operation metadata нельзя молча переносить на другой host. User-owned SAF artifacts остаются вне app backup model. Любое будущее разрешение backup требует отдельного security review/decision.
+
+## D029 — Repository and localization hygiene are executable CI contracts
+Канонические правила clean repository и bilingual UI проверяются executable scripts в `scripts/ci/`, а не остаются только текстом: CI запрещает backup/reject leftovers и production stubs, проверяет text hygiene, EN/RU resource parity и очевидный hardcoded Compose UI text. Проверки должны оставаться узкими и объяснимыми, чтобы не превращаться в ложный policy gate.

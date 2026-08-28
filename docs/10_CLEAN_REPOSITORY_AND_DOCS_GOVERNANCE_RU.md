@@ -25,6 +25,8 @@
 
 Исключение: `reference/archives/` — специальная immutable historical/reference zone, не production source tree.
 
+Executable repository/localization hygiene checks живут в `scripts/ci/` и запускаются GitHub Actions. Они являются реализацией этих правил, но не должны расширяться в неясные regex-gates без конкретного documented invariant.
+
 ## 3. Reference archives
 
 `reference/archives/` хранит проверенные frozen snapshots Legacy, A2 и founding canonical package.

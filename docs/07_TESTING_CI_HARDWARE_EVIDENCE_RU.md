@@ -112,6 +112,19 @@ English и Russian являются first-class UI locales. Для каждог�
 
 Наличие warning не превращается в failure автоматически: intentional compatibility/tooling warnings документируются, а actionable warnings устраняются отдельными проверяемыми changesets.
 
+## 6.2. Phase 1 closure candidate
+
+Closure changeset обязан подтвердить тем же authoritative CI:
+- checked-in Gradle Wrapper остаётся build entrypoint;
+- AGP `9.3.2` собирает проект на JDK 17 / Gradle `9.5.0`;
+- launcher resource устраняет `MissingApplicationIcon`;
+- explicit `dataExtractionRules` устраняет actionable backup-policy warning;
+- `scripts/ci/check_repository_hygiene.sh` проходит на tracked tree;
+- `scripts/ci/check_localization.py` подтверждает EN/RU parity и отсутствие очевидного hardcoded Compose text;
+- unit tests, Android Lint и `assembleDebug` остаются PASS.
+
+`OldTargetApi` для осознанного `targetSdk 36` и available Gradle major/minor update не подавляются только ради нулевого счётчика warnings: их изменение требует отдельного behavior/toolchain review.
+
 ## 7. Hygiene CI
 
 CI должен запрещать production tree leftovers:

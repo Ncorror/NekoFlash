@@ -114,3 +114,15 @@ Foreground operation notification показывает минимум:
 - безопасное действие Cancel только если current operation реально cancellable.
 
 Notification не должна предлагать «Cancel», если engine уже пересёк irreversible boundary и не может честно обещать cancellation semantics.
+
+## 11. Automatic backup / device migration policy
+
+App-managed state NekoFlash **не участвует автоматически** в Android cloud backup или device-to-device migration. Это fail-closed security policy, а не user capability restriction.
+
+Причины:
+- будущий ADB host private key не должен бесшумно клонироваться на другой host;
+- vendor authentication/session state нельзя переносить как обычные preferences;
+- diagnostics и operation metadata могут содержать target-specific state, который станет stale/misleading после migration;
+- пользовательские ROM/image/ZIP artifacts остаются user-owned через SAF и не должны становиться внутренним backup payload приложения.
+
+Manifest указывает и legacy `fullBackupContent`, и Android 12+ `dataExtractionRules`; обе конфигурации исключают все app-managed backup domains. Если позже появится действительно переносимая настройка, она допускается только после отдельного security review и точечного include, а не через включение backup целиком.

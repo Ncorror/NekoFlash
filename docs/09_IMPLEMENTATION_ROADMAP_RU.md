@@ -13,7 +13,7 @@
 
 ## Phase 1 — bootstrap нового repository — CURRENT
 
-Bootstrap CI baseline: **VERIFIED / PASS** (2026-08-28): 7 core unit tests, Android Lint 0 errors, debug APK assembled. Официальный Gradle Wrapper переносится из CI artifact в tracked repository infrastructure.
+Bootstrap CI baseline: **VERIFIED / PASS** (2026-08-28): 7 core unit tests, Android Lint 0 errors, debug APK assembled. Официальный Gradle Wrapper `9.5.0` уже tracked и verified. Текущий closure changeset добавляет launcher identity, explicit no-backup/D2D policy, AGP `9.3.2` и executable repository/localization hygiene checks; Phase 1 закрывается только после его green CI.
 
 - package/application identity;
 - Gradle/Compose baseline;
@@ -24,7 +24,11 @@ Bootstrap CI baseline: **VERIFIED / PASS** (2026-08-28): 7 core unit tests, Andr
 - clean module boundaries;
 - NekoFlash icon/Welcome references;
 - минимальный adaptive app shell;
-- bilingual resource foundation: English default + Russian `values-ru`, generated per-app locale config, без hardcoded user-facing strings.
+- bilingual resource foundation: English default + Russian `values-ru`, generated per-app locale config, без hardcoded user-facing strings;
+- launcher icon wired from the preserved NekoFlash brand reference;
+- automatic backup/D2D migration disabled by explicit XML policy for app-managed data;
+- repository hygiene and localization parity enforced as CI steps;
+- AGP patch baseline updated to `9.3.2`, Gradle intentionally retained at verified `9.5.0`.
 
 Сразу сделать Home/Target Bar skeleton, чтобы core развивался внутри реального product shell.
 

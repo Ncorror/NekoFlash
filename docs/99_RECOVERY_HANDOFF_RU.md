@@ -34,4 +34,4 @@
 
 A2 read-only framing gate на `vayu` для commit `a2479b333ee2f25b0bc86a530d948c48a3423a68` завершён: **PASS**.
 
-Phase 0 COMPLETE. Legacy/A2 frozen. Текущая работа — **Phase 1 clean repository bootstrap**.
+Phase 0 COMPLETE. Legacy/A2 frozen. Текущая работа — **Phase 1 closure candidate**: launcher identity, explicit no-backup/D2D policy, AGP `9.3.2` и executable CI hygiene checks должны пройти green CI. После этого Phase 1 закрывается и начинается Phase 2 USB + Target/Session.

@@ -46,7 +46,7 @@ Current baseline:
 - minSdk: 26
 - targetSdk: 36
 - compileSdk: 37
-- Android Gradle Plugin: 9.3.0
+- Android Gradle Plugin: 9.3.2
 - Gradle: 9.5.0
 - Kotlin: 2.4.10
 - Compose BOM: 2026.08.00
@@ -67,3 +67,11 @@ not as empty placeholders.
 
 Active canonical documentation lives in [`docs/`](docs/). Historical founding
 snapshots live in [`reference/archives/`](reference/archives/) and are immutable.
+
+## Local data policy
+
+Automatic Android cloud backup and device-to-device migration are disabled for
+NekoFlash-managed app data. The application may eventually hold ADB host keys,
+vendor authentication state, diagnostics and operation metadata, so these are
+not silently copied to another device. User-selected artifacts remain
+user-owned through SAF rather than becoming app backup payloads.

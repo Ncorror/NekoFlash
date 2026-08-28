@@ -33,6 +33,8 @@
 | Termux — Git/worktree; GitHub Actions — authoritative build/test CI | `07_TESTING_CI_HARDWARE_EVIDENCE_RU.md`, `09_IMPLEMENTATION_ROADMAP_RU.md`, `12_FOUNDING_DECISIONS_LOG_RU.md` |
 | Frozen Legacy/A2/canonical ZIP живут только в immutable `reference/archives/` | `10_CLEAN_REPOSITORY_AND_DOCS_GOVERNANCE_RU.md`, `12_FOUNDING_DECISIONS_LOG_RU.md` |
 | UI приложения двуязычный: English + Русский; protocol/raw data не переводятся ядром | `01_PRODUCT_CHARTER_RU.md`, `05_FINAL_UI_UX_AND_BRAND_RU.md`, `12_FOUNDING_DECISIONS_LOG_RU.md` |
+| App-managed credentials/state не переносятся Auto Backup/D2D по умолчанию | `06_OPERATIONS_STORAGE_LIFECYCLE_RU.md`, `12_FOUNDING_DECISIONS_LOG_RU.md` |
+| Clean-repo и EN/RU contracts исполняются в CI, а не существуют только в документах | `07_TESTING_CI_HARDWARE_EVIDENCE_RU.md`, `10_CLEAN_REPOSITORY_AND_DOCS_GOVERNANCE_RU.md`, `12_FOUNDING_DECISIONS_LOG_RU.md` |
 | Новый проект строить вертикальными hardware-tested slices | `09_IMPLEMENTATION_ROADMAP_RU.md`, `07_TESTING_CI_HARDWARE_EVIDENCE_RU.md` |
 
 ## Что сознательно не «заморожено навечно»

@@ -76,4 +76,4 @@ Legacy и A2 считаются **FROZEN / REFERENCE ONLY**. Новые product 
 
 В frozen A2 archive нет сохранённого финального diagnostics bundle этого gate; статус PASS зафиксирован по подтверждению владельца проекта и согласуется с кодом/тестовой моделью A2.
 
-Текущая работа: **Phase 1 — bootstrap clean NekoFlash repository**.
+Текущая работа: **Phase 1 — closure candidate**. Bootstrap baseline и tracked wrapper уже подтверждены CI; launcher/backup policy, AGP `9.3.2` и executable hygiene checks должны пройти финальный green CI перед переходом к Phase 2 USB + Target/Session.

@@ -24,6 +24,10 @@
 
 Material 3/Compose используется как platform toolkit, но визуальная система NekoFlash остаётся собственной.
 
+### Phase 1 launcher identity
+
+На этапе bootstrap launcher icon подключается из сохранённого `brand-reference/nekoflash-icon-reference.png` как provenance-preserving alpha asset. Это устраняет generic/default launcher identity уже в foundation, но не означает pixel-freeze: финальные adaptive/monochrome derivatives могут быть подготовлены позже в brand/UI slice при сохранении узнаваемой NekoFlash cat/USB/lightning identity.
+
 ## 3. Welcome / first run
 
 Welcome **остаётся частью продукта**.
