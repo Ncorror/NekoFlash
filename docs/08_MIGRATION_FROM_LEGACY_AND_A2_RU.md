@@ -41,7 +41,7 @@ A2 **не является** фундаментом нового repo целик
 - stage-era read-only ADB вместо generic services;
 - single logical stream assumption;
 - shared packet queue с closing чужих stream packets;
-- host-side Fastboot flash authorization по `unlocked/max-download-size/partition-size`;
+- широкую host-side Fastboot authorization policy по смеси `unlocked/max-download-size/partition-size`; из этого не переносится общий permission gate. В новом проекте отдельно принят только узкий `VERIFIED_LOCKED -> block ordinary flash:<partition>` guard;
 - process entry authorization gate;
 - giant `UsbSessionCoordinator`;
 - global `OperationCoordinator` semantics, где pending verification блокирует unrelated operations;

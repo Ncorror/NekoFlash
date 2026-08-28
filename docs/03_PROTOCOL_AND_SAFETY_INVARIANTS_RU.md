@@ -21,7 +21,7 @@ NekoFlash защищает целостность transport/protocol state и ч
 
 ### B. Device authority
 Примеры:
-- locked bootloader;
+- bootloader/device security state, кроме узкого `VERIFIED_LOCKED -> flash` guard ниже;
 - AVB/OEM restriction;
 - ADB authorization отсутствует;
 - Fastboot `FAIL`;
@@ -32,7 +32,7 @@ NekoFlash защищает целостность transport/protocol state и ч
 
 ### C. Advisory
 Примеры:
-- `unlocked=unknown/no` перед guided flash;
+- lock state `UNKNOWN`/unsupported/contradictory;
 - неизвестный `max-download-size`;
 - неизвестный partition size;
 - unusual/critical partition;
@@ -84,7 +84,19 @@ Inbound USB framing policy из A2 принята после PASS hardware gate 
 - Для DATA OUT source не меняется во время передачи.
 - Для DATA IN sink использует partial/commit semantics, когда возможно.
 - Mid-DATA transport ambiguity после возможной mutation не ретраится автоматически.
-- `max-download-size`, `partition-size`, `unlocked` — diagnostics/advisories, а не host authorization, кроме случая, когда конкретный wire request физически невозможно корректно представить.
+- `max-download-size` и `partition-size` — diagnostics/advisories, а не host authorization, кроме случая, когда конкретный wire request физически невозможно корректно представить. Bootloader lock state имеет только одно узкое исключение — Verified Bootloader Lock Protection ниже.
+
+### 5.1 Verified Bootloader Lock Protection
+
+Это **единственный специально принятый product-level hard safety guard** поверх обычных protocol/correctness invariants.
+
+- Guard срабатывает только когда устройство в **текущей Fastboot `SessionGeneration`** однозначно подтверждает `LOCKED`.
+- `UNKNOWN`, unsupported query, противоречивый ответ и состояние из предыдущей generation не равны `LOCKED`.
+- При `VERIFIED_LOCKED` NekoFlash не отправляет обычный `flash:<partition>` и его typed/Quick Flash эквивалент. Тот же guard применяется к raw Fastboot console, если пользователь вводит именно `flash:<partition>`.
+- Guard **не является общей классификацией mutating-команд** и сам по себе не блокирует `download`, `erase`, `format`, `boot`, `set_active`, reboot, OEM/flashing commands, diagnostics или произвольный raw command. Их может отклонить само устройство.
+- Mi Unlock и другой явный unlock workflow при `VERIFIED_LOCKED` разрешены: их цель — изменить lock state.
+- Успех unlock-команды не переводит локальное состояние в `UNLOCKED`. После reboot/re-enumeration старая generation инвалидируется; обычный flash разрешается только после новой проверки состояния в новой Fastboot session.
+- Нельзя добавлять новые host-side запреты «по аналогии с locked bootloader» без отдельного canonical decision.
 
 ## 6. Sideload invariants, доказанные A2
 

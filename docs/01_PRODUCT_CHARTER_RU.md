@@ -51,7 +51,9 @@ NekoFlash должен честно соблюдать/отображать:
 - реальные server/vendor restrictions в Mi Unlock;
 - физический disconnect/re-enumeration.
 
-Приложение не должно превращать отказ устройства в локальное «разрешение», но и не должно заранее подменять устройство собственным запретом.
+По умолчанию приложение не должно превращать device state или ожидаемый отказ peer в собственную authorization систему. Единственное явно зафиксированное исключение — **Verified Bootloader Lock Protection**: если в текущей Fastboot `SessionGeneration` устройство однозначно подтверждает состояние `LOCKED`, NekoFlash не выполняет обычный `flash:<partition>` образа. Это узкая защита от записи образа при подтверждённо заблокированном bootloader, а не общий режим ограничений.
+
+`UNKNOWN`, unsupported query, противоречивые данные или старое состояние до reconnect **не считаются `LOCKED`**. Mi Unlock/unlock workflow при `LOCKED` остаётся доступным. Это исключение нельзя автоматически расширять на `erase`, `format`, `boot`, `set_active`, OEM/raw commands или другие операции: там действуют обычные protocol/device responses, если отдельный correctness invariant не требует остановки.
 
 ## 5. Что значит «профессиональное»
 
@@ -122,5 +124,7 @@ USB/protocol/session/transcript/evidence без необходимости debug
 Любой новый hard-block должен отвечать на вопрос:
 
 > Какой конкретный protocol/transport/device invariant нарушится, если мы позволим отправить эту валидную команду?
+
+Единственное product-level исключение, уже отдельно принятое в canonical decisions, — Verified Bootloader Lock Protection для обычного `flash:<partition>` при подтверждённом `LOCKED`. Расширять это исключение «по аналогии» нельзя: новое ограничение требует отдельного явного founding decision.
 
 Если ответ сводится к «это опасно», «обычному пользователю не нужно» или «так спокойнее» — это не основание для core restriction.

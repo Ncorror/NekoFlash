@@ -80,9 +80,10 @@ Hardware test сразу.
 - DATA OUT;
 - flash/boot/erase/format/set_active/reboot;
 - OEM/flashing;
-- typed UI + raw console используют один engine.
+- typed UI + raw console используют один engine;
+- Verified Bootloader Lock Protection: только подтверждённый `LOCKED` блокирует обычный `flash:<partition>` во всех user-facing Fastboot путях; Mi Unlock/unlock path не блокируется.
 
-Перенести доказанные A2 USBFS ideas без старого host authorization.
+Перенести доказанные A2 USBFS ideas без старой широкой host authorization policy. Не расширять узкий verified-lock guard на другие команды по аналогии.
 
 ## Phase 6 — Fastboot DATA IN + modern partition workflows
 

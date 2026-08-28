@@ -16,6 +16,7 @@
 - Новый repo — clean architecture; Legacy/A2 только sources/reference/evidence.
 - **NO ARTIFICIAL CAPABILITY RESTRICTIONS.**
 - Системные/device ограничения и protocol invariants остаются реальными.
+- Единственный узкий product-level hard guard: current-session `VERIFIED_LOCKED` блокирует только обычный `flash:<partition>`; `UNKNOWN != LOCKED`, Mi Unlock разрешён, расширять guard по аналогии нельзя.
 - GUI и raw tools используют один core.
 - ADB сразу multi-stream + generic services.
 - Fastboot — один generic transaction engine, включая DATA OUT и DATA IN.

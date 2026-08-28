@@ -182,7 +182,7 @@ Typed tools:
 - Raw Fastboot;
 - Quick Flash / Plan.
 
-Preflight показывает конкретные advisories. `unlocked/max-download-size/partition-size` не становятся скрытым authorization gate.
+Preflight показывает конкретные advisories. `max-download-size`, `partition-size` и неизвестный lock state не становятся скрытым authorization gate. Единственное исключение — подтверждённый `LOCKED`: обычный partition `flash` блокируется общим Verified Bootloader Lock Protection; остальные Fastboot capabilities этим автоматически не запрещаются.
 
 ## 10. Recovery Workspace
 
@@ -256,6 +256,8 @@ Mi Unlock имеет собственный polished workflow:
 - настоящий error response;
 - transcript/evidence;
 - reconnect/reboot state.
+
+`VERIFIED_LOCKED` не скрывает и не запрещает Mi Unlock: unlock workflow является разрешённым путём изменения lock state. После reboot/re-enumeration UI не считает unlock завершённым по старому флагу — новая Fastboot session должна заново подтвердить `UNLOCKED`, прежде чем обычный Flash станет доступен.
 
 Никакой vendor магии внутри generic USB/Fastboot core.
 
