@@ -1,0 +1,195 @@
+# Termux setup
+
+Дата: 2026-08-29
+Статус: канонический рабочий процесс. Порт проверенного процесса A2 (`docs/TERMUX_SETUP.md` в `reference/archives/NekoFlash-A2-frozen.zip`) на новый репозиторий. Меняется только имя репозитория.
+
+Termux — это Git/GitHub-клиент для NekoFlash. Android-сборки производит GitHub Actions. Это соответствует уже зафиксированному в `docs/00`, `docs/07` и `docs/09`.
+
+## Установка инструментов
+
+```bash
+pkg update -y
+pkg upgrade -y
+pkg install git gh openssh zip unzip python -y
+```
+
+Не устанавливайте для этого процесса Android Studio, Android SDK, локальный Gradle, эмулятор, desktop adb или desktop fastboot.
+
+## Git identity
+
+```bash
+git config --global user.name "Ncorror"
+git config --global user.email "rastaxd1102@gmail.com"
+git config --global init.defaultBranch main
+```
+
+## Чистая переавторизация GitHub
+
+Только когда авторизация действительно сломана или её нужно сбросить намеренно:
+
+```bash
+gh auth logout --hostname github.com --user Ncorror || true
+gh auth login --hostname github.com --git-protocol https --web
+gh auth switch --hostname github.com --user Ncorror
+gh auth setup-git --hostname github.com
+gh auth status --active --hostname github.com
+```
+
+`gh auth logout` удаляет локальную конфигурацию авторизации. Он не отзывает OAuth-токены GitHub CLI на других устройствах.
+
+## Клонирование
+
+```bash
+cd ~
+gh repo clone Ncorror/NekoFlash
+cd NekoFlash
+```
+
+## Установка единственного push-хелпера
+
+Из корня репозитория:
+
+```bash
+rm -f "$PREFIX/bin/gpush"
+install -m 0755 scripts/gpush "$PREFIX/bin/gpush"
+```
+
+Push-хелпер в проекте ровно один: `scripts/gpush` (устанавливается как команда `gpush`). Он не добавляет файлы в индекс и не создаёт коммиты. Он проверяет авторизацию GitHub, идентичность репозитория, чистоту рабочего дерева и расхождение с удалённой веткой — и только потом пушит. Если авторизация отсутствует или недействительна, он сам запускает обычный вход через браузер.
+
+## Канонический процесс: чат ↔ Termux
+
+Это обязательный операторский контракт для изменений, приходящих из чата. Новая или восстановленная сессия обязана прочитать этот раздел до того, как выдавать команды Termux, меняющие репозиторий. Не изобретайте альтернативный процесс только потому, что какая-то другая команда тоже сработала бы.
+
+Канонические идентичности:
+
+- корень репозитория: `~/NekoFlash`;
+- репозиторий GitHub: `Ncorror/NekoFlash`;
+- push-хелпер: `./scripts/gpush` (установленная команда `gpush` — тот же файл).
+
+Правила авторизации:
+
+- не выходить из аккаунта и не сбрасывать авторизацию в ходе обычной работы;
+- использовать действующую сессию `gh`, пока она валидна;
+- запускать чистую переавторизацию только когда авторизация действительно недействительна или пользователь явно попросил сброс;
+- никогда не помещать токены GitHub, `hosts.yml`, учётные данные и другие секреты в патчи, chat-артефакты или репозиторий.
+
+### Стандартная доставка изменения из чата
+
+Штатная передача — **один install-ZIP**, а не импровизированная пачка команд и не замена всего дерева исходников. ZIP содержит ровно:
+
+```text
+<change>-install.zip
+└── <change>-install/
+    ├── APPLY_IN_TERMUX.sh
+    ├── <change>.patch
+    └── README.txt
+```
+
+Пользователь скачивает этот ZIP в Android `Downloads` и выполняет одну команду запуска с реальными именами, которые сообщил ассистент:
+
+```bash
+cd ~/storage/downloads && \
+rm -rf <install-dir> && \
+unzip -o <install-zip> && \
+bash <install-dir>/APPLY_IN_TERMUX.sh
+```
+
+Ассистент не должен предполагать, что созданный в чате файл уже лежит в `~/storage/downloads`: сначала файл должен быть передан пользователю и скачан им.
+
+`APPLY_IN_TERMUX.sh` обязан:
+
+1. вычислить абсолютный `SCRIPT_DIR` до любого `cd`;
+2. перейти в `~/NekoFlash`;
+3. потребовать ожидаемую ветку и чистое рабочее дерево;
+4. проверить идентичность репозитория и авторизацию GitHub;
+5. выполнить `git fetch origin`;
+6. сверить локальный HEAD и `origin/<branch>` с точной проверенной базовой линией, зашитой в установщик;
+7. проверить SHA-256 проверенного патча;
+8. выполнить `git apply --check` до применения;
+9. применить только этот проверенный патч;
+10. проверить полный набор изменённых файлов, включая untracked;
+11. выполнить `git diff --check`;
+12. выполнить синтаксические проверки вроде `bash -n` для изменённых shell-скриптов;
+13. добавить в индекс только точный проверенный набор файлов, никогда не `git add .`;
+14. проверить состав индекса и `git diff --cached --check`;
+15. создать ровно один запланированный коммит;
+16. запушить через `./scripts/gpush`;
+17. снова выполнить fetch и убедиться, что локальный HEAD равен удалённой ветке;
+18. завершиться с чистым рабочим деревом.
+
+Если ошибка произошла до коммита, установщик восстанавливает только те файлы, которые сам изменил. Если коммит удался, а push — нет, локальный коммит сохраняется и об ошибке сообщается; история не уничтожается автоматически.
+
+Не создавайте второй push-хелпер, замену recovery-хелперу или новую обёртку авторизации, когда отслеживаемые скрипты проекта уже покрывают операцию. Если канонический процесс действительно не может выполнить нужную задачу — сначала назовите точный пробел, потом предлагайте отступление.
+
+## Ежедневный Git-процесс
+
+```bash
+cd ~/NekoFlash
+git status
+git pull --ff-only
+
+# правки или применение проверенного патча
+
+git diff --check
+git diff
+
+git add <точные-файлы-для-коммита>
+git diff --cached --check
+git diff --cached
+git commit -m "small verified change"
+gpush
+```
+
+Не используйте `git add .` для миграционных этапов. Добавляйте в индекс точный проверенный набор файлов.
+
+## Локальные проверки перед коммитом
+
+Два первых гейта CI выполнимы в Termux и стоят доли секунды:
+
+```bash
+bash scripts/ci/check_repository_hygiene.sh
+python3 scripts/ci/check_localization.py
+```
+
+Gradle-часть (`test`, `lint`, `assembleDebug`) на телефоне не запускается. Локальный PASS означает «не завалю CI по мелочи», а не «сборка прошла».
+
+## GitHub Actions
+
+CI выбирается по **точному закоммиченному HEAD**, а не по самому свежему запуску:
+
+```bash
+cd ~/NekoFlash
+git fetch origin
+
+HEAD="$(git rev-parse HEAD)"
+REMOTE="$(git rev-parse origin/main)"
+
+[ "$HEAD" = "$REMOTE" ] || {
+  echo "ERROR: local HEAD and origin/main differ"
+  exit 1
+}
+
+RUN_ID="$(
+  gh run list \
+    --commit "$HEAD" \
+    --limit 1 \
+    --json databaseId \
+    --jq '.[0].databaseId // empty'
+)"
+
+[ -n "$RUN_ID" ] || {
+  echo "ERROR: no GitHub Actions run found for $HEAD"
+  exit 1
+}
+
+gh run watch "$RUN_ID" --exit-status
+```
+
+Разобрать конкретный запуск:
+
+```bash
+gh run view "$RUN_ID"
+gh run view "$RUN_ID" --log-failed
+```
+
+Успех CI доказывает только автоматические проверки. Поведение USB/ADB/Fastboot остаётся `NOT YET VERIFIED`, пока не выполнен соответствующий аппаратный тест.

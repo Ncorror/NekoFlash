@@ -1,0 +1,67 @@
+#!/data/data/com.termux/files/usr/bin/bash
+
+set -euo pipefail
+
+GITHUB_HOST="github.com"
+EXPECTED_REPO="Ncorror/NekoFlash"
+
+fail() {
+    echo "Error: $*" >&2
+    exit 1
+}
+
+command -v git >/dev/null 2>&1 || fail "git is not installed"
+command -v gh >/dev/null 2>&1 || fail "GitHub CLI (gh) is not installed"
+
+if ! gh auth status --active --hostname "$GITHUB_HOST" >/dev/null 2>&1; then
+    echo "GitHub authentication is missing or invalid. Starting browser login..."
+    gh auth login --hostname "$GITHUB_HOST" --git-protocol https --web
+fi
+
+gh auth setup-git --hostname "$GITHUB_HOST"
+gh auth status --active --hostname "$GITHUB_HOST"
+
+git rev-parse --is-inside-work-tree >/dev/null 2>&1 || fail "not inside a Git repository"
+git rev-parse --verify HEAD >/dev/null 2>&1 || fail "repository has no commits yet"
+
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root"
+
+origin_url="$(git remote get-url origin 2>/dev/null || true)"
+case "$origin_url" in
+    "https://github.com/$EXPECTED_REPO"|"https://github.com/$EXPECTED_REPO.git"|"git@github.com:$EXPECTED_REPO.git")
+        ;;
+    *)
+        fail "unexpected origin: ${origin_url:-<missing>} (expected $EXPECTED_REPO)"
+        ;;
+esac
+
+branch="$(git branch --show-current)"
+[ -n "$branch" ] || fail "detached HEAD"
+
+if [ -n "$(git status --porcelain)" ]; then
+    fail "working tree is not clean; commit or restore changes before push"
+fi
+
+echo "Repository: $EXPECTED_REPO"
+echo "Branch: $branch"
+
+git fetch origin
+
+if git show-ref --verify --quiet "refs/remotes/origin/$branch"; then
+    read -r local_only remote_only <<EOF_COUNTS
+$(git rev-list --left-right --count "HEAD...origin/$branch")
+EOF_COUNTS
+    if [ "$remote_only" -ne 0 ]; then
+        fail "origin/$branch contains commits not present locally; run git pull --ff-only first"
+    fi
+fi
+
+if git rev-parse --abbrev-ref --symbolic-full-name '@{u}' >/dev/null 2>&1; then
+    git push
+else
+    echo "No upstream. Setting origin/$branch..."
+    git push -u origin "$branch"
+fi
+
+echo "Push complete: $(git rev-parse HEAD)"
