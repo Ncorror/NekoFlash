@@ -123,12 +123,17 @@ Authoritative CI подтвердил Phase 1 closure:
 - explicit `dataExtractionRules`/backup policy устраняет actionable backup warning;
 - `scripts/ci/check_repository_hygiene.sh` PASS;
 - `scripts/ci/check_localization.py` PASS;
-- `scripts/ci/check_kotlin_style.sh` PASS;
 - 7 core unit tests PASS;
 - Android Lint: **0 errors, 2 warnings**;
 - `assembleDebug`: PASS.
 
 Оставшиеся warnings осознанные и не подавляются ради нулевого счётчика: `OldTargetApi` для `targetSdk 36` при `compileSdk 37` и наличие более новой Gradle версии. Их изменение требует отдельного Android behavior/toolchain review.
+
+## 6.3. Kotlin style gate — 2026-08-30
+
+`scripts/ci/check_kotlin_style.sh` добавлен после закрытия Phase 1 и в evidence-записи 6.1/6.2 не входит: на 2026-08-28 этой проверки не существовало.
+
+Гейт подтверждён authoritative CI в том же changeset, которым введён: detekt `1.23.8` разбирает Kotlin `2.4.10`, текущее дерево проходит оба прогона (стиль/сложность и границы модулей), SHA-256 дистрибутива сверяется перед запуском.
 
 ## 7. Hygiene CI
 

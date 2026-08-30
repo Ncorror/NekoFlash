@@ -25,7 +25,7 @@
 
 Исключение: `reference/archives/` — специальная immutable historical/reference zone, не production source tree.
 
-Executable repository/localization hygiene checks живут в `scripts/ci/` и запускаются GitHub Actions. Они являются реализацией этих правил, но не должны расширяться в неясные regex-gates без конкретного documented invariant.
+Executable checks живут в `scripts/ci/` и запускаются GitHub Actions: repository hygiene, localization contract и Kotlin style/complexity/module boundaries (конфигурация последнего — в `config/detekt/`). Они являются реализацией этих правил, но не должны расширяться в неясные regex-gates без конкретного documented invariant.
 
 ## 3. Reference archives
 
