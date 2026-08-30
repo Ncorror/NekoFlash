@@ -49,6 +49,7 @@ dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:diagnostics"))
     implementation(project(":core:operation"))
+    implementation(project(":usb:android"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

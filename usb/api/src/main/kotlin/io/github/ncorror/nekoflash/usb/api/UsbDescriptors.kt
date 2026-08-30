@@ -64,7 +64,27 @@ public data class UsbEndpointDescriptor(
 
 public enum class UsbEndpointDirection {
     IN,
-    OUT,
+    OUT;
+
+    public companion object {
+        /**
+         * Бит направления в адресе эндпоинта по спецификации USB.
+         *
+         * Установленный бит означает IN. Значение спецификационное, а не
+         * платформенное: Android отдаёт его как есть.
+         */
+        public const val DIRECTION_MASK_IN: Int = 0x80
+
+        /**
+         * Направление по сырому значению.
+         *
+         * Проверяется бит, а не равенство: значение может прийти и как готовое
+         * направление, и как полный адрес эндпоинта, а бит направления в них
+         * один и тот же.
+         */
+        public fun fromRaw(raw: Int): UsbEndpointDirection =
+            if (raw and DIRECTION_MASK_IN != 0) IN else OUT
+    }
 }
 
 /**
@@ -76,5 +96,14 @@ public enum class UsbEndpointDirection {
  */
 public enum class UsbTransferType {
     BULK,
-    OTHER,
+    OTHER;
+
+    public companion object {
+        /** Код bulk-передачи по спецификации USB. */
+        public const val TRANSFER_TYPE_BULK: Int = 2
+
+        /** Тип передачи по сырому значению. */
+        public fun fromRaw(raw: Int): UsbTransferType =
+            if (raw == TRANSFER_TYPE_BULK) BULK else OTHER
+    }
 }

@@ -299,6 +299,22 @@ class UsbInterfaceClassifierTest {
         assertNull(UsbInterfaceClassifier.rebind(ambiguousReplacement, previous))
     }
 
+    @Test
+    fun rawEndpointDirectionIsReadFromTheDirectionBit() {
+        assertEquals(UsbEndpointDirection.IN, UsbEndpointDirection.fromRaw(0x80))
+        assertEquals(UsbEndpointDirection.OUT, UsbEndpointDirection.fromRaw(0x00))
+        assertEquals(UsbEndpointDirection.IN, UsbEndpointDirection.fromRaw(0x81))
+        assertEquals(UsbEndpointDirection.OUT, UsbEndpointDirection.fromRaw(0x01))
+    }
+
+    @Test
+    fun onlyBulkIsRecognisedAsBulk() {
+        assertEquals(UsbTransferType.BULK, UsbTransferType.fromRaw(2))
+        listOf(0, 1, 3).forEach { raw ->
+            assertEquals(UsbTransferType.OTHER, UsbTransferType.fromRaw(raw))
+        }
+    }
+
     private companion object {
         const val CANONICAL_IN = 0x81
         const val CANONICAL_OUT = 0x01

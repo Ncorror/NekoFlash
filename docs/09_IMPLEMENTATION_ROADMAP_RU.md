@@ -35,7 +35,8 @@ Phase 1 closure CI: **VERIFIED / PASS** (2026-08-28). Подтверждены 7
 ## Phase 2 — USB + Target/Session vertical slice — CURRENT
 
 - `usb:api` — платформенно-независимый контракт: дескрипторы, классификация интерфейсов, идентичность target, сессии и `SessionGeneration`, политика разрешений. **Готово**;
-- манифест: `uses-feature android.hardware.usb.host` и обработка `USB_DEVICE_ATTACHED` (в Legacy и A2 обе декларации присутствуют — переносятся вместе с первым USB-кодом, а не заранее пустыми);
+- манифест: `uses-feature android.hardware.usb.host` и обработка `USB_DEVICE_ATTACHED`. **Готово**;
+- `usb:android` — маппер дескрипторов Android в модель `usb:api`. **Готово**;
 - descriptor discovery;
 - permission;
 - Target identity;
