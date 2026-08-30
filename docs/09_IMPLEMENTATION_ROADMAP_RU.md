@@ -36,9 +36,9 @@ Phase 1 closure CI: **VERIFIED / PASS** (2026-08-28). Подтверждены 7
 
 - `usb:api` — платформенно-независимый контракт: дескрипторы, классификация интерфейсов, идентичность target, сессии и `SessionGeneration`, политика разрешений. **Готово**;
 - манифест: `uses-feature android.hardware.usb.host` и обработка `USB_DEVICE_ATTACHED`. **Готово**;
-- `usb:android` — маппер дескрипторов Android в модель `usb:api`. **Готово**;
+- `usb:android` — маппер дескрипторов, перечисление устройств, приёмники подключения и отключения, запрос разрешения. **Готово**;
 - descriptor discovery;
-- permission;
+- permission — политика и Android-механика. **Готово**;
 - Target identity;
 - SessionGeneration;
 - claim/release;
