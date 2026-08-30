@@ -34,6 +34,7 @@ Phase 1 closure CI: **VERIFIED / PASS** (2026-08-28). Подтверждены 7
 
 ## Phase 2 — USB + Target/Session vertical slice — CURRENT
 
+- манифест: `uses-feature android.hardware.usb.host` и обработка `USB_DEVICE_ATTACHED` (в Legacy и A2 обе декларации присутствуют — переносятся вместе с первым USB-кодом, а не заранее пустыми);
 - descriptor discovery;
 - permission;
 - Target identity;
@@ -125,7 +126,7 @@ Hardware test сразу.
 - terminal tabs/history;
 - supporting diagnostics pane;
 - refined Welcome;
-- brand/theme polish;
+- brand/theme polish: замена дефолтной Material-палитры на опорную палитру Legacy (`accent #E9782B` и роли из `05_FINAL_UI_UX_AND_BRAND_RU.md` §2), вывод светлой схемы;
 - accessibility/localization foundations.
 
 Важно: UI не «ждёт Phase 9». Каждый предыдущий vertical slice имеет рабочий production UI. Phase 9 — completion/polish, а не первая GUI-интеграция.

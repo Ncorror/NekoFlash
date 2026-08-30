@@ -24,6 +24,35 @@
 
 Material 3/Compose используется как platform toolkit, но визуальная система NekoFlash остаётся собственной.
 
+### Опорная палитра
+
+Источник — не подбор на глаз, а действующая палитра Legacy: `app/src/main/res/values/colors.xml` в `reference/archives/NekoFlash-main-legacy.zip`, помеченная там комментарием «NekoFlash V6 — restrained cyber-dark palette». Роли взяты из `values/styles.xml` того же снапшота, где они уже сопоставлены с темой.
+
+| Роль | Значение | Имя в Legacy | Применение в Legacy |
+|---|---|---|---|
+| **Action accent (фирменный orange)** | `#E9782B` | `accent` | `colorPrimary`, `android:colorAccent` |
+| Accent pressed | `#CC5D18` | `accent_pressed` | `colorPrimaryVariant` |
+| Accent soft | `#F1A56D` | `accent_soft` | `colorSecondary` |
+| On accent | `#0A0D12` | `on_accent` | `colorOnPrimary` |
+| Surface base | `#080D13` | `bg_base` | `windowBackground`, status/navigation bar |
+| Surface card | `#121A24` | `bg_card` | `colorSurface` |
+| Surface elevated | `#192431` | `bg_elevated` | диалоги, bottom sheet |
+| Surface header | `#0D141D` | `bg_header` | шапка |
+| Stroke | `#324052` | `stroke` | границы |
+| Text primary | `#F3F6FA` | `text_primary` | `colorOnSurface` |
+| Text secondary | `#AEB8C5` | `text_secondary` | |
+| Text muted | `#738092` | `text_muted` | |
+| **Cool/technology accent** | `#59B9E7` | `status_info` | статусы, информационные состояния |
+| Cool accent dim | `#102B3A` | `cool_accent_dim` | приглушённый холодный фон |
+
+Семантика логов и состояний оттуда же: success `#68C979`, warning `#DCAA58`, error `#E06C75`, hint `#F2B766`, command `#E98B49`, system `#758397`, info `#9FAAB6`.
+
+Оранжевый — это именно `accent` продукта, а не цвет, снятый с картинки: тёплый неон на Welcome-арте ближе к красному (`#D84848`) и служит атмосферой сцены, а не UI-токеном. Cyan на иконке (`#00D8F0`, свечение до `#00F0F0`) — язык самой иконки; в интерфейсе холодный акцент представлен более сдержанным `#59B9E7`.
+
+A2 этой палитры не унаследовал: его `ui/theme/Color.kt` содержит синие Material-заготовки (`NekoBlue #315DA8` и производные) без оранжевого. Поэтому источником бренда для нового репозитория служит Legacy, а не A2.
+
+**Текущее состояние кода:** `NekoFlashTheme` использует стандартные `lightColorScheme()`/`darkColorScheme()` Material 3, то есть дефолтную палитру, а не эту. Это осознанный placeholder периода bootstrap; замена выполняется в Phase 9 (`brand/theme polish`), см. `09_IMPLEMENTATION_ROADMAP_RU.md`. Отдельно учитывается, что Legacy-палитра построена под тёмную тему: светлая схема выводится в brand/theme slice, а не переносится механически.
+
 ### Phase 1 launcher identity
 
 На этапе bootstrap launcher icon подключается из сохранённого `brand-reference/nekoflash-icon-reference.png` как provenance-preserving alpha asset. Это устраняет generic/default launcher identity уже в foundation, но не означает pixel-freeze: финальные adaptive/monochrome derivatives могут быть подготовлены позже в brand/UI slice при сохранении узнаваемой NekoFlash cat/USB/lightning identity.

@@ -52,6 +52,13 @@ Archive integrity is recorded in:
 
 `reference/SHA256SUMS`
 
+The manifest stores bare file names, so verification must be run from inside
+the archives directory:
+
+```bash
+cd reference/archives && sha256sum -c ../SHA256SUMS
+```
+
 Reference archives are immutable.
 
 Do not replace or modify an existing archive after it has been committed.
