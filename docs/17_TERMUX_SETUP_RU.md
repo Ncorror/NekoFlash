@@ -149,7 +149,10 @@ gpush
 ```bash
 bash scripts/ci/check_repository_hygiene.sh
 python3 scripts/ci/check_localization.py
+bash scripts/ci/check_kotlin_style.sh
 ```
+
+Третья проверка требует Java (`pkg install openjdk-17`) и при первом запуске скачивает detekt CLI около 70 МБ в `build/tools/`. Без Java она мягко пропускается локально, но в CI обязательна. Кэш в git не попадает: `**/build/` в `.gitignore`.
 
 Gradle-часть (`test`, `lint`, `assembleDebug`) на телефоне не запускается. Локальный PASS означает «не завалю CI по мелочи», а не «сборка прошла».
 

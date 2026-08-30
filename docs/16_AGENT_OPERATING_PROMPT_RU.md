@@ -96,7 +96,7 @@ Android USB permission, ADB RSA-авторизация, заблокирован
 - **Конкурентность:** `kotlinx.coroutines` + `Flow`, structured concurrency, `CoroutineScope` привязан к `SessionGeneration`; никаких голых `Thread`/`Handler.postDelayed` (так было в Legacy).
 - **Ошибки:** sealed `Outcome`/`Result` (`Success/Failed/Cancelled/Unknown`) для ожидаемых протокольных исходов; исключения — только для программистских ошибок.
 - **Иммутабельность:** `val`/`data class`/`sealed class` по умолчанию; никаких «god-классов» с десятками `private var`, как было в `MainActivity.kt`/`DeviceViewModel.kt` Legacy.
-- **Инструменты:** ни в Legacy, ни в A2, ни пока в новом репозитории нет ktlint/detekt — закрепить ADR-ом как CI-гейт, не откладывать.
+- **Инструменты:** detekt — обязательный гейт CI (`scripts/ci/check_kotlin_style.sh`), включая правило границ модулей: `core:*` не может импортировать `usb`/`protocol`/`feature`/`vendor`/`ui`/`android`/`androidx`. Запускается локально той же командой.
 - **Тесты:** пишутся в том же changeset, что и код; стиль именования `<Subject>Test` — по образцу A2 (`UsbPermissionPolicyTest`, `OperationCoordinatorTest`).
 
 ## 5. Порядок работы в рамках задачи или сессии

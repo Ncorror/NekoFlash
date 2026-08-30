@@ -34,6 +34,9 @@ jobs:
       - name: Localization contract
         run: python3 ./scripts/ci/check_localization.py
 
+      - name: Kotlin style, complexity and module boundaries
+        run: ./scripts/ci/check_kotlin_style.sh
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
 

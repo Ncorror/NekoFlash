@@ -95,6 +95,7 @@ English и Russian являются first-class UI locales. Для каждог�
 - static analysis/lint;
 - formatting;
 - repository hygiene scan;
+- Kotlin style/complexity/module-boundary scan;
 - no generated binary drift where relevant;
 - test report artifact;
 - build identity embedded/exportable in diagnostics;
@@ -122,6 +123,7 @@ Authoritative CI подтвердил Phase 1 closure:
 - explicit `dataExtractionRules`/backup policy устраняет actionable backup warning;
 - `scripts/ci/check_repository_hygiene.sh` PASS;
 - `scripts/ci/check_localization.py` PASS;
+- `scripts/ci/check_kotlin_style.sh` PASS;
 - 7 core unit tests PASS;
 - Android Lint: **0 errors, 2 warnings**;
 - `assembleDebug`: PASS.

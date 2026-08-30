@@ -1,0 +1,22 @@
+build:
+  maxIssues: 0
+
+naming:
+  FunctionNaming:
+    ignoreAnnotated: ['Composable']
+
+complexity:
+  LargeClass:
+    threshold: 600
+  LongMethod:
+    threshold: 60
+  LongParameterList:
+    functionThreshold: 8
+    constructorThreshold: 10
+    ignoreAnnotated: ['Composable']
+  TooManyFunctions:
+    thresholdInFiles: 20
+    thresholdInClasses: 20
+    thresholdInObjects: 20
+    thresholdInInterfaces: 20
+    ignoreAnnotatedFunctions: ['Composable']
