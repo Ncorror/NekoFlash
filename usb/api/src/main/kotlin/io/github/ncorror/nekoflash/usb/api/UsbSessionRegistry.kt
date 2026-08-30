@@ -2,6 +2,9 @@ package io.github.ncorror.nekoflash.usb.api
 
 import io.github.ncorror.nekoflash.core.model.SessionGeneration
 import io.github.ncorror.nekoflash.core.model.TargetId
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import java.util.concurrent.atomic.AtomicLong
 
 /**
@@ -37,6 +40,17 @@ public class UsbSessionRegistry(
     private val generations = AtomicLong(0L)
     private val active = LinkedHashMap<Long, UsbSession>()
     private val closed = LinkedHashMap<Long, UsbSession>()
+    private val activeState = MutableStateFlow<List<UsbSession>>(emptyList())
+
+    /**
+     * Незавершённые сессии в порядке открытия.
+     *
+     * Наблюдаемое состояние, а не снимок по запросу: слой выше подписывается
+     * один раз и видит каждое изменение, вместо того чтобы опрашивать реестр и
+     * рисковать пропустить короткоживущую сессию. Текущее значение доступно как
+     * `activeSessions.value`.
+     */
+    public val activeSessions: StateFlow<List<UsbSession>> = activeState.asStateFlow()
 
     /**
      * Открывает новую сессию для target и выдаёт ей новую generation.
@@ -65,6 +79,7 @@ public class UsbSessionRegistry(
             state = UsbSessionState.DISCOVERED,
         )
         active[session.generation.value] = session
+        publishLocked()
         session
     }
 
@@ -132,11 +147,6 @@ public class UsbSessionRegistry(
         activeFor(targetId)
     }
 
-    /** Все незавершённые сессии в порядке открытия. */
-    public fun activeSessions(): List<UsbSession> = synchronized(lock) {
-        active.values.toList()
-    }
-
     private fun transition(
         generation: SessionGeneration,
         target: UsbSessionState,
@@ -161,7 +171,12 @@ public class UsbSessionRegistry(
         }
         val updated = session.copy(state = target)
         active[generation.value] = updated
+        publishLocked()
         UsbSessionTransition.Applied(updated)
+    }
+
+    private fun publishLocked() {
+        activeState.value = active.values.toList()
     }
 
     private fun activeFor(targetId: TargetId): UsbSession? =
@@ -176,6 +191,7 @@ public class UsbSessionRegistry(
             closureReason = reason,
         )
         active.remove(session.generation.value)
+        publishLocked()
         if (closedHistoryLimit > 0) {
             closed[session.generation.value] = closedSession
             while (closed.size > closedHistoryLimit) {

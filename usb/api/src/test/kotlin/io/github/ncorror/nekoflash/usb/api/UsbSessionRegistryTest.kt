@@ -48,7 +48,7 @@ class UsbSessionRegistryTest {
         val superseded = registry.session(first.generation)
         assertEquals(UsbSessionState.CLOSED, superseded?.state)
         assertEquals(UsbSessionClosureReason.SUPERSEDED, superseded?.closureReason)
-        assertEquals(listOf(second.generation), registry.activeSessions().map { it.generation })
+        assertEquals(listOf(second.generation), registry.activeSessions.value.map { it.generation })
     }
 
     @Test
@@ -60,7 +60,7 @@ class UsbSessionRegistryTest {
 
         assertEquals(
             listOf(one.generation, other.generation),
-            registry.activeSessions().map { it.generation },
+            registry.activeSessions.value.map { it.generation },
         )
     }
 
@@ -150,7 +150,22 @@ class UsbSessionRegistryTest {
         val closedSessions = registry.closeDetached(deviceA)
 
         assertEquals(listOf(lost.generation), closedSessions.map { it.generation })
-        assertEquals(listOf(kept.generation), registry.activeSessions().map { it.generation })
+        assertEquals(listOf(kept.generation), registry.activeSessions.value.map { it.generation })
+    }
+
+    @Test
+    fun publishedStateFollowsEveryChange() {
+        val registry = UsbSessionRegistry()
+        assertTrue(registry.activeSessions.value.isEmpty())
+
+        val session = registry.open(identityOf(deviceA), candidateOf(deviceA))
+        assertEquals(listOf(UsbSessionState.DISCOVERED), registry.activeSessions.value.map { it.state })
+
+        registry.markReady(session.generation)
+        assertEquals(listOf(UsbSessionState.READY), registry.activeSessions.value.map { it.state })
+
+        registry.close(session.generation, UsbSessionClosureReason.RELEASED)
+        assertTrue(registry.activeSessions.value.isEmpty())
     }
 
     @Test
