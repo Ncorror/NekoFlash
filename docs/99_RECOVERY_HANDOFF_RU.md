@@ -8,7 +8,9 @@
 4. `02_CORE_ARCHITECTURE_RU.md`
 5. `05_FINAL_UI_UX_AND_BRAND_RU.md`
 6. `12_FOUNDING_DECISIONS_LOG_RU.md`
-7. актуальный roadmap/status нового repository
+7. `16_AGENT_OPERATING_PROMPT_RU.md` и `/CLAUDE.md` — операционные правила сессии
+8. `17_TERMUX_SETUP_RU.md` — как доставляются и пушатся изменения
+9. актуальный roadmap/status нового repository
 
 ## Нельзя забывать
 
@@ -16,7 +18,7 @@
 - Новый repo — clean architecture; Legacy/A2 только sources/reference/evidence.
 - **NO ARTIFICIAL CAPABILITY RESTRICTIONS.**
 - Системные/device ограничения и protocol invariants остаются реальными.
-- Единственный узкий product-level hard guard: current-session `VERIFIED_LOCKED` блокирует только обычный `flash:<partition>`; `UNKNOWN != LOCKED`, Mi Unlock разрешён, расширять guard по аналогии нельзя.
+- Product-level hard guards отсутствуют (D031 отменил прежний lock guard). Подтверждённый `LOCKED` — самое сильное предупреждение плюс typed confirmation `yes` в guided UI; `UNKNOWN != LOCKED`; raw console выполняет без prompt; отказ принадлежит устройству; Mi Unlock не затронут.
 - GUI и raw tools используют один core.
 - ADB сразу multi-stream + generic services.
 - Fastboot — один generic transaction engine, включая DATA OUT и DATA IN.

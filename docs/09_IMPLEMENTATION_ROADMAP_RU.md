@@ -81,7 +81,7 @@ Hardware test сразу.
 - flash/boot/erase/format/set_active/reboot;
 - OEM/flashing;
 - typed UI + raw console используют один engine;
-- Verified Bootloader Lock Protection: только подтверждённый `LOCKED` блокирует обычный `flash:<partition>` во всех user-facing Fastboot путях; Mi Unlock/unlock path не блокируется.
+- Lock state как advisory: подтверждённый `LOCKED` даёт предупреждение и typed confirmation `yes` в guided UI для записи образа; команда не отменяется на стороне хоста, raw console выполняет её без prompt, Mi Unlock не затронут.
 
 Перенести доказанные A2 USBFS ideas без старой широкой host authorization policy. Не расширять узкий verified-lock guard на другие команды по аналогии.
 

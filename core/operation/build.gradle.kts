@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.kotlin.jvm)
+    `java-library`
 }
 
 kotlin {
@@ -7,6 +8,6 @@ kotlin {
 }
 
 dependencies {
-    implementation(project(":core:model"))
+    api(project(":core:model"))
     testImplementation(libs.junit4)
 }

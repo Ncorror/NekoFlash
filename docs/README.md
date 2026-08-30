@@ -29,6 +29,12 @@
 18. `17_TERMUX_SETUP_RU.md` — Termux как Git/GitHub-клиент, `scripts/gpush` и порядок доставки изменений install-ZIP.
 19. `99_RECOVERY_HANDOFF_RU.md` — минимальный handoff для восстановления будущей сессии.
 
+Architecture Decision Records — в `adr/`:
+
+- `0001_PROJECT_IDENTITY_AND_BUILD_BASELINE_RU.md` — identity, Android/toolchain baseline, начальные модули, авторитет CI.
+- `0002_LOCKED_BOOTLOADER_IS_ADVISORY_RU.md` — отмена product-level hard guard: подтверждённый `LOCKED` даёт предупреждение и typed confirmation, а не запрет.
+- `0003_PHASE2_TECHNICAL_BASELINE_RU.md` — `api()` вместо `implementation()`, конкурентная модель, DI, статический анализ.
+
 `brand-reference/` содержит реальные Legacy-ресурсы Welcome и иконки как **визуальный reference**, а не готовый контракт пиксель-в-пиксель.
 
 ## Источники опыта

@@ -14,7 +14,7 @@
 | ADB foundation должен быть multi-stream, а не один read-only stream | `02_CORE_ARCHITECTURE_RU.md`, `12_FOUNDING_DECISIONS_LOG_RU.md` |
 | Fastboot должен быть полным, включая raw/OEM/erase/format/fetch/DATA IN | `04_CAPABILITY_MATRIX_RU.md`, `02_CORE_ARCHITECTURE_RU.md` |
 | `max-download-size`, `partition-size` и неизвестный lock state не являются нашей системой разрешений | `03_PROTOCOL_AND_SAFETY_INVARIANTS_RU.md`, `05_FINAL_UI_UX_AND_BRAND_RU.md` |
-| Единственный узкий device-state hard guard: current-session `VERIFIED_LOCKED` блокирует только обычный `flash:<partition>`; Mi Unlock остаётся доступным; расширять guard по аналогии нельзя | `01_PRODUCT_CHARTER_RU.md`, `03_PROTOCOL_AND_SAFETY_INVARIANTS_RU.md`, `12_FOUNDING_DECISIONS_LOG_RU.md` |
+| Product-level hard guards отсутствуют: подтверждённый `LOCKED` даёт предупреждение и typed confirmation `yes`, а не запрет; отказ принадлежит устройству; Mi Unlock не затронут | `01_PRODUCT_CHARTER_RU.md`, `03_PROTOCOL_AND_SAFETY_INVARIANTS_RU.md`, `12_FOUNDING_DECISIONS_LOG_RU.md`, `docs/adr/0002_...` |
 | Один generic core для GUI, raw terminal, Quick Flash и vendor workflows | `02_CORE_ARCHITECTURE_RU.md`, `12_FOUNDING_DECISIONS_LOG_RU.md` |
 | Mi Unlock нельзя забыть/спрятать; это first-class feature | `01_PRODUCT_CHARTER_RU.md`, `05_FINAL_UI_UX_AND_BRAND_RU.md`, `09_IMPLEMENTATION_ROADMAP_RU.md` |
 | Welcome остаётся и должен сохранять NekoFlash identity | `05_FINAL_UI_UX_AND_BRAND_RU.md`, `brand-reference/` |

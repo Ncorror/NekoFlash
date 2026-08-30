@@ -19,6 +19,11 @@ or product whitelists as an authorization model. The UI may warn and confirm,
 but valid professional protocol capabilities are not removed because they are
 powerful.
 
+There are no product-level hard guards. A confirmed `LOCKED` bootloader produces
+the strongest warning and a typed `yes` confirmation for image writes, exactly as
+`erase userdata` and `format` do; the command is still sent and the real device
+response is shown. Refusal belongs to the device.
+
 Correctness remains strict: transport framing, ownership, session generation,
 mutation boundaries, byte accounting, peer responses and `UNKNOWN` outcomes are
 core invariants.

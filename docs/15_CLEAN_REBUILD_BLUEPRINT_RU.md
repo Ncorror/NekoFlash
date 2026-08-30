@@ -100,7 +100,7 @@ NekoFlash даёт технически грамотному пользоват�
 
 Четыре допустимых класса `stop/fail`: **Hard invariant** (битая рамка протокола, потерян ownership, доказуемо неоднозначная мутация), **Device authority** (реальный `FAIL`/отказ устройства — показать честно), **Advisory** (неизвестное состояние — предупредить, не блокировать), **User intent** (деструктивное действие — одно подтверждение в guided UI, в raw-консоли доступно всегда).
 
-Единственное принятое исключение — **Verified Bootloader Lock Protection**: обычный `flash:<partition>` не выполняется только если **текущая** Fastboot `SessionGeneration` однозначно подтвердила `LOCKED`; `UNKNOWN`/устаревшее/неподдерживаемое — не `LOCKED`; guard не трогает `erase/format/boot/set_active/OEM/raw`; Mi Unlock остаётся доступен при `LOCKED`. Расширение «по аналогии» запрещено без отдельного founding decision. Полная версия правила и таблица классов — в `docs/01_PRODUCT_CHARTER_RU.md`, `docs/03_PROTOCOL_AND_SAFETY_INVARIANTS_RU.md` и в `NekoFlash-Refactor-Prompt-v2.md`.
+Product-level исключений нет ни одного (D031). Подтверждённый `LOCKED` — класс D: guided UI показывает предупреждение и требует ввести `yes`, после чего команда уходит на устройство без изменений; `UNKNOWN`/устаревшее/неподдерживаемое — обычный advisory без typed confirmation; raw console выполняет без prompt; отказ приходит от устройства как `FAIL`. Проверка lock state не живёт в protocol engine. Полная версия правила и таблица классов — в `docs/01_PRODUCT_CHARTER_RU.md`, `docs/03_PROTOCOL_AND_SAFETY_INVARIANTS_RU.md` и `docs/16_AGENT_OPERATING_PROMPT_RU.md`.
 
 ## 6. Как использовать этот документ
 

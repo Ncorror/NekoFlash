@@ -182,7 +182,7 @@ Typed tools:
 - Raw Fastboot;
 - Quick Flash / Plan.
 
-Preflight показывает конкретные advisories. `max-download-size`, `partition-size` и неизвестный lock state не становятся скрытым authorization gate. Единственное исключение — подтверждённый `LOCKED`: обычный partition `flash` блокируется общим Verified Bootloader Lock Protection; остальные Fastboot capabilities этим автоматически не запрещаются.
+Preflight показывает конкретные advisories. `max-download-size`, `partition-size` и lock state не становятся authorization gate. Подтверждённый `LOCKED` даёт самое сильное предупреждение и typed confirmation `yes` для записи образа, но не отменяет команду: она уходит на устройство, и пользователь видит настоящий ответ peer.
 
 ## 10. Recovery Workspace
 
@@ -257,7 +257,7 @@ Mi Unlock имеет собственный polished workflow:
 - transcript/evidence;
 - reconnect/reboot state.
 
-`VERIFIED_LOCKED` не скрывает и не запрещает Mi Unlock: unlock workflow является разрешённым путём изменения lock state. После reboot/re-enumeration UI не считает unlock завершённым по старому флагу — новая Fastboot session должна заново подтвердить `UNLOCKED`, прежде чем обычный Flash станет доступен.
+Подтверждённый `LOCKED` не скрывает и не запрещает Mi Unlock: unlock workflow является нормальным путём изменения lock state. После reboot/re-enumeration UI не считает unlock завершённым по старому флагу — lock state определяется заново в новой Fastboot session.
 
 Никакой vendor магии внутри generic USB/Fastboot core.
 
@@ -304,7 +304,23 @@ Advisories: ...
 [ Cancel ] [ Execute ]
 ```
 
-Raw Terminal не получает denylist только потому, что команда destructive.
+Для наиболее разрушительных намерений — `erase userdata`, `format` и запись образа при подтверждённом `LOCKED` — confirmation является typed: пользователь вводит `yes`. Это одна и та же форма подтверждения для всех трёх случаев, а не отдельный режим для заблокированного bootloader.
+
+```text
+Bootloader: LOCKED (подтверждено в текущей session)
+
+Устройство почти наверняка отклонит запись ответом FAIL,
+и раздел не будет изменён. На части загрузчиков сначала
+передаётся весь объём образа и только затем приходит отказ.
+
+Введите yes для отправки команды:  [______]
+
+[ Cancel ] [ Execute ]
+```
+
+Предупреждение говорит, что реально произойдёт, и не изображает ответ устройства заранее: настоящий `FAIL`/`OKAY` показывается после выполнения.
+
+Raw Terminal не получает denylist и не получает prompt: команда уходит на устройство, ответ peer отображается как есть.
 
 ## 17. Adaptive UI
 

@@ -51,9 +51,11 @@ NekoFlash должен честно соблюдать/отображать:
 - реальные server/vendor restrictions в Mi Unlock;
 - физический disconnect/re-enumeration.
 
-По умолчанию приложение не должно превращать device state или ожидаемый отказ peer в собственную authorization систему. Единственное явно зафиксированное исключение — **Verified Bootloader Lock Protection**: если в текущей Fastboot `SessionGeneration` устройство однозначно подтверждает состояние `LOCKED`, NekoFlash не выполняет обычный `flash:<partition>` образа. Это узкая защита от записи образа при подтверждённо заблокированном bootloader, а не общий режим ограничений.
+Приложение не превращает device state или ожидаемый отказ peer в собственную authorization систему. Исключений из этого правила нет: product-level hard guards в NekoFlash отсутствуют.
 
-`UNKNOWN`, unsupported query, противоречивые данные или старое состояние до reconnect **не считаются `LOCKED`**. Mi Unlock/unlock workflow при `LOCKED` остаётся доступным. Это исключение нельзя автоматически расширять на `erase`, `format`, `boot`, `set_active`, OEM/raw commands или другие операции: там действуют обычные protocol/device responses, если отдельный correctness invariant не требует остановки.
+Подтверждённый `LOCKED` — не запрет, а **самое сильное предупреждение**. В guided UI запись образа при подтверждённом `LOCKED` требует typed confirmation: пользователь вводит `yes`, как и для `erase userdata`/`format`. После подтверждения команда уходит на устройство без изменений, и пользователь видит настоящий ответ peer.
+
+`UNKNOWN`, unsupported query, противоречивые данные или старое состояние до reconnect **не считаются `LOCKED`**: для них действует обычный advisory без typed confirmation. Mi Unlock/unlock workflow при `LOCKED` доступен как обычно. Raw console выполняет команду без prompt и показывает ответ устройства.
 
 ## 5. Что значит «профессиональное»
 
@@ -125,6 +127,6 @@ USB/protocol/session/transcript/evidence без необходимости debug
 
 > Какой конкретный protocol/transport/device invariant нарушится, если мы позволим отправить эту валидную команду?
 
-Единственное product-level исключение, уже отдельно принятое в canonical decisions, — Verified Bootloader Lock Protection для обычного `flash:<partition>` при подтверждённом `LOCKED`. Расширять это исключение «по аналогии» нельзя: новое ограничение требует отдельного явного founding decision.
+Product-level исключений из этого правила нет. Прежний Verified Bootloader Lock Protection отменён решением D031: он подменял ответ устройства решением хоста, что запрещено классом Device authority в `03_PROTOCOL_AND_SAFETY_INVARIANTS_RU.md`. Любое новое host-side ограничение требует отдельного явного founding decision и обязано пройти тест четырёх классов.
 
 Если ответ сводится к «это опасно», «обычному пользователю не нужно» или «так спокойнее» — это не основание для core restriction.

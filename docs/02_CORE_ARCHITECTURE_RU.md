@@ -120,7 +120,7 @@ Fastboot — host-driven synchronous transaction model.
 - Mi Unlock/vendor workflows;
 - diagnostics.
 
-Никакой общей product whitelist/denylist внутри transaction engine. Единственное canonical исключение — узкий Verified Bootloader Lock Protection для обычного `flash:<partition>`. Он должен быть общим для typed Flash, Quick Flash и raw Fastboot пути, а не UI-only disable, и не должен превращаться в классификатор всех «опасных» команд.
+Никакой product whitelist/denylist внутри transaction engine, без исключений. Engine не проверяет lock state как условие выполнения команды: он отправляет запрошенную команду и возвращает реальный ответ peer. Предупреждение и typed confirmation при подтверждённом `LOCKED` принадлежат use-case/presentation слою, поэтому raw Fastboot путь использует тот же engine без дополнительного gate.
 
 Bootloader Fastboot и fastbootd должны быть различимы в TargetMode/capabilities.
 
