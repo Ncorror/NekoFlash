@@ -5,6 +5,14 @@ naming:
   FunctionNaming:
     ignoreAnnotated: ['Composable']
 
+style:
+  # Ранний возврат из guard clause не считается лишним выходом: он снижает
+  # вложенность, а не усложняет функцию. Правило продолжает ловить настоящие
+  # многовыходные функции.
+  ReturnCount:
+    max: 2
+    excludeGuardClauses: true
+
 complexity:
   LargeClass:
     threshold: 600

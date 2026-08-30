@@ -53,19 +53,25 @@ else
 fi
 
 echo
-echo "== module boundaries (core) =="
+echo "== module boundaries =="
 boundary_log="$(mktemp)"
 trap 'rm -f "$boundary_log"' EXIT
-if java -jar "$DETEKT_JAR" \
-    --input core \
-    --config config/detekt/core-boundaries.yml > "$boundary_log" 2>&1; then
-    echo "boundaries: PASS"
-else
-    echo "boundaries: FAIL - core imports something it must not depend on" >&2
-    grep ForbiddenImport "$boundary_log" >&2 || cat "$boundary_log" >&2
-    failures=$((failures + 1))
-fi
+check_boundary() {
+    local label="$1"
+    local input="$2"
+    local config="$3"
+    [ -d "$input" ] || return 0
+    if java -jar "$DETEKT_JAR" --input "$input" --config "$config" > "$boundary_log" 2>&1; then
+        echo "  $label: PASS"
+    else
+        echo "  $label: FAIL - imports something it must not depend on" >&2
+        grep ForbiddenImport "$boundary_log" >&2 || cat "$boundary_log" >&2
+        failures=$((failures + 1))
+    fi
+}
 
+check_boundary "core" "core" "config/detekt/core-boundaries.yml"
+check_boundary "usb:api" "usb/api" "config/detekt/usb-api-boundaries.yml"
 echo
 if [ "$failures" -gt 0 ]; then
     echo "kotlin style: FAIL ($failures)" >&2

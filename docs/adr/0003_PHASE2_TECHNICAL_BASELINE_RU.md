@@ -44,7 +44,8 @@ DI-библиотека не вводится. На текущем масшта�
 Гейт внедрён отдельным changeset. Реализация:
 
 - **detekt 1.23.8 как самостоятельный CLI-jar**, а не Gradle-плагин. Плагин связал бы гейт стиля с совместимостью AGP/Gradle/Kotlin: обновление toolchain могло бы уронить сборку продукта из-за анализатора. CLI от сборки независим. Версия и SHA-256 дистрибутива закреплены в `scripts/ci/check_kotlin_style.sh` так же, как закреплён Gradle Wrapper; несовпадение checksum — отказ.
-- **Два прогона.** `config/detekt/detekt.yml` — стиль и сложность (`LargeClass` 600, `LongMethod` 60, `TooManyFunctions` 20). `config/detekt/core-boundaries.yml` — `ForbiddenImport`: `core:*` не может импортировать `usb`/`protocol`/`feature`/`vendor`/`ui`/`android`/`androidx`. Так направление зависимостей из раздела 1 проверяется машиной, а не только на ревью.
+- **Стиль и сложность.** `config/detekt/detekt.yml` — `LargeClass` 600, `LongMethod` 60, `TooManyFunctions` 20. `ReturnCount` оставлен на значении 2, но с `excludeGuardClauses`: ранний возврат из guard clause снижает вложенность, а не усложняет функцию; правило продолжает ловить настоящие многовыходные функции.
+- **Границы модулей.** Отдельный конфиг `ForbiddenImport` на каждый защищаемый модуль: `config/detekt/core-boundaries.yml` для `core:*` и `config/detekt/usb-api-boundaries.yml` для `usb:api`. Так направление зависимостей из раздела 1 проверяется машиной, а не только на ревью. Новый модуль добавляется одной строкой в `scripts/ci/check_kotlin_style.sh`.
 - **Compose учтён.** `FunctionNaming`, `LongParameterList` и `TooManyFunctions` игнорируют `@Composable`: PascalCase-имена и длинные списки параметров там нормальны, а без исключения гейт давал бы ложные срабатывания на каждом Composable.
 - **Локально запускается той же командой.** Требуется Java; без неё проверка мягко пропускается с подсказкой, но в CI обязательна.
 

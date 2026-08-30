@@ -48,6 +48,10 @@ Artifact I/O | Diagnostics/Evidence | Vendor workflows | Persistence
 
 USB слой не должен знать, что `flash:boot` «опасен», что Mi Unlock — Xiaomi feature, или какую кнопку нажал пользователь.
 
+Классификация по дескрипторам даёт транспортный вид интерфейса (ADB-класс или Fastboot-класс), но **не** `TargetMode`. Отличить обычный Android от Recovery или Sideload, а bootloader fastboot от fastbootd, дескриптор не может — это устанавливает только протокольный handshake. Поэтому `usb:api` оперирует собственным `UsbInterfaceKind`, а сопоставление с `TargetMode` происходит выше по стеку.
+
+Идентичность target выводится с явным указанием источника. Серийный номер переживает re-enumeration и смену режима; имя USB-подключения — нет. Слой выше обязан различать эти два случая, а не считать любой `TargetId` одинаково надёжным.
+
 Native backend допускается для performance/correctness-sensitive I/O, но JNI API должен оставаться transport-oriented.
 
 ## 4. ADB architecture
