@@ -1,8 +1,14 @@
 package io.github.ncorror.nekoflash
 
 import android.app.Application
+import android.net.Uri
+import io.github.ncorror.nekoflash.core.diagnostics.DiagnosticBundle
+import io.github.ncorror.nekoflash.core.diagnostics.DiagnosticBundleResult
+import io.github.ncorror.nekoflash.core.diagnostics.InMemoryDiagnosticSink
 import io.github.ncorror.nekoflash.core.model.SessionGeneration
+import io.github.ncorror.nekoflash.diagnostics.HostFacts
 import io.github.ncorror.nekoflash.usb.android.AndroidUsbHost
+import io.github.ncorror.nekoflash.usb.api.UsbDiagnosticReport
 import io.github.ncorror.nekoflash.usb.api.UsbPermissionCallbackIdentity
 import io.github.ncorror.nekoflash.usb.api.UsbPermissionPolicy
 import io.github.ncorror.nekoflash.usb.api.UsbSessionCoordinator
