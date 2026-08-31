@@ -45,7 +45,7 @@ Phase 1 closure CI: **VERIFIED / PASS** (2026-08-28). Подтверждены 7
 - claim/release;
 - detach/re-enumeration;
 - basic diagnostics export;
-- UI показывает target/mode/session.
+- UI показывает target/session. **Готово**; режим остаётся неизвестным до handshake, и экран говорит об этом прямо.
 
 Hardware test сразу.
 

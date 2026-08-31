@@ -9,21 +9,36 @@
     <string name="nav_operations">Operations</string>
     <string name="nav_diagnostics">Diagnostics</string>
 
-    <string name="foundation_title">Clean foundation</string>
-    <string name="foundation_description">Phase 1 establishes the application shell and core contracts. USB ownership begins in Phase 2; ADB, Fastboot and Recovery are built as protocol engines rather than screen-specific implementations.</string>
 
     <string name="build_baseline_title">Current build baseline</string>
     <string name="build_baseline_values" translatable="false">compileSdk 37 · targetSdk 36 · minSdk 26</string>
     <string name="professional_capability_policy">No novice/expert permission profiles. No artificial capability gates.</string>
 
     <string name="target_label">Target</string>
-    <string name="target_none_attached">No device attached</string>
-    <string name="mode_label">Mode</string>
 
-    <string name="target_mode_adb" translatable="false">ADB</string>
-    <string name="target_mode_recovery">Recovery</string>
-    <string name="target_mode_sideload">Sideload</string>
-    <string name="target_mode_bootloader_fastboot">Fastboot (bootloader)</string>
-    <string name="target_mode_fastbootd" translatable="false">Fastbootd</string>
-    <string name="target_mode_unknown">Unknown</string>
+    <string name="sessions_title">USB sessions</string>
+    <string name="sessions_empty">No device attached. Connect a device over USB.</string>
+    <string name="session_generation_label">Session</string>
+    <string name="session_state_label">State</string>
+    <string name="session_interface_label">Interface</string>
+    <string name="session_identity_label">Identity</string>
+
+    <string name="session_state_discovered">Discovered</string>
+    <string name="session_state_permission_pending">Waiting for permission</string>
+    <string name="session_state_ready">Permission granted</string>
+    <string name="session_state_claimed">Claimed</string>
+    <string name="session_state_closed">Closed</string>
+
+    <string name="identity_source_serial">Serial number, survives reconnection</string>
+    <string name="identity_source_attachment">USB connection, changes on reconnection</string>
+
+    <string name="interface_kind_adb" translatable="false">ADB</string>
+    <string name="interface_kind_fastboot" translatable="false">Fastboot</string>
+
+    <string name="match_confidence_canonical">canonical descriptors</string>
+    <string name="match_confidence_android_compatible">Android subclass, other protocol</string>
+    <string name="match_confidence_generic_vendor">vendor specific, non canonical</string>
+
+    <string name="mode_requires_handshake">Protocol mode is unknown until a handshake. Descriptors distinguish an ADB class interface from a Fastboot class one, but not Android from Recovery or Sideload, nor bootloader Fastboot from fastbootd.</string>
+
 </resources>

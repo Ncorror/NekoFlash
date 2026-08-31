@@ -8,18 +8,32 @@
     <string name="nav_operations">Операции</string>
     <string name="nav_diagnostics">Диагностика</string>
 
-    <string name="foundation_title">Чистая основа</string>
-    <string name="foundation_description">Этап 1 формирует оболочку приложения и базовые контракты. Владение USB начинается на этапе 2; ADB, Fastboot и Recovery строятся как протокольные движки, а не реализации, привязанные к отдельным экранам.</string>
 
     <string name="build_baseline_title">Текущая базовая конфигурация сборки</string>
     <string name="professional_capability_policy">Нет профилей разрешений «Новичок / Эксперт». Нет искусственных ограничителей возможностей.</string>
 
     <string name="target_label">Целевое устройство</string>
-    <string name="target_none_attached">Устройство не подключено</string>
-    <string name="mode_label">Режим</string>
 
-    <string name="target_mode_recovery">Recovery</string>
-    <string name="target_mode_sideload">Sideload</string>
-    <string name="target_mode_bootloader_fastboot">Fastboot (bootloader)</string>
-    <string name="target_mode_unknown">Неизвестно</string>
+    <string name="sessions_title">Сессии USB</string>
+    <string name="sessions_empty">Устройство не подключено. Подключите его по USB.</string>
+    <string name="session_generation_label">Сессия</string>
+    <string name="session_state_label">Состояние</string>
+    <string name="session_interface_label">Интерфейс</string>
+    <string name="session_identity_label">Идентичность</string>
+
+    <string name="session_state_discovered">Обнаружено</string>
+    <string name="session_state_permission_pending">Ожидание разрешения</string>
+    <string name="session_state_ready">Разрешение получено</string>
+    <string name="session_state_claimed">Интерфейс захвачен</string>
+    <string name="session_state_closed">Завершена</string>
+
+    <string name="identity_source_serial">Серийный номер, переживает переподключение</string>
+    <string name="identity_source_attachment">Подключение USB, меняется при переподключении</string>
+
+    <string name="match_confidence_canonical">канонические дескрипторы</string>
+    <string name="match_confidence_android_compatible">подкласс Android, другой протокол</string>
+    <string name="match_confidence_generic_vendor">vendor specific, неканонический</string>
+
+    <string name="mode_requires_handshake">Протокольный режим неизвестен до handshake. Дескрипторы отличают интерфейс класса ADB от класса Fastboot, но не обычный Android от Recovery или Sideload и не bootloader Fastboot от fastbootd.</string>
+
 </resources>

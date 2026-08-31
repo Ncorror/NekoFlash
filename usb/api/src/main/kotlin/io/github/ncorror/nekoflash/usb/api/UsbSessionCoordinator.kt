@@ -23,6 +23,15 @@ public class UsbSessionCoordinator(
     private val host: UsbHost,
     private val registry: UsbSessionRegistry = UsbSessionRegistry(),
     private val allowGenericVendor: Boolean = true,
+    /**
+     * Вызывается после успешно отправленного запроса разрешения.
+     *
+     * Существует ради планирования таймаута: сам координатор время не
+     * планирует, потому что планирование нельзя выполнить детерминированно в
+     * тесте. Платформенный слой по этому уведомлению заводит отсчёт и по
+     * истечении вызывает [onPermissionTimeout].
+     */
+    private val onPermissionRequested: (SessionGeneration) -> Unit = {},
 ) : UsbHost.Listener {
     /** Незавершённые сессии. Для показа на экране и для владельцев операций. */
     public val sessions: StateFlow<List<UsbSession>>
@@ -60,7 +69,9 @@ public class UsbSessionCoordinator(
             return
         }
         registry.markPermissionPending(session.generation)
-        if (!host.requestPermission(device)) {
+        if (host.requestPermission(device)) {
+            onPermissionRequested(session.generation)
+        } else {
             registry.close(session.generation, UsbSessionClosureReason.DETACHED)
         }
     }

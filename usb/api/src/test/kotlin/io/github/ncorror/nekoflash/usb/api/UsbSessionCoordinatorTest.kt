@@ -197,6 +197,34 @@ class UsbSessionCoordinatorTest {
         assertEquals(1, coordinator.sessions.value.size)
     }
 
+    @Test
+    fun aPermissionRequestAnnouncesItselfSoTheTimeoutCanBeScheduled() {
+        val host = FakeUsbHost(attached = listOf(deviceA))
+        val scheduled = mutableListOf<Long>()
+        val coordinator = UsbSessionCoordinator(
+            host = host,
+            onPermissionRequested = { scheduled += it.value },
+        )
+
+        coordinator.start()
+
+        assertEquals(listOf(coordinator.sessions.value.single().generation.value), scheduled)
+    }
+
+    @Test
+    fun noTimeoutIsScheduledWhenPermissionWasAlreadyGranted() {
+        val host = FakeUsbHost(attached = listOf(deviceA), permitted = setOf(deviceA.deviceName))
+        val scheduled = mutableListOf<Long>()
+        val coordinator = UsbSessionCoordinator(
+            host = host,
+            onPermissionRequested = { scheduled += it.value },
+        )
+
+        coordinator.start()
+
+        assertTrue(scheduled.isEmpty())
+    }
+
     private class FakeUsbHost(
         private val attached: List<UsbDeviceDescriptor>,
         private val permitted: Set<String> = emptySet(),

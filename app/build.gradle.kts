@@ -49,7 +49,9 @@ dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:diagnostics"))
     implementation(project(":core:operation"))
+    implementation(project(":usb:api"))
     implementation(project(":usb:android"))
+    implementation(libs.kotlinx.coroutines.core)
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

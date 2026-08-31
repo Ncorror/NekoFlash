@@ -4,11 +4,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -21,11 +22,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.github.ncorror.nekoflash.R
-import io.github.ncorror.nekoflash.core.model.TargetMode
+import io.github.ncorror.nekoflash.usb.api.TargetIdentitySource
+import io.github.ncorror.nekoflash.usb.api.UsbInterfaceKind
+import io.github.ncorror.nekoflash.usb.api.UsbMatchConfidence
+import io.github.ncorror.nekoflash.usb.api.UsbSession
+import io.github.ncorror.nekoflash.usb.api.UsbSessionState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NekoFlashApp() {
+fun NekoFlashApp(sessions: List<UsbSession> = emptyList()) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -53,10 +58,10 @@ fun NekoFlashApp() {
                             .width(240.dp)
                             .fillMaxSize(),
                     )
-                    Workspace(modifier = Modifier.weight(1f))
+                    Workspace(sessions = sessions, modifier = Modifier.weight(1f))
                 }
             } else {
-                Workspace(modifier = Modifier.fillMaxSize())
+                Workspace(sessions = sessions, modifier = Modifier.fillMaxSize())
             }
         }
     }
@@ -79,21 +84,33 @@ private fun ProjectNavigation(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun Workspace(modifier: Modifier = Modifier) {
+private fun Workspace(
+    sessions: List<UsbSession>,
+    modifier: Modifier = Modifier,
+) {
     Column(
-        modifier = modifier.padding(24.dp),
+        modifier = modifier
+            .verticalScroll(rememberScrollState())
+            .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
-        TargetBar()
-
         Text(
-            text = stringResource(R.string.foundation_title),
+            text = stringResource(R.string.sessions_title),
             style = MaterialTheme.typography.headlineMedium,
         )
-        Text(
-            text = stringResource(R.string.foundation_description),
-            style = MaterialTheme.typography.bodyLarge,
-        )
+
+        if (sessions.isEmpty()) {
+            Text(
+                text = stringResource(R.string.sessions_empty),
+                style = MaterialTheme.typography.bodyLarge,
+            )
+        } else {
+            sessions.forEach { session -> SessionCard(session) }
+            Text(
+                text = stringResource(R.string.mode_requires_handshake),
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
 
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(
@@ -112,45 +129,77 @@ private fun Workspace(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun TargetBar() {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        tonalElevation = 2.dp,
-        shape = MaterialTheme.shapes.medium,
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 18.dp, vertical = 14.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+private fun SessionCard(session: UsbSession) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Column {
-                Text(stringResource(R.string.target_label), style = MaterialTheme.typography.labelMedium)
-                Text(
-                    stringResource(R.string.target_none_attached),
-                    style = MaterialTheme.typography.titleMedium,
-                )
-            }
-            Spacer(modifier = Modifier.width(24.dp))
-            Column {
-                Text(stringResource(R.string.mode_label), style = MaterialTheme.typography.labelMedium)
-                Text(
-                    localizedTargetMode(TargetMode.UNKNOWN),
-                    style = MaterialTheme.typography.titleMedium,
-                )
-            }
+            LabelledValue(
+                label = stringResource(R.string.target_label),
+                value = session.targetId.value,
+            )
+            LabelledValue(
+                label = stringResource(R.string.session_identity_label),
+                value = localizedIdentitySource(session.identity.source),
+            )
+            LabelledValue(
+                label = stringResource(R.string.session_interface_label),
+                value = localizedInterfaceKind(session.candidate.kind) + " · " +
+                    localizedMatchConfidence(session.candidate.confidence),
+            )
+            LabelledValue(
+                label = stringResource(R.string.session_state_label),
+                value = localizedSessionState(session.state),
+            )
+            LabelledValue(
+                label = stringResource(R.string.session_generation_label),
+                value = session.generation.value.toString(),
+            )
         }
     }
 }
 
 @Composable
-private fun localizedTargetMode(mode: TargetMode): String = stringResource(
-    when (mode) {
-        TargetMode.ADB -> R.string.target_mode_adb
-        TargetMode.RECOVERY -> R.string.target_mode_recovery
-        TargetMode.SIDELOAD -> R.string.target_mode_sideload
-        TargetMode.BOOTLOADER_FASTBOOT -> R.string.target_mode_bootloader_fastboot
-        TargetMode.FASTBOOTD -> R.string.target_mode_fastbootd
-        TargetMode.UNKNOWN -> R.string.target_mode_unknown
+private fun LabelledValue(label: String, value: String) {
+    Column {
+        Text(text = label, style = MaterialTheme.typography.labelMedium)
+        Text(text = value, style = MaterialTheme.typography.bodyLarge)
+    }
+}
+
+@Composable
+private fun localizedSessionState(state: UsbSessionState): String = stringResource(
+    when (state) {
+        UsbSessionState.DISCOVERED -> R.string.session_state_discovered
+        UsbSessionState.PERMISSION_PENDING -> R.string.session_state_permission_pending
+        UsbSessionState.READY -> R.string.session_state_ready
+        UsbSessionState.CLAIMED -> R.string.session_state_claimed
+        UsbSessionState.CLOSED -> R.string.session_state_closed
+    },
+)
+
+@Composable
+private fun localizedIdentitySource(source: TargetIdentitySource): String = stringResource(
+    when (source) {
+        TargetIdentitySource.SERIAL -> R.string.identity_source_serial
+        TargetIdentitySource.USB_ATTACHMENT -> R.string.identity_source_attachment
+    },
+)
+
+@Composable
+private fun localizedInterfaceKind(kind: UsbInterfaceKind): String = stringResource(
+    when (kind) {
+        UsbInterfaceKind.ADB -> R.string.interface_kind_adb
+        UsbInterfaceKind.FASTBOOT -> R.string.interface_kind_fastboot
+    },
+)
+
+@Composable
+private fun localizedMatchConfidence(confidence: UsbMatchConfidence): String = stringResource(
+    when (confidence) {
+        UsbMatchConfidence.CANONICAL -> R.string.match_confidence_canonical
+        UsbMatchConfidence.ANDROID_COMPATIBLE -> R.string.match_confidence_android_compatible
+        UsbMatchConfidence.GENERIC_VENDOR -> R.string.match_confidence_generic_vendor
     },
 )
