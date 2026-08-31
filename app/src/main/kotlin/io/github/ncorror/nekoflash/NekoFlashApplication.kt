@@ -72,9 +72,12 @@ public class NekoFlashApplication : Application() {
      * закрывает чужой поток.
      */
     public fun writeDiagnostics(destination: Uri): DiagnosticBundleResult {
+        // Незавершённые и недавно завершённые вместе: отключение устройства
+        // перед выгрузкой — обычное дело, и без закрытых сессий отчёт был бы
+        // пустым именно в самом интересном случае.
         val sections = UsbDiagnosticReport.sections(
             host = HostFacts.collect(this),
-            sessions = usbSessions.sessions.value,
+            sessions = usbSessions.sessions.value + usbSessions.recentlyClosedSessions(),
             events = events.snapshot(),
             droppedEvents = events.droppedCount(),
         )

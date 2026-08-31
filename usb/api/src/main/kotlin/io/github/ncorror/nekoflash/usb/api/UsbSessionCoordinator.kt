@@ -51,6 +51,9 @@ public class UsbSessionCoordinator(
     public val sessions: StateFlow<List<UsbSession>>
         get() = registry.activeSessions
 
+    /** Недавно завершённые сессии. Нужны отчёту после отключения устройства. */
+    public fun recentlyClosedSessions(): List<UsbSession> = registry.recentlyClosedSessions()
+
     /** Начинает наблюдение и сразу разбирает уже подключённые устройства. */
     public fun start() {
         host.start(this)
@@ -91,17 +94,16 @@ public class UsbSessionCoordinator(
             fields = deviceFields(device) + candidateFields(candidate),
         )
         if (host.hasPermission(device)) {
-            registry.markReady(session.generation)
-            emit("permission_already_granted", session)
+            emit("permission_already_granted", registry.markReady(session.generation).or(session))
             return
         }
-        registry.markPermissionPending(session.generation)
+        val pending = registry.markPermissionPending(session.generation).or(session)
         if (host.requestPermission(device)) {
             onPermissionRequested(session.generation)
-            emit("permission_requested", session)
+            emit("permission_requested", pending)
         } else {
             registry.close(session.generation, UsbSessionClosureReason.DETACHED)
-            emit("permission_request_failed_device_gone", session)
+            emit("permission_request_failed_device_gone", pending)
         }
     }
 
@@ -120,8 +122,11 @@ public class UsbSessionCoordinator(
         when (val decision = UsbPermissionPolicy.resolve(pending, device, granted)) {
             is UsbPermissionPolicy.Decision.Proceed -> proceed(decision)
             is UsbPermissionPolicy.Decision.Denied -> {
-                registry.close(decision.session.generation, UsbSessionClosureReason.PERMISSION_DENIED)
-                emit("permission_denied", decision.session)
+                val closed = registry.close(
+                    decision.session.generation,
+                    UsbSessionClosureReason.PERMISSION_DENIED,
+                )
+                emit("permission_denied", closed.or(decision.session))
             }
 
             UsbPermissionPolicy.Decision.MissingDevice ->
@@ -167,13 +172,11 @@ public class UsbSessionCoordinator(
                 identity = UsbTargetIdentity.fromDescriptor(decision.candidate.device),
                 candidate = decision.candidate,
             )
-            registry.markReady(opened.generation)
-            emit("permission_granted_without_request", opened)
+            emit("permission_granted_without_request", registry.markReady(opened.generation).or(opened))
             return
         }
-        val refreshed = registry.refresh(existing.generation, decision.candidate)
-        registry.markReady(existing.generation)
-        val updated = (refreshed as? UsbSessionTransition.Applied)?.session ?: existing
+        registry.refresh(existing.generation, decision.candidate)
+        val updated = registry.markReady(existing.generation).or(existing)
         emit("permission_granted", updated)
         if (updated.identity.source != existing.identity.source) {
             emit(
@@ -186,6 +189,21 @@ public class UsbSessionCoordinator(
             )
         }
     }
+
+    /**
+     * Состояние сессии после применённого перехода.
+     *
+     * Событие обязано сообщать состояние **после** перехода, а не до него.
+     * Снимок, взятый заранее, попадал в evidence как текущее состояние и врал:
+     * `permission_requested` сообщал `DISCOVERED`, а `permission_granted` —
+     * `PERMISSION_PENDING`. Отчёт, который называет прошлое настоящим, хуже
+     * отсутствующего.
+     *
+     * Если переход отклонён, остаётся прежний снимок: отклонение само по себе
+     * состояния не меняет.
+     */
+    private fun UsbSessionTransition.or(fallback: UsbSession): UsbSession =
+        (this as? UsbSessionTransition.Applied)?.session ?: fallback
 
     private fun emit(
         message: String,

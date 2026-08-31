@@ -164,6 +164,17 @@ public class UsbSessionRegistry(
                 .map { closeLocked(it, UsbSessionClosureReason.DETACHED) }
         }
 
+    /**
+     * Недавно завершённые сессии, от самой старой к самой новой.
+     *
+     * Нужны отчёту: оператор обычно отключает устройство прежде, чем выгружать
+     * диагностику, и без этого списка снимок сессий оказывался бы пустым именно
+     * тогда, когда он интереснее всего.
+     */
+    public fun recentlyClosedSessions(): List<UsbSession> = synchronized(lock) {
+        closed.values.toList()
+    }
+
     /** Текущее состояние сессии, включая недавно завершённые. */
     public fun session(generation: SessionGeneration): UsbSession? = synchronized(lock) {
         active[generation.value] ?: closed[generation.value]

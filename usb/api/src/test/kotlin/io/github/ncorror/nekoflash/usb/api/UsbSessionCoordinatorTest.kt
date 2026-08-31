@@ -201,6 +201,65 @@ class UsbSessionCoordinatorTest {
     }
 
     @Test
+    fun everyEventReportsTheStateAfterItsTransition() {
+        val host = FakeUsbHost(attached = listOf(deviceA))
+        val sink = InMemoryDiagnosticSink()
+        val coordinator = coordinatorWith(host, sink)
+
+        coordinator.start()
+        coordinator.onPermissionResult(deviceA.copy(serialNumber = "MI9SERIAL"), granted = true)
+
+        val states = sink.snapshot().associate { it.message to it.fields["state"] }
+        assertEquals("PERMISSION_PENDING", states["permission_requested"])
+        assertEquals("READY", states["permission_granted"])
+        assertEquals("READY", states["identity_refined"])
+    }
+
+    @Test
+    fun anAlreadyPermittedDeviceReportsReadyNotDiscovered() {
+        val host = FakeUsbHost(attached = listOf(deviceA), permitted = setOf(deviceA.deviceName))
+        val sink = InMemoryDiagnosticSink()
+
+        coordinatorWith(host, sink).start()
+
+        val event = sink.snapshot().single { it.message == "permission_already_granted" }
+        assertEquals("READY", event.fields["state"])
+    }
+
+    @Test
+    fun aDeniedPermissionReportsClosedNotPending() {
+        val host = FakeUsbHost(attached = listOf(deviceA))
+        val sink = InMemoryDiagnosticSink()
+        val coordinator = coordinatorWith(host, sink)
+        coordinator.start()
+
+        coordinator.onPermissionResult(deviceA, granted = false)
+
+        val event = sink.snapshot().single { it.message == "permission_denied" }
+        assertEquals("CLOSED", event.fields["state"])
+    }
+
+    @Test
+    fun closedSessionsStayAvailableForTheReport() {
+        val host = FakeUsbHost(attached = listOf(deviceA), permitted = setOf(deviceA.deviceName))
+        val coordinator = coordinatorWith(host, InMemoryDiagnosticSink())
+        coordinator.start()
+        val opened = coordinator.sessions.value.single()
+
+        coordinator.onDeviceDetached(deviceA)
+
+        assertTrue(coordinator.sessions.value.isEmpty())
+        assertEquals(
+            listOf(opened.generation),
+            coordinator.recentlyClosedSessions().map { it.generation },
+        )
+        assertEquals(
+            UsbSessionClosureReason.DETACHED,
+            coordinator.recentlyClosedSessions().single().closureReason,
+        )
+    }
+
+    @Test
     fun aPermissionRequestAnnouncesItselfSoTheTimeoutCanBeScheduled() {
         val host = FakeUsbHost(attached = listOf(deviceA))
         val scheduled = mutableListOf<Long>()
