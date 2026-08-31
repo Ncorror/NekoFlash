@@ -34,20 +34,25 @@ Phase 1 closure CI: **VERIFIED / PASS** (2026-08-28). Подтверждены 7
 
 ## Phase 2 — USB + Target/Session vertical slice — CURRENT
 
-- `usb:api` — платформенно-независимый контракт: дескрипторы, классификация интерфейсов, идентичность target, сессии и `SessionGeneration`, политика разрешений. **Готово**;
-- манифест: `uses-feature android.hardware.usb.host` и обработка `USB_DEVICE_ATTACHED`. **Готово**;
-- `usb:android` — маппер дескрипторов, перечисление устройств, приёмники подключения и отключения, запрос разрешения. **Готово**;
-- descriptor discovery;
-- permission — политика и Android-механика. **Готово**;
-- Target identity;
-- SessionGeneration;
-- связывание событий USB в состояние сессий. **Готово**;
-- claim/release;
-- detach/re-enumeration;
-- basic diagnostics export;
-- UI показывает target/session. **Готово**; режим остаётся неизвестным до handshake, и экран говорит об этом прямо.
+Статус каждого пункта проставляется по факту наличия работающего кода, а не по ощущению завершённости. Пункт, сделанный в составе другого, ссылается на него явно.
 
-Hardware test сразу.
+Укрупнённая отметка «готово» на строке, покрывающей сразу несколько пунктов, **запрещена**: именно так список однажды разошёлся с действительностью, и пропущенный пункт `basic diagnostics export` был замечен только со стороны.
+
+| Пункт | Статус | Где |
+|---|---|---|
+| Манифест: `uses-feature android.hardware.usb.host`, `USB_DEVICE_ATTACHED`, `device_filter.xml` | **готово** | `app/src/main/AndroidManifest.xml`, `usb/android/src/main/AndroidManifest.xml`, `app/src/main/res/xml/device_filter.xml` |
+| Descriptor discovery | **готово** | `AndroidUsbHost.devices`, `AndroidUsbDescriptorMapper`, `UsbInterfaceClassifier` |
+| Target identity | **готово** | `UsbTargetIdentity` — с указанием источника, потому что имя подключения не переживает re-enumeration |
+| `SessionGeneration` | **готово** | `UsbSessionRegistry` — монотонная выдача, необратимое завершение |
+| Permission | **готово** | `UsbPermissionPolicy`, `UsbPermissionCallbackIdentity`, `AndroidUsbHost.requestPermission`, планирование таймаута в `NekoFlashApplication` |
+| Связывание событий USB в состояние сессий | **готово** | `UsbSessionCoordinator` |
+| Detach / re-enumeration | **готово** | `UsbSessionRegistry.closeDetached`, приёмник `ACTION_USB_DEVICE_DETACHED` |
+| UI показывает target и сессию | **готово** | `NekoFlashApp`; протокольный режим не показывается — до handshake он неизвестен, и экран говорит об этом прямо |
+| Claim / release | **не сделано** | состояние `CLAIMED` и `UsbSessionRegistry.markClaimed` существуют, но платформенного `claimInterface`/`UsbDeviceConnection` в проекте нет, а `markClaimed` не вызывается ни одной строкой production-кода. Состояние «интерфейс захвачен» сейчас недостижимо |
+| Basic diagnostics export | **частично** | сборщик архива `DiagnosticBundle` готов и покрыт тестами, включая побайтовую детерминированность. Запись событий USB и выгрузка архива не подключены: `DiagnosticSink` в production-коде не используется |
+| Hardware test | **не сделан** | discovery, permission, identity и detach проверяемы уже сейчас, но evidence по `07_TESTING_CI_HARDWARE_EVIDENCE_RU.md` требует работающей выгрузки логов |
+
+Фаза не считается закрытой, пока остаётся хотя бы один пункт без отметки «готово».
 
 ## Phase 3 — настоящий ADB foundation + Terminal
 
