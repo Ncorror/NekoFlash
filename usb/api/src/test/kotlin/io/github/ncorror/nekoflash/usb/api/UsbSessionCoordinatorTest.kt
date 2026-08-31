@@ -1,5 +1,8 @@
 package io.github.ncorror.nekoflash.usb.api
 
+import io.github.ncorror.nekoflash.core.diagnostics.DiagnosticEvent
+import io.github.ncorror.nekoflash.core.diagnostics.InMemoryDiagnosticSink
+import java.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -225,6 +228,84 @@ class UsbSessionCoordinatorTest {
         assertTrue(scheduled.isEmpty())
     }
 
+    @Test
+    fun aFullPermissionCycleIsRecordedAsEvidence() {
+        val host = FakeUsbHost(attached = listOf(deviceA))
+        val sink = InMemoryDiagnosticSink()
+        val coordinator = coordinatorWith(host, sink)
+
+        coordinator.start()
+        coordinator.onPermissionResult(deviceA.copy(serialNumber = "MI9SERIAL"), granted = true)
+        coordinator.onDeviceDetached(deviceA)
+
+        assertEquals(
+            listOf(
+                "session_opened",
+                "permission_requested",
+                "permission_granted",
+                "identity_refined",
+                "session_closed_detached",
+            ),
+            sink.snapshot().map { it.message },
+        )
+    }
+
+    @Test
+    fun anOpenedSessionCarriesEnoughContextToBeUseful() {
+        val host = FakeUsbHost(attached = listOf(deviceA))
+        val sink = InMemoryDiagnosticSink()
+
+        coordinatorWith(host, sink).start()
+
+        val opened = sink.snapshot().first { it.message == "session_opened" }
+        assertEquals("usb", opened.category)
+        assertEquals(1L, opened.sessionGeneration?.value)
+        assertEquals("/dev/bus/usb/001/002", opened.fields["connection"])
+        assertEquals("0x2717", opened.fields["vendorId"])
+        assertEquals("ADB", opened.fields["interfaceKind"])
+        assertEquals("CANONICAL", opened.fields["matchConfidence"])
+        assertEquals("DISCOVERED", opened.fields["state"])
+        assertEquals(FIXED_TIME, opened.timestamp)
+    }
+
+    @Test
+    fun aDeniedPermissionAndAnIgnoredDeviceAreBothRecorded() {
+        val sink = InMemoryDiagnosticSink()
+        val host = FakeUsbHost(attached = listOf(deviceA.copy(interfaces = emptyList())))
+        coordinatorWith(host, sink).start()
+
+        val withUsable = FakeUsbHost(attached = listOf(deviceA))
+        val denied = InMemoryDiagnosticSink()
+        val coordinator = coordinatorWith(withUsable, denied)
+        coordinator.start()
+        coordinator.onPermissionResult(deviceA, granted = false)
+
+        assertEquals(listOf("device_ignored_no_usable_interface"), sink.snapshot().map { it.message })
+        assertEquals("permission_denied", denied.snapshot().last().message)
+    }
+
+    @Test
+    fun aTimeoutRecordsWhichOutcomeWasChosen() {
+        val host = FakeUsbHost(attached = listOf(deviceA))
+        val sink = InMemoryDiagnosticSink()
+        val coordinator = coordinatorWith(host, sink)
+        coordinator.start()
+        val session = coordinator.sessions.value.single()
+
+        coordinator.onPermissionTimeout(session.generation, permissionGrantedNow = false)
+
+        val timeout = sink.snapshot().last()
+        assertEquals("permission_timeout", timeout.message)
+        assertEquals("CLOSE_AND_REPORT", timeout.fields["outcome"])
+    }
+
+    @Test
+    fun byDefaultNothingIsRecorded() {
+        val host = FakeUsbHost(attached = listOf(deviceA))
+
+        UsbSessionCoordinator(host).start()
+    }
+
     private class FakeUsbHost(
         private val attached: List<UsbDeviceDescriptor>,
         private val permitted: Set<String> = emptySet(),
@@ -255,6 +336,14 @@ class UsbSessionCoordinatorTest {
     }
 
     private companion object {
+        val FIXED_TIME: Instant = Instant.parse("2026-08-31T10:00:00Z")
+
+        fun coordinatorWith(host: UsbHost, sink: InMemoryDiagnosticSink) = UsbSessionCoordinator(
+            host = host,
+            diagnostics = sink,
+            clock = { FIXED_TIME },
+        )
+
         val deviceA = UsbDeviceDescriptor(
             deviceId = 1001,
             deviceName = "/dev/bus/usb/001/002",

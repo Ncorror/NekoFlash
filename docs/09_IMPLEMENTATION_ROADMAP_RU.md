@@ -48,11 +48,15 @@ Phase 1 closure CI: **VERIFIED / PASS** (2026-08-28). Подтверждены 7
 | Связывание событий USB в состояние сессий | **готово** | `UsbSessionCoordinator` |
 | Detach / re-enumeration | **готово** | `UsbSessionRegistry.closeDetached`, приёмник `ACTION_USB_DEVICE_DETACHED` |
 | UI показывает target и сессию | **готово** | `NekoFlashApp`; протокольный режим не показывается — до handshake он неизвестен, и экран говорит об этом прямо |
+| Basic diagnostics export | **частично** | сборщик архива `DiagnosticBundle` и запись событий USB готовы и покрыты тестами. Остаётся выгрузка архива из приложения |
 | Claim / release | **не сделано** | состояние `CLAIMED` и `UsbSessionRegistry.markClaimed` существуют, но платформенного `claimInterface`/`UsbDeviceConnection` в проекте нет, а `markClaimed` не вызывается ни одной строкой production-кода. Состояние «интерфейс захвачен» сейчас недостижимо |
-| Basic diagnostics export | **частично** | сборщик архива `DiagnosticBundle` готов и покрыт тестами, включая побайтовую детерминированность. Запись событий USB и выгрузка архива не подключены: `DiagnosticSink` в production-коде не используется |
 | Hardware test | **не сделан** | discovery, permission, identity и detach проверяемы уже сейчас, но evidence по `07_TESTING_CI_HARDWARE_EVIDENCE_RU.md` требует работающей выгрузки логов |
 
 Фаза не считается закрытой, пока остаётся хотя бы один пункт без отметки «готово».
+
+`Basic diagnostics export` намеренно поставлен перед `claim / release`. Без выгрузки логов аппаратный прогон даёт впечатления, а не evidence, которого требует `07_TESTING_CI_HARDWARE_EVIDENCE_RU.md`. Сначала диагностика — тогда уже сделанное можно проверить на устройстве с настоящим отчётом, а `claim / release` ляжет на работающую запись событий и будет проверяем сразу. В обратном порядке его пришлось бы проверять дважды.
+
+Перестановка записана здесь намеренно: правило из `16_AGENT_OPERATING_PROMPT_RU.md` не запрещает менять порядок, оно запрещает делать это молча.
 
 ## Phase 3 — настоящий ADB foundation + Terminal
 

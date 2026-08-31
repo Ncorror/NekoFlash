@@ -1,7 +1,10 @@
 package io.github.ncorror.nekoflash.usb.api
 
+import io.github.ncorror.nekoflash.core.diagnostics.DiagnosticEvent
+import io.github.ncorror.nekoflash.core.diagnostics.DiagnosticSink
 import io.github.ncorror.nekoflash.core.model.SessionGeneration
 import kotlinx.coroutines.flow.StateFlow
+import java.time.Instant
 
 /**
  * Превращает события USB в состояние сессий.
@@ -32,6 +35,17 @@ public class UsbSessionCoordinator(
      * истечении вызывает [onPermissionTimeout].
      */
     private val onPermissionRequested: (SessionGeneration) -> Unit = {},
+    /**
+     * Куда записываются события USB.
+     *
+     * Нужен для evidence: `07_TESTING_CI_HARDWARE_EVIDENCE_RU.md` требует
+     * структурных логов, а не пересказа увиденного на экране. По умолчанию
+     * события никуда не идут — это позволяет использовать координатор в тестах,
+     * не собирая журнал.
+     */
+    private val diagnostics: DiagnosticSink = DiagnosticSink { },
+    /** Источник времени. Вынесен, чтобы в тестах отметки были предсказуемы. */
+    private val clock: () -> Instant = Instant::now,
 ) : UsbHost.Listener {
     /** Незавершённые сессии. Для показа на экране и для владельцев операций. */
     public val sessions: StateFlow<List<UsbSession>>
@@ -62,22 +76,42 @@ public class UsbSessionCoordinator(
     }
 
     override fun onDeviceAttached(device: UsbDeviceDescriptor) {
-        val candidate = UsbInterfaceClassifier.primaryCandidate(device, allowGenericVendor) ?: return
+        val candidate = UsbInterfaceClassifier.primaryCandidate(device, allowGenericVendor)
+        if (candidate == null) {
+            emit(
+                message = "device_ignored_no_usable_interface",
+                fields = deviceFields(device),
+            )
+            return
+        }
         val session = registry.open(UsbTargetIdentity.fromDescriptor(device), candidate)
+        emit(
+            message = "session_opened",
+            session = session,
+            fields = deviceFields(device) + candidateFields(candidate),
+        )
         if (host.hasPermission(device)) {
             registry.markReady(session.generation)
+            emit("permission_already_granted", session)
             return
         }
         registry.markPermissionPending(session.generation)
         if (host.requestPermission(device)) {
             onPermissionRequested(session.generation)
+            emit("permission_requested", session)
         } else {
             registry.close(session.generation, UsbSessionClosureReason.DETACHED)
+            emit("permission_request_failed_device_gone", session)
         }
     }
 
     override fun onDeviceDetached(device: UsbDeviceDescriptor) {
-        registry.closeDetached(device)
+        val closed = registry.closeDetached(device)
+        if (closed.isEmpty()) {
+            emit("detached_without_session", fields = deviceFields(device))
+            return
+        }
+        closed.forEach { session -> emit("session_closed_detached", session) }
     }
 
     override fun onPermissionResult(device: UsbDeviceDescriptor?, granted: Boolean) {
@@ -85,13 +119,19 @@ public class UsbSessionCoordinator(
             .filter { it.state == UsbSessionState.PERMISSION_PENDING }
         when (val decision = UsbPermissionPolicy.resolve(pending, device, granted)) {
             is UsbPermissionPolicy.Decision.Proceed -> proceed(decision)
-            is UsbPermissionPolicy.Decision.Denied ->
+            is UsbPermissionPolicy.Decision.Denied -> {
                 registry.close(decision.session.generation, UsbSessionClosureReason.PERMISSION_DENIED)
+                emit("permission_denied", decision.session)
+            }
 
-            UsbPermissionPolicy.Decision.MissingDevice,
-            UsbPermissionPolicy.Decision.NoCandidate,
-            UsbPermissionPolicy.Decision.UnmatchedDenial,
-            -> Unit
+            UsbPermissionPolicy.Decision.MissingDevice ->
+                emit("permission_answer_without_device")
+
+            UsbPermissionPolicy.Decision.NoCandidate ->
+                emit("permission_answer_no_usable_interface")
+
+            UsbPermissionPolicy.Decision.UnmatchedDenial ->
+                emit("permission_denial_without_session")
         }
     }
 
@@ -112,6 +152,11 @@ public class UsbSessionCoordinator(
         if (outcome != UsbPermissionPolicy.TimeoutOutcome.IGNORE) {
             registry.close(generation, UsbSessionClosureReason.PERMISSION_TIMED_OUT)
         }
+        emit(
+            message = "permission_timeout",
+            session = session,
+            fields = mapOf("outcome" to outcome.name),
+        )
         return outcome
     }
 
@@ -123,9 +168,57 @@ public class UsbSessionCoordinator(
                 candidate = decision.candidate,
             )
             registry.markReady(opened.generation)
+            emit("permission_granted_without_request", opened)
             return
         }
-        registry.refresh(existing.generation, decision.candidate)
+        val refreshed = registry.refresh(existing.generation, decision.candidate)
         registry.markReady(existing.generation)
+        val updated = (refreshed as? UsbSessionTransition.Applied)?.session ?: existing
+        emit("permission_granted", updated)
+        if (updated.identity.source != existing.identity.source) {
+            emit(
+                message = "identity_refined",
+                session = updated,
+                fields = mapOf(
+                    "from" to existing.identity.source.name,
+                    "to" to updated.identity.source.name,
+                ),
+            )
+        }
+    }
+
+    private fun emit(
+        message: String,
+        session: UsbSession? = null,
+        fields: Map<String, String> = emptyMap(),
+    ) {
+        diagnostics.emit(
+            DiagnosticEvent(
+                timestamp = clock(),
+                category = DIAGNOSTIC_CATEGORY,
+                message = message,
+                targetId = session?.targetId,
+                sessionGeneration = session?.generation,
+                fields = if (session == null) fields else fields + ("state" to session.state.name),
+            ),
+        )
+    }
+
+    private fun deviceFields(device: UsbDeviceDescriptor): Map<String, String> = mapOf(
+        "connection" to device.deviceName,
+        "vendorId" to device.vendorId.toHex(),
+        "productId" to device.productId.toHex(),
+    )
+
+    private fun candidateFields(candidate: UsbInterfaceCandidate): Map<String, String> = mapOf(
+        "interfaceKind" to candidate.kind.name,
+        "matchConfidence" to candidate.confidence.name,
+        "interfaceIndex" to candidate.interfaceIndex.toString(),
+    )
+
+    private fun Int.toHex(): String = "0x%04X".format(this)
+
+    private companion object {
+        const val DIAGNOSTIC_CATEGORY = "usb"
     }
 }
