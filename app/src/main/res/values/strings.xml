@@ -18,7 +18,7 @@
 
     <string name="sessions_title">USB sessions</string>
     <string name="diagnostics_export">Export diagnostics</string>
-    <string name="diagnostics_export_done">Diagnostics saved: %1$d sections</string>
+    <string name="diagnostics_export_done">Diagnostics saved (sections: %1$d)</string>
     <string name="diagnostics_export_failed">Could not save diagnostics: %1$s</string>
     <string name="sessions_empty">No device attached. Connect a device over USB.</string>
     <string name="session_generation_label">Session</string>

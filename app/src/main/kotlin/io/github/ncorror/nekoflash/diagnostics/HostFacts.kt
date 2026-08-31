@@ -2,6 +2,7 @@ package io.github.ncorror.nekoflash.diagnostics
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Settings
@@ -24,11 +25,10 @@ public object HostFacts {
     /**
      * Собирает всё, что доступно без запроса дополнительных разрешений.
      *
-     * `Build.getSerial()` требует `READ_PHONE_STATE`, и без него платформа
-     * отвечает отказом. Это ограничение самой платформы, а не приложения,
-     * поэтому оно записывается как отказ с указанием причины: подменять ответ
-     * платформы собственным умолчанием запрещено
-     * `03_PROTOCOL_AND_SAFETY_INVARIANTS_RU.md`.
+     * Там, где платформа сведений не отдаёт, записывается причина отказа.
+     * Подменять ответ платформы собственным умолчанием запрещено
+     * `03_PROTOCOL_AND_SAFETY_INVARIANTS_RU.md`, а пустое место в отчёте
+     * читалось бы как «этого у устройства нет».
      */
     public fun collect(context: Context): Map<String, String> = buildMap {
         put("app.applicationId", context.packageName)
@@ -48,14 +48,14 @@ public object HostFacts {
         put("host.supportedAbis", Build.SUPPORTED_ABIS.joinToString(","))
 
         put("host.androidId", androidId(context))
-        put("host.serial", hostSerial())
+        put("host.serial", HOST_SERIAL_UNAVAILABLE)
     }
 
     private fun appVersion(context: Context): Map<String, String> = try {
         val info = context.packageManager.getPackageInfo(context.packageName, 0)
         mapOf(
             "app.versionName" to (info.versionName ?: UNAVAILABLE),
-            "app.versionCode" to info.longVersionCode.toString(),
+            "app.versionCode" to versionCode(info).toString(),
         )
     } catch (unavailable: PackageManager.NameNotFoundException) {
         mapOf(
@@ -75,11 +75,37 @@ public object HostFacts {
             Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
         }.getOrNull() ?: UNAVAILABLE
 
-    @SuppressLint("HardwareIds")
-    private fun hostSerial(): String =
-        runCatching { Build.getSerial() }
-            .getOrElse { return "$UNAVAILABLE:requires_read_phone_state" }
-            ?: UNAVAILABLE
+    /**
+     * Номер версии пакета.
+     *
+     * `PackageInfo.longVersionCode` появился в API 28, а минимальная
+     * поддерживаемая версия — 26, поэтому на более старых устройствах берётся
+     * устаревшее поле. Без проверки уровня приложение падало бы на Android 8.
+     */
+    private fun versionCode(info: PackageInfo): Long =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            info.longVersionCode
+        } else {
+            legacyVersionCode(info)
+        }
+
+    @Suppress("DEPRECATION")
+    private fun legacyVersionCode(info: PackageInfo): Long = info.versionCode.toLong()
 
     private const val UNAVAILABLE = "unavailable"
+
+    /**
+     * Серийный номер хоста платформа не отдаёт обычному приложению.
+     *
+     * `Build.getSerial()` требует `READ_PRIVILEGED_PHONE_STATE` — разрешения
+     * системного уровня, которое обычному приложению не выдаётся ни при каких
+     * действиях пользователя. Вызов не делается вовсе: он не может завершиться
+     * успешно, а обёрнутый в перехват исключения выглядел бы как попытка, хотя
+     * попыткой не является.
+     *
+     * Причина записывается в отчёт: пустое место читалось бы как «серийного
+     * номера у устройства нет», что неверно. Это отказ платформы, а не решение
+     * приложения.
+     */
+    private const val HOST_SERIAL_UNAVAILABLE = "unavailable:requires_privileged_permission"
 }
