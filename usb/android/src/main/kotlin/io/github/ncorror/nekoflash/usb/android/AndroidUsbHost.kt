@@ -10,6 +10,7 @@ import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
 import android.os.Build
 import io.github.ncorror.nekoflash.usb.api.UsbDeviceDescriptor
+import io.github.ncorror.nekoflash.usb.api.UsbHost
 import io.github.ncorror.nekoflash.usb.api.UsbPermissionCallbackIdentity
 
 /**
@@ -32,30 +33,12 @@ import io.github.ncorror.nekoflash.usb.api.UsbPermissionCallbackIdentity
 public class AndroidUsbHost(
     context: Context,
     private val callbackIdentity: UsbPermissionCallbackIdentity,
-) {
-    /** Наблюдатель за событиями USB. Вызывается в главном потоке приложения. */
-    public interface Listener {
-        /** Устройство подключено. */
-        public fun onDeviceAttached(device: UsbDeviceDescriptor)
-
-        /** Устройство отключено. Handle прошлой сессии после этого непригоден. */
-        public fun onDeviceDetached(device: UsbDeviceDescriptor)
-
-        /**
-         * Пришёл ответ на запрос разрешения.
-         *
-         * [device] может отсутствовать: система вправе ответить без
-         * дескриптора. Решение по такому ответу принимает
-         * `UsbPermissionPolicy`, а не этот класс.
-         */
-        public fun onPermissionResult(device: UsbDeviceDescriptor?, granted: Boolean)
-    }
-
+) : UsbHost {
     private val appContext: Context = context.applicationContext
     private val usbManager: UsbManager =
         appContext.getSystemService(Context.USB_SERVICE) as UsbManager
 
-    private var listener: Listener? = null
+    private var listener: UsbHost.Listener? = null
     private var permissionAction: String? = null
 
     private val permissionReceiver = object : BroadcastReceiver() {
@@ -85,7 +68,7 @@ public class AndroidUsbHost(
      * одновременных владельца USB привели бы к двойной обработке одного
      * события.
      */
-    public fun start(listener: Listener) {
+    override fun start(listener: UsbHost.Listener) {
         stop()
         this.listener = listener
         val action = callbackIdentity.nextAction()
@@ -101,7 +84,7 @@ public class AndroidUsbHost(
      * ошибкой, поэтому она подавляется: повторная остановка — обычное дело при
      * завершении, а не сбой.
      */
-    public fun stop() {
+    override fun stop() {
         if (permissionAction == null) return
         runCatching { appContext.unregisterReceiver(permissionReceiver) }
         runCatching { appContext.unregisterReceiver(attachDetachReceiver) }
@@ -110,7 +93,7 @@ public class AndroidUsbHost(
     }
 
     /** Дескрипторы всех подключённых сейчас устройств. */
-    public fun devices(): List<UsbDeviceDescriptor> =
+    override fun devices(): List<UsbDeviceDescriptor> =
         usbManager.deviceList.values.map(AndroidUsbDescriptorMapper::map)
 
     /**
@@ -119,7 +102,7 @@ public class AndroidUsbHost(
      * Возвращает `false`, если устройство уже отключено: отсутствующее
      * устройство не имеет разрешения, и это не ошибка.
      */
-    public fun hasPermission(device: UsbDeviceDescriptor): Boolean =
+    override fun hasPermission(device: UsbDeviceDescriptor): Boolean =
         findDevice(device)?.let { usbManager.hasPermission(it) } == true
 
     /**
@@ -129,7 +112,7 @@ public class AndroidUsbHost(
      * запросом. Ответ придёт в [Listener.onPermissionResult]; таймаут ожидания
      * задаёт вызывающий по `UsbPermissionPolicy.RESPONSE_TIMEOUT_MS`.
      */
-    public fun requestPermission(device: UsbDeviceDescriptor): Boolean {
+    override fun requestPermission(device: UsbDeviceDescriptor): Boolean {
         val action = permissionAction ?: return false
         val target = findDevice(device) ?: return false
         val intent = Intent(action).setPackage(appContext.packageName)

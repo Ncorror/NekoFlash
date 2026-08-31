@@ -41,6 +41,7 @@ Phase 1 closure CI: **VERIFIED / PASS** (2026-08-28). Подтверждены 7
 - permission — политика и Android-механика. **Готово**;
 - Target identity;
 - SessionGeneration;
+- связывание событий USB в состояние сессий. **Готово**;
 - claim/release;
 - detach/re-enumeration;
 - basic diagnostics export;

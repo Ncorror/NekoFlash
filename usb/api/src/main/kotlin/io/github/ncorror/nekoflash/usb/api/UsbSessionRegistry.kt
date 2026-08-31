@@ -83,6 +83,33 @@ public class UsbSessionRegistry(
         session
     }
 
+    /**
+     * Обновляет сведения о подключении, не меняя состояние сессии.
+     *
+     * Нужен после выдачи разрешения: платформа отдаёт новый объект дескриптора,
+     * а серийный номер до этого момента мог быть недоступен. Идентичность при
+     * этом уточняется, но не подменяется — если серийный номер уже был известен
+     * и новый ему противоречит, прежнее значение сохраняется, потому что
+     * расхождение означает другое устройство, а решать это должен слой выше.
+     *
+     * Generation не меняется: подключение то же самое.
+     */
+    public fun refresh(
+        generation: SessionGeneration,
+        candidate: UsbInterfaceCandidate,
+    ): UsbSessionTransition = synchronized(lock) {
+        val session = active[generation.value]
+            ?: return@synchronized rejectionFor(generation)
+        val serial = candidate.device.normalizedSerialNumber
+        val updated = session.copy(
+            candidate = candidate,
+            identity = if (serial != null) session.identity.refinedWithSerial(serial) else session.identity,
+        ).let { it.copy(targetId = it.identity.id) }
+        active[generation.value] = updated
+        publishLocked()
+        UsbSessionTransition.Applied(updated)
+    }
+
     /** Отмечает, что разрешение запрошено и ответ ещё не получен. */
     public fun markPermissionPending(generation: SessionGeneration): UsbSessionTransition =
         transition(generation, UsbSessionState.PERMISSION_PENDING)
@@ -147,22 +174,24 @@ public class UsbSessionRegistry(
         activeFor(targetId)
     }
 
+    private fun rejectionFor(generation: SessionGeneration): UsbSessionTransition.Rejected {
+        val remembered = closed[generation.value]
+        return UsbSessionTransition.Rejected(
+            session = remembered,
+            reason = if (remembered == null) {
+                UsbSessionRejection.UNKNOWN_GENERATION
+            } else {
+                UsbSessionRejection.ALREADY_CLOSED
+            },
+        )
+    }
+
     private fun transition(
         generation: SessionGeneration,
         target: UsbSessionState,
     ): UsbSessionTransition = synchronized(lock) {
         val session = active[generation.value]
-        if (session == null) {
-            val remembered = closed[generation.value]
-            return@synchronized UsbSessionTransition.Rejected(
-                session = remembered,
-                reason = if (remembered == null) {
-                    UsbSessionRejection.UNKNOWN_GENERATION
-                } else {
-                    UsbSessionRejection.ALREADY_CLOSED
-                },
-            )
-        }
+            ?: return@synchronized rejectionFor(generation)
         if (!UsbSessionStateMachine.allows(session.state, target)) {
             return@synchronized UsbSessionTransition.Rejected(
                 session = session,
