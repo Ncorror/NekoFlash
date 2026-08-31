@@ -11,6 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.time.Instant
 import java.util.UUID
 
 /**
@@ -42,12 +43,39 @@ public class NekoFlashApplication : Application() {
         )
     }
 
+    private val events = InMemoryDiagnosticSink()
+
     /** Состояние сессий USB. Экран подписывается на него и ничего не опрашивает. */
     public val usbSessions: UsbSessionCoordinator by lazy {
         UsbSessionCoordinator(
             host = host,
             onPermissionRequested = ::schedulePermissionTimeout,
+            diagnostics = events,
         )
+    }
+
+    /** Имя файла, предлагаемое системному диалогу сохранения. */
+    public fun suggestedDiagnosticsFileName(): String =
+        DiagnosticBundle.suggestedFileName(Instant.now())
+
+    /**
+     * Записывает диагностический архив в выбранный пользователем файл.
+     *
+     * Поток открывает и закрывает вызывающий этого метода владелец: провайдер
+     * документов может оказаться медленным, а сборщик архива намеренно не
+     * закрывает чужой поток.
+     */
+    public fun writeDiagnostics(destination: Uri): DiagnosticBundleResult {
+        val sections = UsbDiagnosticReport.sections(
+            host = HostFacts.collect(this),
+            sessions = usbSessions.sessions.value,
+            events = events.snapshot(),
+            droppedEvents = events.droppedCount(),
+        )
+        return contentResolver.openOutputStream(destination).use { output ->
+            requireNotNull(output) { "Document provider returned no stream" }
+            DiagnosticBundle.write(output, sections, Instant.now())
+        }
     }
 
     override fun onCreate() {

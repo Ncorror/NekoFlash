@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -30,7 +31,11 @@ import io.github.ncorror.nekoflash.usb.api.UsbSessionState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NekoFlashApp(sessions: List<UsbSession> = emptyList()) {
+fun NekoFlashApp(
+    sessions: List<UsbSession> = emptyList(),
+    exportStatus: String? = null,
+    onExportDiagnostics: () -> Unit = {},
+) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -58,10 +63,20 @@ fun NekoFlashApp(sessions: List<UsbSession> = emptyList()) {
                             .width(240.dp)
                             .fillMaxSize(),
                     )
-                    Workspace(sessions = sessions, modifier = Modifier.weight(1f))
+                    Workspace(
+                        sessions = sessions,
+                        exportStatus = exportStatus,
+                        onExportDiagnostics = onExportDiagnostics,
+                        modifier = Modifier.weight(1f),
+                    )
                 }
             } else {
-                Workspace(sessions = sessions, modifier = Modifier.fillMaxSize())
+                Workspace(
+                    sessions = sessions,
+                    exportStatus = exportStatus,
+                    onExportDiagnostics = onExportDiagnostics,
+                    modifier = Modifier.fillMaxSize(),
+                )
             }
         }
     }
@@ -86,6 +101,8 @@ private fun ProjectNavigation(modifier: Modifier = Modifier) {
 @Composable
 private fun Workspace(
     sessions: List<UsbSession>,
+    exportStatus: String?,
+    onExportDiagnostics: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -110,6 +127,20 @@ private fun Workspace(
                 text = stringResource(R.string.mode_requires_handshake),
                 style = MaterialTheme.typography.bodySmall,
             )
+        }
+
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier.padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Button(onClick = onExportDiagnostics) {
+                    Text(stringResource(R.string.diagnostics_export))
+                }
+                if (exportStatus != null) {
+                    Text(text = exportStatus, style = MaterialTheme.typography.bodyMedium)
+                }
+            }
         }
 
         Card(modifier = Modifier.fillMaxWidth()) {

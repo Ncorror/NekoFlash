@@ -48,7 +48,7 @@ Phase 1 closure CI: **VERIFIED / PASS** (2026-08-28). Подтверждены 7
 | Связывание событий USB в состояние сессий | **готово** | `UsbSessionCoordinator` |
 | Detach / re-enumeration | **готово** | `UsbSessionRegistry.closeDetached`, приёмник `ACTION_USB_DEVICE_DETACHED` |
 | UI показывает target и сессию | **готово** | `NekoFlashApp`; протокольный режим не показывается — до handshake он неизвестен, и экран говорит об этом прямо |
-| Basic diagnostics export | **частично** | сборщик архива `DiagnosticBundle` и запись событий USB готовы и покрыты тестами. Остаётся выгрузка архива из приложения |
+| Basic diagnostics export | **готово** | `DiagnosticBundle` собирает детерминированный архив, `UsbSessionCoordinator` пишет события, `UsbDiagnosticReport` формирует разделы, выгрузка идёт через системный диалог сохранения файла |
 | Claim / release | **не сделано** | состояние `CLAIMED` и `UsbSessionRegistry.markClaimed` существуют, но платформенного `claimInterface`/`UsbDeviceConnection` в проекте нет, а `markClaimed` не вызывается ни одной строкой production-кода. Состояние «интерфейс захвачен» сейчас недостижимо |
 | Hardware test | **не сделан** | discovery, permission, identity и detach проверяемы уже сейчас, но evidence по `07_TESTING_CI_HARDWARE_EVIDENCE_RU.md` требует работающей выгрузки логов |
 

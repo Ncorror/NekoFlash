@@ -15,6 +15,9 @@
     <string name="target_label">Целевое устройство</string>
 
     <string name="sessions_title">Сессии USB</string>
+    <string name="diagnostics_export">Выгрузить диагностику</string>
+    <string name="diagnostics_export_done">Диагностика сохранена: разделов %1$d</string>
+    <string name="diagnostics_export_failed">Не удалось сохранить диагностику: %1$s</string>
     <string name="sessions_empty">Устройство не подключено. Подключите его по USB.</string>
     <string name="session_generation_label">Сессия</string>
     <string name="session_state_label">Состояние</string>

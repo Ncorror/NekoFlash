@@ -2,10 +2,16 @@ package io.github.ncorror.nekoflash
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.res.stringResource
 import io.github.ncorror.nekoflash.ui.NekoFlashApp
 import io.github.ncorror.nekoflash.ui.theme.NekoFlashTheme
 
@@ -16,12 +22,38 @@ class MainActivity : ComponentActivity() {
 
         // Владение USB живёт на уровне приложения: подключённое устройство не
         // должно теряться при повороте экрана или пересоздании активности.
-        val coordinator = (application as NekoFlashApplication).usbSessions
+        val application = application as NekoFlashApplication
 
         setContent {
-            val sessions by coordinator.sessions.collectAsState()
+            val sessions by application.usbSessions.sessions.collectAsState()
+            var exportStatus by remember { mutableStateOf<String?>(null) }
+
+            val savedTemplate = stringResource(R.string.diagnostics_export_done)
+            val failedTemplate = stringResource(R.string.diagnostics_export_failed)
+
+            // Системный диалог сохранения: файл создаёт пользователь там, где
+            // ему нужно, а приложение не заводит собственного хранилища отчётов.
+            val saveLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.CreateDocument("application/zip"),
+            ) { destination ->
+                if (destination == null) return@rememberLauncherForActivityResult
+                exportStatus = runCatching { application.writeDiagnostics(destination) }
+                    .fold(
+                        onSuccess = { result -> savedTemplate.format(result.sectionCount) },
+                        onFailure = { failure ->
+                            failedTemplate.format(failure.message ?: failure.javaClass.simpleName)
+                        },
+                    )
+            }
+
             NekoFlashTheme {
-                NekoFlashApp(sessions = sessions)
+                NekoFlashApp(
+                    sessions = sessions,
+                    exportStatus = exportStatus,
+                    onExportDiagnostics = {
+                        saveLauncher.launch(application.suggestedDiagnosticsFileName())
+                    },
+                )
             }
         }
     }
