@@ -115,10 +115,6 @@ public class UsbSessionCoordinator(
         emit("interface_released", registry.markReady(generation).or(session))
     }
 
-    /** Удерживается ли интерфейс этой сессии прямо сейчас. */
-    public fun isClaimed(generation: SessionGeneration): Boolean =
-        handles[generation.value]?.held == true
-
     /** Недавно завершённые сессии. Нужны отчёту после отключения устройства. */
     public fun recentlyClosedSessions(): List<UsbSession> = registry.recentlyClosedSessions()
 

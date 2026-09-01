@@ -78,4 +78,8 @@ Legacy и A2 считаются **FROZEN / REFERENCE ONLY**. Новые product 
 
 **Phase 1 завершена: COMPLETE / PASS.** Authoritative GitHub Actions подтвердил clean bootstrap, tracked Gradle Wrapper, AGP `9.3.2`, launcher/adaptive/monochrome icon, explicit no-backup/D2D policy, executable repository/localization hygiene, 7 core unit tests, Android Lint `0 errors` и debug APK assembly.
 
-Текущая работа: **Phase 2 — USB + Target/Session vertical slice**. Первый production path строится от descriptor discovery и permission lifecycle к `TargetId`, `SessionGeneration`, application-scoped ownership, detach/re-enumeration, diagnostics и hardware evidence.
+**Phase 2 завершена: COMPLETE / PASS.** USB + Target/Session vertical slice построен и подтверждён на реальном устройстве: descriptor discovery, permission lifecycle с выдачей и отказом, `TargetId` с уточнением серийным номером, `SessionGeneration`, application-scoped ownership, detach/re-enumeration, захват и освобождение интерфейса, выгрузка evidence приложением. Полная таблица проверок и критерий PASS — `07_TESTING_CI_HARDWARE_EVIDENCE_RU.md` §6.10.
+
+Текущая работа: **Phase 3 — настоящий ADB foundation + Terminal**. Первым переносится доказанный на `vayu` inbound framing invariant.
+
+Статус каждого пункта текущей фазы смотреть в чеклисте `09_IMPLEMENTATION_ROADMAP_RU.md`: он обновляется тем же changeset, что и код, и является единственным источником истины о готовности.

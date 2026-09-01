@@ -37,6 +37,12 @@
 
 A2 read-only framing gate на `vayu` для commit `a2479b333ee2f25b0bc86a530d948c48a3423a68` завершён: **PASS**.
 
-Phase 0 COMPLETE. Phase 1 COMPLETE / PASS. Legacy/A2 frozen. Authoritative CI подтвердил tracked wrapper, AGP `9.3.2`, launcher/adaptive/monochrome icon, no-backup/D2D policy, executable hygiene/localization checks, 7 unit tests, Lint `0 errors` и debug APK assembly.
+Phase 0, Phase 1 и Phase 2 — COMPLETE. Legacy/A2 frozen.
 
-Текущая работа — **Phase 2 USB + Target/Session**: descriptor discovery, permission lifecycle, `TargetId`, `SessionGeneration`, application-scoped ownership, detach/re-enumeration, diagnostics и hardware evidence.
+Phase 2 закрыта аппаратным прогоном: discovery, permission с выдачей и отказом, идентичность target с уточнением серийным номером, `SessionGeneration`, detach и re-enumeration, захват и освобождение интерфейса, выгрузка evidence. Критерий PASS и полная таблица проверок — `07_TESTING_CI_HARDWARE_EVIDENCE_RU.md` §6.10.
+
+Модулей шесть: `:app`, `:core:model`, `:core:diagnostics`, `:core:operation`, `:usb:api`, `:usb:android`. Тестов 131.
+
+Текущая работа — **Phase 3: настоящий ADB foundation + Terminal**. Первым делом переносится доказанный на `vayu` inbound framing invariant из A2 — он обязателен и записан в `00_START_HERE_RU.md`.
+
+Актуальный статус каждого пункта фазы всегда смотреть в чеклисте `09_IMPLEMENTATION_ROADMAP_RU.md`, а не в этом файле: чеклист обновляется тем же changeset, что и код.

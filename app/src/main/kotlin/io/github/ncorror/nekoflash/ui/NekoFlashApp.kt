@@ -34,7 +34,6 @@ import io.github.ncorror.nekoflash.usb.api.UsbSessionState
 fun NekoFlashApp(
     sessions: List<UsbSession> = emptyList(),
     exportStatus: String? = null,
-    claimedGenerations: Set<Long> = emptySet(),
     onRescanUsb: () -> Unit = {},
     onClaim: (UsbSession) -> Unit = {},
     onRelease: (UsbSession) -> Unit = {},
@@ -70,7 +69,6 @@ fun NekoFlashApp(
                     Workspace(
                         sessions = sessions,
                         exportStatus = exportStatus,
-                        claimedGenerations = claimedGenerations,
                         onRescanUsb = onRescanUsb,
                         onClaim = onClaim,
                         onRelease = onRelease,
@@ -82,7 +80,6 @@ fun NekoFlashApp(
                 Workspace(
                     sessions = sessions,
                     exportStatus = exportStatus,
-                    claimedGenerations = claimedGenerations,
                     onRescanUsb = onRescanUsb,
                     onClaim = onClaim,
                     onRelease = onRelease,
@@ -114,7 +111,6 @@ private fun ProjectNavigation(modifier: Modifier = Modifier) {
 private fun Workspace(
     sessions: List<UsbSession>,
     exportStatus: String?,
-    claimedGenerations: Set<Long>,
     onRescanUsb: () -> Unit,
     onClaim: (UsbSession) -> Unit,
     onRelease: (UsbSession) -> Unit,
@@ -133,7 +129,6 @@ private fun Workspace(
         )
         SessionList(
             sessions = sessions,
-            claimedGenerations = claimedGenerations,
             onClaim = onClaim,
             onRelease = onRelease,
         )
@@ -149,7 +144,6 @@ private fun Workspace(
 @Composable
 private fun SessionList(
     sessions: List<UsbSession>,
-    claimedGenerations: Set<Long>,
     onClaim: (UsbSession) -> Unit,
     onRelease: (UsbSession) -> Unit,
 ) {
@@ -163,7 +157,6 @@ private fun SessionList(
     sessions.forEach { session ->
         SessionCard(
             session = session,
-            claimed = session.generation.value in claimedGenerations,
             onClaim = { onClaim(session) },
             onRelease = { onRelease(session) },
         )
@@ -222,10 +215,12 @@ private fun BuildBaselineCard() {
 @Composable
 private fun SessionCard(
     session: UsbSession,
-    claimed: Boolean,
     onClaim: () -> Unit,
     onRelease: () -> Unit,
 ) {
+    // Удерживается ли интерфейс, видно по самому состоянию сессии. Отдельный
+    // список захваченных был бы вторым источником истины о том же самом.
+    val claimed = session.state == UsbSessionState.CLAIMED
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(20.dp),

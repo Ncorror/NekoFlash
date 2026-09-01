@@ -29,7 +29,6 @@ class MainActivity : ComponentActivity() {
         setContent {
             val sessions by coordinator.sessions.collectAsState()
             var exportStatus by remember { mutableStateOf<String?>(null) }
-            var claimedGenerations by remember { mutableStateOf(emptySet<Long>()) }
 
             val savedTemplate = stringResource(R.string.diagnostics_export_done)
             val failedTemplate = stringResource(R.string.diagnostics_export_failed)
@@ -54,21 +53,14 @@ class MainActivity : ComponentActivity() {
                 NekoFlashApp(
                     sessions = sessions,
                     exportStatus = exportStatus,
-                    claimedGenerations = claimedGenerations,
                     onRescanUsb = { coordinator.scanAttachedDevices() },
                     onClaim = { session ->
-                        when (val result = coordinator.claim(session.generation)) {
-                            is UsbClaimResult.Claimed ->
-                                claimedGenerations = claimedGenerations + session.generation.value
-
-                            is UsbClaimResult.Failed ->
-                                exportStatus = claimFailedTemplate.format(result.reason.name)
+                        val result = coordinator.claim(session.generation)
+                        if (result is UsbClaimResult.Failed) {
+                            exportStatus = claimFailedTemplate.format(result.reason.name)
                         }
                     },
-                    onRelease = { session ->
-                        coordinator.release(session.generation)
-                        claimedGenerations = claimedGenerations - session.generation.value
-                    },
+                    onRelease = { session -> coordinator.release(session.generation) },
                     onExportDiagnostics = {
                         saveLauncher.launch(application.suggestedDiagnosticsFileName())
                     },

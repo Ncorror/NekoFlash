@@ -63,8 +63,12 @@ Current baseline:
 
 - `:app` — adaptive product shell.
 - `:core:model` — target/session identity contracts.
-- `:core:diagnostics` — structured diagnostics foundation.
+- `:core:diagnostics` — structured diagnostics foundation and evidence bundle writer.
 - `:core:operation` — operation identity, mutation boundary and outcome contracts.
+- `:usb:api` — platform independent USB contracts: descriptors, interface
+  classification, target identity, session ownership, permission policy.
+- `:usb:android` — the Android USB host: descriptor mapping, discovery,
+  attach/detach receivers, permission requests, interface claim and release.
 
 Modules are added only when they represent a real ownership boundary. USB, ADB,
 Fastboot, Recovery and vendor modules are introduced in their roadmap phases,

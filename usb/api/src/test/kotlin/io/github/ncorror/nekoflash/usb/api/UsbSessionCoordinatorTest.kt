@@ -211,8 +211,7 @@ class UsbSessionCoordinatorTest {
 
         val result = coordinator.claim(session.generation)
 
-        assertTrue(result is UsbClaimResult.Claimed)
-        assertTrue(coordinator.isClaimed(session.generation))
+        assertTrue((result as UsbClaimResult.Claimed).handle.held)
         assertEquals(UsbSessionState.CLAIMED, coordinator.sessions.value.single().state)
         assertEquals("CLAIMED", sink.snapshot().last { it.message == "interface_claimed" }.fields["state"])
     }
@@ -228,7 +227,6 @@ class UsbSessionCoordinatorTest {
         coordinator.release(session.generation)
 
         assertFalse(claimed.handle.held)
-        assertFalse(coordinator.isClaimed(session.generation))
         val after = coordinator.sessions.value.single()
         assertEquals(UsbSessionState.READY, after.state)
         assertEquals(session.generation, after.generation)
@@ -278,7 +276,6 @@ class UsbSessionCoordinatorTest {
         coordinator.onDeviceDetached(deviceA)
 
         assertFalse(claimed.handle.held)
-        assertFalse(coordinator.isClaimed(session.generation))
     }
 
     @Test
