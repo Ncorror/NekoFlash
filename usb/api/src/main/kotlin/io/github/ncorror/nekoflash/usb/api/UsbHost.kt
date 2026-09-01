@@ -53,4 +53,16 @@ public interface UsbHost {
      * запросом. Ответ приходит в [Listener.onPermissionResult].
      */
     public fun requestPermission(device: UsbDeviceDescriptor): Boolean
+
+    /**
+     * Захватывает интерфейс устройства.
+     *
+     * Захват исключителен: пока интерфейс удерживается, другой владелец его не
+     * получит. Освобождение — обязанность вызывающего через
+     * [UsbTransportHandle.close].
+     *
+     * Отказ платформы возвращается как есть и не подменяется собственным
+     * умолчанием.
+     */
+    public fun claim(candidate: UsbInterfaceCandidate): UsbClaimResult
 }

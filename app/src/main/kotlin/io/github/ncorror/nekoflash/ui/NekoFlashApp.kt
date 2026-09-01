@@ -34,7 +34,10 @@ import io.github.ncorror.nekoflash.usb.api.UsbSessionState
 fun NekoFlashApp(
     sessions: List<UsbSession> = emptyList(),
     exportStatus: String? = null,
+    claimedGenerations: Set<Long> = emptySet(),
     onRescanUsb: () -> Unit = {},
+    onClaim: (UsbSession) -> Unit = {},
+    onRelease: (UsbSession) -> Unit = {},
     onExportDiagnostics: () -> Unit = {},
 ) {
     Scaffold(
@@ -67,7 +70,10 @@ fun NekoFlashApp(
                     Workspace(
                         sessions = sessions,
                         exportStatus = exportStatus,
+                        claimedGenerations = claimedGenerations,
                         onRescanUsb = onRescanUsb,
+                        onClaim = onClaim,
+                        onRelease = onRelease,
                         onExportDiagnostics = onExportDiagnostics,
                         modifier = Modifier.weight(1f),
                     )
@@ -76,7 +82,10 @@ fun NekoFlashApp(
                 Workspace(
                     sessions = sessions,
                     exportStatus = exportStatus,
+                    claimedGenerations = claimedGenerations,
                     onRescanUsb = onRescanUsb,
+                    onClaim = onClaim,
+                    onRelease = onRelease,
                     onExportDiagnostics = onExportDiagnostics,
                     modifier = Modifier.fillMaxSize(),
                 )
@@ -105,7 +114,10 @@ private fun ProjectNavigation(modifier: Modifier = Modifier) {
 private fun Workspace(
     sessions: List<UsbSession>,
     exportStatus: String?,
+    claimedGenerations: Set<Long>,
     onRescanUsb: () -> Unit,
+    onClaim: (UsbSession) -> Unit,
+    onRelease: (UsbSession) -> Unit,
     onExportDiagnostics: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -119,59 +131,101 @@ private fun Workspace(
             text = stringResource(R.string.sessions_title),
             style = MaterialTheme.typography.headlineMedium,
         )
+        SessionList(
+            sessions = sessions,
+            claimedGenerations = claimedGenerations,
+            onClaim = onClaim,
+            onRelease = onRelease,
+        )
+        ActionsCard(
+            exportStatus = exportStatus,
+            onRescanUsb = onRescanUsb,
+            onExportDiagnostics = onExportDiagnostics,
+        )
+        BuildBaselineCard()
+    }
+}
 
-        if (sessions.isEmpty()) {
+@Composable
+private fun SessionList(
+    sessions: List<UsbSession>,
+    claimedGenerations: Set<Long>,
+    onClaim: (UsbSession) -> Unit,
+    onRelease: (UsbSession) -> Unit,
+) {
+    if (sessions.isEmpty()) {
+        Text(
+            text = stringResource(R.string.sessions_empty),
+            style = MaterialTheme.typography.bodyLarge,
+        )
+        return
+    }
+    sessions.forEach { session ->
+        SessionCard(
+            session = session,
+            claimed = session.generation.value in claimedGenerations,
+            onClaim = { onClaim(session) },
+            onRelease = { onRelease(session) },
+        )
+    }
+    Text(
+        text = stringResource(R.string.mode_requires_handshake),
+        style = MaterialTheme.typography.bodySmall,
+    )
+}
+
+@Composable
+private fun ActionsCard(
+    exportStatus: String?,
+    onRescanUsb: () -> Unit,
+    onExportDiagnostics: () -> Unit,
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Button(onClick = onRescanUsb) {
+                Text(stringResource(R.string.usb_rescan))
+            }
             Text(
-                text = stringResource(R.string.sessions_empty),
-                style = MaterialTheme.typography.bodyLarge,
-            )
-        } else {
-            sessions.forEach { session -> SessionCard(session) }
-            Text(
-                text = stringResource(R.string.mode_requires_handshake),
+                text = stringResource(R.string.usb_rescan_hint),
                 style = MaterialTheme.typography.bodySmall,
             )
-        }
-
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(
-                modifier = Modifier.padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Button(onClick = onRescanUsb) {
-                    Text(stringResource(R.string.usb_rescan))
-                }
-                Text(
-                    text = stringResource(R.string.usb_rescan_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                Button(onClick = onExportDiagnostics) {
-                    Text(stringResource(R.string.diagnostics_export))
-                }
-                if (exportStatus != null) {
-                    Text(text = exportStatus, style = MaterialTheme.typography.bodyMedium)
-                }
+            Button(onClick = onExportDiagnostics) {
+                Text(stringResource(R.string.diagnostics_export))
             }
-        }
-
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(
-                modifier = Modifier.padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text(
-                    stringResource(R.string.build_baseline_title),
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                Text(stringResource(R.string.build_baseline_values))
-                Text(stringResource(R.string.professional_capability_policy))
+            if (exportStatus != null) {
+                Text(text = exportStatus, style = MaterialTheme.typography.bodyMedium)
             }
         }
     }
 }
 
 @Composable
-private fun SessionCard(session: UsbSession) {
+private fun BuildBaselineCard() {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                stringResource(R.string.build_baseline_title),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Text(stringResource(R.string.build_baseline_values))
+            Text(stringResource(R.string.professional_capability_policy))
+        }
+    }
+}
+
+@Composable
+private fun SessionCard(
+    session: UsbSession,
+    claimed: Boolean,
+    onClaim: () -> Unit,
+    onRelease: () -> Unit,
+) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(20.dp),
@@ -198,6 +252,20 @@ private fun SessionCard(session: UsbSession) {
                 label = stringResource(R.string.session_generation_label),
                 value = session.generation.value.toString(),
             )
+
+            if (session.state == UsbSessionState.READY || session.state == UsbSessionState.CLAIMED) {
+                Button(onClick = if (claimed) onRelease else onClaim) {
+                    Text(
+                        stringResource(
+                            if (claimed) R.string.usb_release else R.string.usb_claim,
+                        ),
+                    )
+                }
+                Text(
+                    text = stringResource(R.string.usb_claim_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
         }
     }
 }

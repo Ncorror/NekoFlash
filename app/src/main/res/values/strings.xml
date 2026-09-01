@@ -17,6 +17,10 @@
     <string name="target_label">Target</string>
 
     <string name="sessions_title">USB sessions</string>
+    <string name="usb_claim">Claim interface</string>
+    <string name="usb_release">Release interface</string>
+    <string name="usb_claim_hint">Claiming is exclusive: while the interface is held, no other owner on this host can use it. Nothing is claimed automatically.</string>
+    <string name="usb_claim_failed">Claim refused by the platform: %1$s</string>
     <string name="usb_rescan">Rescan USB</string>
     <string name="usb_rescan_hint">Re-examines attached devices and asks for permission again where it is missing.</string>
     <string name="diagnostics_export">Export diagnostics</string>

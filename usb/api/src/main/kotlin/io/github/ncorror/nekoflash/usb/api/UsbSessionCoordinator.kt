@@ -47,9 +47,77 @@ public class UsbSessionCoordinator(
     /** Источник времени. Вынесен, чтобы в тестах отметки были предсказуемы. */
     private val clock: () -> Instant = Instant::now,
 ) : UsbHost.Listener {
+    private val handles = java.util.concurrent.ConcurrentHashMap<Long, UsbTransportHandle>()
+
     /** Незавершённые сессии. Для показа на экране и для владельцев операций. */
     public val sessions: StateFlow<List<UsbSession>>
         get() = registry.activeSessions
+
+    /**
+     * Захватывает интерфейс сессии.
+     *
+     * Требует состояния [UsbSessionState.READY]: захват без выданного
+     * разрешения платформа всё равно не выполнит, а попытка выглядела бы в
+     * журнале как отказ устройства, которым она не является.
+     *
+     * Захват **не** происходит автоматически при подключении. Пока нет
+     * протокольного движка, который бы им пользовался, удержание
+     * исключительного ресурса не давало бы ничего и мешало бы другим
+     * владельцам USB на этом хосте. С появлением протокольных движков захват
+     * станет частью открытия транспорта — так он устроен и в Legacy, и в A2.
+     */
+    public fun claim(generation: SessionGeneration): UsbClaimResult {
+        val session = registry.session(generation)
+        if (session == null || session.closed) {
+            emit("claim_rejected_session_unavailable", session)
+            return UsbClaimResult.Failed(UsbClaimFailure.DEVICE_GONE)
+        }
+        if (session.state != UsbSessionState.READY && session.state != UsbSessionState.CLAIMED) {
+            emit(
+                message = "claim_rejected_not_ready",
+                session = session,
+                fields = mapOf("required" to UsbSessionState.READY.name),
+            )
+            return UsbClaimResult.Failed(UsbClaimFailure.OPEN_REFUSED)
+        }
+
+        return when (val result = host.claim(session.candidate)) {
+            is UsbClaimResult.Claimed -> {
+                handles.put(generation.value, result.handle)?.close()
+                emit("interface_claimed", registry.markClaimed(generation).or(session))
+                result
+            }
+
+            is UsbClaimResult.Failed -> {
+                emit(
+                    message = "claim_failed",
+                    session = session,
+                    fields = mapOf("reason" to result.reason.name),
+                )
+                result
+            }
+        }
+    }
+
+    /**
+     * Освобождает удерживаемый интерфейс, не закрывая сессию.
+     *
+     * Устройство остаётся подключённым, разрешение — выданным, generation той
+     * же: меняется лишь то, держим мы интерфейс или нет. Возможность отпустить
+     * устройство обязательна — удерживать его без способа освободить было бы
+     * ограничением, созданным приложением.
+     */
+    public fun release(generation: SessionGeneration) {
+        val handle = handles.remove(generation.value)
+        handle?.close()
+        val session = registry.session(generation) ?: return
+        if (session.state != UsbSessionState.CLAIMED) return
+        emit("interface_released", registry.markReady(generation).or(session))
+    }
+
+    /** Удерживается ли интерфейс этой сессии прямо сейчас. */
+    public fun isClaimed(generation: SessionGeneration): Boolean =
+        handles[generation.value]?.held == true
 
     /** Недавно завершённые сессии. Нужны отчёту после отключения устройства. */
     public fun recentlyClosedSessions(): List<UsbSession> = registry.recentlyClosedSessions()
@@ -113,7 +181,13 @@ public class UsbSessionCoordinator(
             emit("detached_without_session", fields = deviceFields(device))
             return
         }
-        closed.forEach { session -> emit("session_closed_detached", session) }
+        closed.forEach { session ->
+            // Удерживаемый интерфейс отпускается вместе с сессией: держать
+            // ресурс отключённого устройства бессмысленно, а handle прошлой
+            // generation всё равно непригоден.
+            handles.remove(session.generation.value)?.close()
+            emit("session_closed_detached", session)
+        }
     }
 
     override fun onPermissionResult(device: UsbDeviceDescriptor?, granted: Boolean) {
@@ -122,6 +196,7 @@ public class UsbSessionCoordinator(
         when (val decision = UsbPermissionPolicy.resolve(pending, device, granted)) {
             is UsbPermissionPolicy.Decision.Proceed -> proceed(decision)
             is UsbPermissionPolicy.Decision.Denied -> {
+                handles.remove(decision.session.generation.value)?.close()
                 val closed = registry.close(
                     decision.session.generation,
                     UsbSessionClosureReason.PERMISSION_DENIED,

@@ -7,11 +7,17 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.hardware.usb.UsbDevice
+import android.hardware.usb.UsbDeviceConnection
+import android.hardware.usb.UsbInterface
 import android.hardware.usb.UsbManager
 import android.os.Build
 import io.github.ncorror.nekoflash.usb.api.UsbDeviceDescriptor
+import io.github.ncorror.nekoflash.usb.api.UsbClaimFailure
+import io.github.ncorror.nekoflash.usb.api.UsbClaimResult
 import io.github.ncorror.nekoflash.usb.api.UsbHost
+import io.github.ncorror.nekoflash.usb.api.UsbInterfaceCandidate
 import io.github.ncorror.nekoflash.usb.api.UsbPermissionCallbackIdentity
+import io.github.ncorror.nekoflash.usb.api.UsbTransportHandle
 
 /**
  * Владение USB на стороне Android: перечисление устройств, приёмники
@@ -125,6 +131,62 @@ public class AndroidUsbHost(
         )
         usbManager.requestPermission(target, pendingIntent)
         return true
+    }
+
+    /**
+     * Захватывает интерфейс устройства.
+     *
+     * Захват принудительный: вендорный интерфейс на некоторых хостах занят
+     * ядерным драйвером, и без принудительного отбора ADB и Fastboot не
+     * работают. Это отбор у драйвера, который всё равно не говорит по этим
+     * протоколам, а не ограничение возможностей пользователя. Так сделано и в
+     * Legacy, и в A2.
+     *
+     * При неудаче захвата соединение закрывается сразу: оставленное открытым,
+     * оно удерживало бы файловый дескриптор без пользы.
+     */
+    override fun claim(candidate: UsbInterfaceCandidate): UsbClaimResult {
+        val device = findDevice(candidate.device)
+            ?: return UsbClaimResult.Failed(UsbClaimFailure.DEVICE_GONE)
+        val usbInterface = device.getInterfaceOrNull(candidate.interfaceIndex)
+            ?: return UsbClaimResult.Failed(UsbClaimFailure.DEVICE_GONE)
+        val connection = usbManager.openDevice(device)
+            ?: return UsbClaimResult.Failed(UsbClaimFailure.OPEN_REFUSED)
+
+        if (!connection.claimInterface(usbInterface, true)) {
+            runCatching { connection.close() }
+            return UsbClaimResult.Failed(UsbClaimFailure.INTERFACE_REFUSED)
+        }
+        return UsbClaimResult.Claimed(
+            AndroidUsbTransportHandle(connection, usbInterface, candidate),
+        )
+    }
+
+    private fun UsbDevice.getInterfaceOrNull(index: Int): UsbInterface? =
+        if (index in 0 until interfaceCount) getInterface(index) else null
+
+    /**
+     * Удерживаемый интерфейс на стороне Android.
+     *
+     * Освобождение защищено от исключений: устройство может исчезнуть между
+     * захватом и освобождением, и это обычный ход событий, а не сбой.
+     */
+    private class AndroidUsbTransportHandle(
+        private val connection: UsbDeviceConnection,
+        private val usbInterface: UsbInterface,
+        override val candidate: UsbInterfaceCandidate,
+    ) : UsbTransportHandle {
+        private var released = false
+
+        override val held: Boolean
+            get() = !released
+
+        override fun close() {
+            if (released) return
+            released = true
+            runCatching { connection.releaseInterface(usbInterface) }
+            runCatching { connection.close() }
+        }
     }
 
     /**

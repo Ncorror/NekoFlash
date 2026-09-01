@@ -4,6 +4,7 @@ import io.github.ncorror.nekoflash.core.diagnostics.DiagnosticEvent
 import io.github.ncorror.nekoflash.core.diagnostics.InMemoryDiagnosticSink
 import java.time.Instant
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -198,6 +199,112 @@ class UsbSessionCoordinatorTest {
 
         assertTrue(host.stopped)
         assertEquals(1, coordinator.sessions.value.size)
+    }
+
+    @Test
+    fun claimingAReadySessionHoldsTheInterface() {
+        val host = FakeUsbHost(attached = listOf(deviceA), permitted = setOf(deviceA.deviceName))
+        val sink = InMemoryDiagnosticSink()
+        val coordinator = coordinatorWith(host, sink)
+        coordinator.start()
+        val session = coordinator.sessions.value.single()
+
+        val result = coordinator.claim(session.generation)
+
+        assertTrue(result is UsbClaimResult.Claimed)
+        assertTrue(coordinator.isClaimed(session.generation))
+        assertEquals(UsbSessionState.CLAIMED, coordinator.sessions.value.single().state)
+        assertEquals("CLAIMED", sink.snapshot().last { it.message == "interface_claimed" }.fields["state"])
+    }
+
+    @Test
+    fun releasingReturnsToReadyWithoutEndingTheSession() {
+        val host = FakeUsbHost(attached = listOf(deviceA), permitted = setOf(deviceA.deviceName))
+        val coordinator = coordinatorWith(host, InMemoryDiagnosticSink())
+        coordinator.start()
+        val session = coordinator.sessions.value.single()
+        val claimed = coordinator.claim(session.generation) as UsbClaimResult.Claimed
+
+        coordinator.release(session.generation)
+
+        assertFalse(claimed.handle.held)
+        assertFalse(coordinator.isClaimed(session.generation))
+        val after = coordinator.sessions.value.single()
+        assertEquals(UsbSessionState.READY, after.state)
+        assertEquals(session.generation, after.generation)
+    }
+
+    @Test
+    fun claimingWithoutPermissionIsRefusedBeforeTouchingTheDevice() {
+        val host = FakeUsbHost(attached = listOf(deviceA))
+        val coordinator = coordinatorWith(host, InMemoryDiagnosticSink())
+        coordinator.start()
+        val pending = coordinator.sessions.value.single()
+
+        val result = coordinator.claim(pending.generation)
+
+        assertTrue(result is UsbClaimResult.Failed)
+        assertTrue(host.claims.isEmpty())
+        assertEquals(UsbSessionState.PERMISSION_PENDING, coordinator.sessions.value.single().state)
+    }
+
+    @Test
+    fun aRefusedClaimIsReportedWithThePlatformReason() {
+        val host = FakeUsbHost(
+            attached = listOf(deviceA),
+            permitted = setOf(deviceA.deviceName),
+            claimFailure = UsbClaimFailure.INTERFACE_REFUSED,
+        )
+        val sink = InMemoryDiagnosticSink()
+        val coordinator = coordinatorWith(host, sink)
+        coordinator.start()
+        val session = coordinator.sessions.value.single()
+
+        val result = coordinator.claim(session.generation)
+
+        assertEquals(UsbClaimFailure.INTERFACE_REFUSED, (result as UsbClaimResult.Failed).reason)
+        assertEquals("INTERFACE_REFUSED", sink.snapshot().last().fields["reason"])
+        assertEquals(UsbSessionState.READY, coordinator.sessions.value.single().state)
+    }
+
+    @Test
+    fun detachReleasesAHeldInterface() {
+        val host = FakeUsbHost(attached = listOf(deviceA), permitted = setOf(deviceA.deviceName))
+        val coordinator = coordinatorWith(host, InMemoryDiagnosticSink())
+        coordinator.start()
+        val session = coordinator.sessions.value.single()
+        val claimed = coordinator.claim(session.generation) as UsbClaimResult.Claimed
+
+        coordinator.onDeviceDetached(deviceA)
+
+        assertFalse(claimed.handle.held)
+        assertFalse(coordinator.isClaimed(session.generation))
+    }
+
+    @Test
+    fun aStaleGenerationCannotBeClaimed() {
+        val host = FakeUsbHost(attached = listOf(deviceA), permitted = setOf(deviceA.deviceName))
+        val coordinator = coordinatorWith(host, InMemoryDiagnosticSink())
+        coordinator.start()
+        val session = coordinator.sessions.value.single()
+        coordinator.onDeviceDetached(deviceA)
+
+        val result = coordinator.claim(session.generation)
+
+        assertEquals(UsbClaimFailure.DEVICE_GONE, (result as UsbClaimResult.Failed).reason)
+        assertTrue(host.claims.isEmpty())
+    }
+
+    @Test
+    fun releasingASessionThatHoldsNothingChangesNothing() {
+        val host = FakeUsbHost(attached = listOf(deviceA), permitted = setOf(deviceA.deviceName))
+        val coordinator = coordinatorWith(host, InMemoryDiagnosticSink())
+        coordinator.start()
+        val session = coordinator.sessions.value.single()
+
+        coordinator.release(session.generation)
+
+        assertEquals(UsbSessionState.READY, coordinator.sessions.value.single().state)
     }
 
     @Test
@@ -404,8 +511,10 @@ class UsbSessionCoordinatorTest {
         private val attached: List<UsbDeviceDescriptor>,
         private val permitted: Set<String> = emptySet(),
         private val requestSucceeds: Boolean = true,
+        private val claimFailure: UsbClaimFailure? = null,
     ) : UsbHost {
         val permissionRequests = mutableListOf<String>()
+        val claims = mutableListOf<String>()
         var stopped = false
             private set
 
@@ -426,6 +535,25 @@ class UsbSessionCoordinatorTest {
             if (!requestSucceeds) return false
             permissionRequests += device.deviceName
             return true
+        }
+
+        override fun claim(candidate: UsbInterfaceCandidate): UsbClaimResult {
+            claims += candidate.device.deviceName
+            claimFailure?.let { return UsbClaimResult.Failed(it) }
+            return UsbClaimResult.Claimed(FakeHandle(candidate))
+        }
+    }
+
+    private class FakeHandle(
+        override val candidate: UsbInterfaceCandidate,
+    ) : UsbTransportHandle {
+        private var released = false
+
+        override val held: Boolean
+            get() = !released
+
+        override fun close() {
+            released = true
         }
     }
 

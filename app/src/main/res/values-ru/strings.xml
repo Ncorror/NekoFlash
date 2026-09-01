@@ -15,6 +15,10 @@
     <string name="target_label">Целевое устройство</string>
 
     <string name="sessions_title">Сессии USB</string>
+    <string name="usb_claim">Захватить интерфейс</string>
+    <string name="usb_release">Освободить интерфейс</string>
+    <string name="usb_claim_hint">Захват исключителен: пока интерфейс удерживается, другой владелец на этом хосте его не получит. Автоматически ничего не захватывается.</string>
+    <string name="usb_claim_failed">Платформа отказала в захвате: %1$s</string>
     <string name="usb_rescan">Пересканировать USB</string>
     <string name="usb_rescan_hint">Заново разбирает подключённые устройства и повторно запрашивает разрешение там, где его нет.</string>
     <string name="diagnostics_export">Выгрузить диагностику</string>

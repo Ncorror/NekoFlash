@@ -14,6 +14,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
 import io.github.ncorror.nekoflash.ui.NekoFlashApp
 import io.github.ncorror.nekoflash.ui.theme.NekoFlashTheme
+import io.github.ncorror.nekoflash.usb.api.UsbClaimResult
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -23,13 +24,16 @@ class MainActivity : ComponentActivity() {
         // Владение USB живёт на уровне приложения: подключённое устройство не
         // должно теряться при повороте экрана или пересоздании активности.
         val application = application as NekoFlashApplication
+        val coordinator = application.usbSessions
 
         setContent {
-            val sessions by application.usbSessions.sessions.collectAsState()
+            val sessions by coordinator.sessions.collectAsState()
             var exportStatus by remember { mutableStateOf<String?>(null) }
+            var claimedGenerations by remember { mutableStateOf(emptySet<Long>()) }
 
             val savedTemplate = stringResource(R.string.diagnostics_export_done)
             val failedTemplate = stringResource(R.string.diagnostics_export_failed)
+            val claimFailedTemplate = stringResource(R.string.usb_claim_failed)
 
             // Системный диалог сохранения: файл создаёт пользователь там, где
             // ему нужно, а приложение не заводит собственного хранилища отчётов.
@@ -50,7 +54,21 @@ class MainActivity : ComponentActivity() {
                 NekoFlashApp(
                     sessions = sessions,
                     exportStatus = exportStatus,
-                    onRescanUsb = { application.usbSessions.scanAttachedDevices() },
+                    claimedGenerations = claimedGenerations,
+                    onRescanUsb = { coordinator.scanAttachedDevices() },
+                    onClaim = { session ->
+                        when (val result = coordinator.claim(session.generation)) {
+                            is UsbClaimResult.Claimed ->
+                                claimedGenerations = claimedGenerations + session.generation.value
+
+                            is UsbClaimResult.Failed ->
+                                exportStatus = claimFailedTemplate.format(result.reason.name)
+                        }
+                    },
+                    onRelease = { session ->
+                        coordinator.release(session.generation)
+                        claimedGenerations = claimedGenerations - session.generation.value
+                    },
                     onExportDiagnostics = {
                         saveLauncher.launch(application.suggestedDiagnosticsFileName())
                     },

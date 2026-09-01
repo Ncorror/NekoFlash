@@ -146,6 +146,8 @@ public object UsbSessionStateMachine {
             UsbSessionState.CLOSED,
         ),
         UsbSessionState.CLAIMED to setOf(
+            UsbSessionState.READY,
+            UsbSessionState.CLAIMED,
             UsbSessionState.CLOSED,
         ),
         UsbSessionState.CLOSED to emptySet(),
@@ -157,6 +159,15 @@ public object UsbSessionStateMachine {
      * Переход из [UsbSessionState.DISCOVERED] сразу в [UsbSessionState.READY]
      * допустим: разрешение на устройство может быть выдано заранее, и повторно
      * запрашивать его незачем.
+     *
+     * Возврат из [UsbSessionState.CLAIMED] в [UsbSessionState.READY] допустим:
+     * освобождение интерфейса не заканчивает физическую сессию. Устройство
+     * остаётся подключённым, разрешение остаётся выданным, generation та же —
+     * меняется лишь то, держим мы интерфейс или нет. Терминальным по-прежнему
+     * является только [UsbSessionState.CLOSED].
+     *
+     * Повторный захват уже захваченной сессии тоже допустим: он ничего не
+     * меняет, но и не является ошибкой вызывающего.
      */
     public fun allows(from: UsbSessionState, to: UsbSessionState): Boolean =
         to in allowed.getValue(from)
