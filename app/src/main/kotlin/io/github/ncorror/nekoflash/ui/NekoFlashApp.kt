@@ -34,6 +34,7 @@ import io.github.ncorror.nekoflash.usb.api.UsbSessionState
 fun NekoFlashApp(
     sessions: List<UsbSession> = emptyList(),
     exportStatus: String? = null,
+    onRescanUsb: () -> Unit = {},
     onExportDiagnostics: () -> Unit = {},
 ) {
     Scaffold(
@@ -66,6 +67,7 @@ fun NekoFlashApp(
                     Workspace(
                         sessions = sessions,
                         exportStatus = exportStatus,
+                        onRescanUsb = onRescanUsb,
                         onExportDiagnostics = onExportDiagnostics,
                         modifier = Modifier.weight(1f),
                     )
@@ -74,6 +76,7 @@ fun NekoFlashApp(
                 Workspace(
                     sessions = sessions,
                     exportStatus = exportStatus,
+                    onRescanUsb = onRescanUsb,
                     onExportDiagnostics = onExportDiagnostics,
                     modifier = Modifier.fillMaxSize(),
                 )
@@ -102,6 +105,7 @@ private fun ProjectNavigation(modifier: Modifier = Modifier) {
 private fun Workspace(
     sessions: List<UsbSession>,
     exportStatus: String?,
+    onRescanUsb: () -> Unit,
     onExportDiagnostics: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -134,6 +138,13 @@ private fun Workspace(
                 modifier = Modifier.padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
+                Button(onClick = onRescanUsb) {
+                    Text(stringResource(R.string.usb_rescan))
+                }
+                Text(
+                    text = stringResource(R.string.usb_rescan_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                )
                 Button(onClick = onExportDiagnostics) {
                     Text(stringResource(R.string.diagnostics_export))
                 }

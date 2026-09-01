@@ -50,6 +50,7 @@ class MainActivity : ComponentActivity() {
                 NekoFlashApp(
                     sessions = sessions,
                     exportStatus = exportStatus,
+                    onRescanUsb = { application.usbSessions.scanAttachedDevices() },
                     onExportDiagnostics = {
                         saveLauncher.launch(application.suggestedDiagnosticsFileName())
                     },

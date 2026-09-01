@@ -201,6 +201,41 @@ class UsbSessionCoordinatorTest {
     }
 
     @Test
+    fun rescanRetriesPermissionForADeviceThatIsStillAttachedAfterDenial() {
+        val host = FakeUsbHost(attached = listOf(deviceA))
+        val registry = UsbSessionRegistry()
+        val coordinator = UsbSessionCoordinator(host, registry)
+        coordinator.start()
+        val denied = coordinator.sessions.value.single()
+        coordinator.onPermissionResult(deviceA, granted = false)
+        assertTrue(coordinator.sessions.value.isEmpty())
+
+        coordinator.scanAttachedDevices()
+
+        val retried = coordinator.sessions.value.single()
+        assertEquals(UsbSessionState.PERMISSION_PENDING, retried.state)
+        assertTrue(retried.generation.value > denied.generation.value)
+        assertEquals(
+            UsbSessionClosureReason.PERMISSION_DENIED,
+            registry.session(denied.generation)?.closureReason,
+        )
+        assertEquals(listOf(deviceA.deviceName, deviceA.deviceName), host.permissionRequests)
+    }
+
+    @Test
+    fun rescanDoesNotDisturbASessionThatIsStillWaitingForAnAnswer() {
+        val host = FakeUsbHost(attached = listOf(deviceA))
+        val coordinator = UsbSessionCoordinator(host)
+        coordinator.start()
+        val pending = coordinator.sessions.value.single()
+
+        coordinator.scanAttachedDevices()
+
+        assertEquals(pending.generation, coordinator.sessions.value.single().generation)
+        assertEquals(listOf(deviceA.deviceName), host.permissionRequests)
+    }
+
+    @Test
     fun everyEventReportsTheStateAfterItsTransition() {
         val host = FakeUsbHost(attached = listOf(deviceA))
         val sink = InMemoryDiagnosticSink()
