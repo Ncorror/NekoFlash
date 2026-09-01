@@ -32,7 +32,7 @@ Phase 1 closure CI: **VERIFIED / PASS** (2026-08-28). Подтверждены 7
 
 Сразу сделать Home/Target Bar skeleton, чтобы core развивался внутри реального product shell.
 
-## Phase 2 — USB + Target/Session vertical slice — CURRENT
+## Phase 2 — USB + Target/Session vertical slice — COMPLETE
 
 Статус каждого пункта проставляется по факту наличия работающего кода, а не по ощущению завершённости. Пункт, сделанный в составе другого, ссылается на него явно.
 
@@ -50,9 +50,9 @@ Phase 1 closure CI: **VERIFIED / PASS** (2026-08-28). Подтверждены 7
 | UI показывает target и сессию | **готово** | `NekoFlashApp`; протокольный режим не показывается — до handshake он неизвестен, и экран говорит об этом прямо |
 | Basic diagnostics export | **готово** | `DiagnosticBundle` собирает детерминированный архив, `UsbSessionCoordinator` пишет события, `UsbDiagnosticReport` формирует разделы, выгрузка идёт через системный диалог сохранения файла |
 | Claim / release | **готово** | `UsbHost.claim` и `UsbTransportHandle` в контракте, `UsbDeviceConnection.claimInterface(force)` в `usb:android`, захват и освобождение по действию оператора. Автоматического захвата нет намеренно — обоснование в `07_TESTING_CI_HARDWARE_EVIDENCE_RU.md` |
-| Hardware test | **не сделан** | discovery, permission, identity и detach проверяемы уже сейчас, но evidence по `07_TESTING_CI_HARDWARE_EVIDENCE_RU.md` требует работающей выгрузки логов |
+| Hardware test | **готово** | четыре прогона на POCO `25053PC47G` с целью `serial:eff4927c`. Evidence и критерий PASS — `07_TESTING_CI_HARDWARE_EVIDENCE_RU.md` §6.10 |
 
-Фаза не считается закрытой, пока остаётся хотя бы один пункт без отметки «готово».
+Фаза закрыта: все пункты имеют отметку «готово», каждый подтверждён кодом, тестами и аппаратным прогоном.
 
 `Basic diagnostics export` намеренно поставлен перед `claim / release`. Без выгрузки логов аппаратный прогон даёт впечатления, а не evidence, которого требует `07_TESTING_CI_HARDWARE_EVIDENCE_RU.md`. Сначала диагностика — тогда уже сделанное можно проверить на устройстве с настоящим отчётом, а `claim / release` ляжет на работающую запись событий и будет проверяем сразу. В обратном порядке его пришлось бы проверять дважды.
 

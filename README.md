@@ -9,7 +9,8 @@ Recovery and vendor workflows.
 
 - Phase 0: complete; A2 final inbound framing gate passed and A2 is frozen.
 - Phase 1: complete; clean application/bootstrap foundation verified by CI.
-- Phase 2: active; USB + Target/Session ownership foundation.
+- Phase 2: complete; USB + Target/Session ownership verified on hardware.
+- Phase 3: next; ADB transport and protocol engines.
 - Legacy and A2 are reference/evidence only.
 
 ## Product rule

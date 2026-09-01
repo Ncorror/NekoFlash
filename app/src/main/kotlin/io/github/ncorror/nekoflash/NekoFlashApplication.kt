@@ -12,6 +12,7 @@ import io.github.ncorror.nekoflash.usb.api.UsbDiagnosticReport
 import io.github.ncorror.nekoflash.usb.api.UsbPermissionCallbackIdentity
 import io.github.ncorror.nekoflash.usb.api.UsbPermissionPolicy
 import io.github.ncorror.nekoflash.usb.api.UsbSessionCoordinator
+import io.github.ncorror.nekoflash.usb.api.UsbSessionState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -103,7 +104,15 @@ public class NekoFlashApplication : Application() {
     private fun schedulePermissionTimeout(generation: SessionGeneration) {
         scope.launch {
             delay(UsbPermissionPolicy.RESPONSE_TIMEOUT_MS)
-            val session = usbSessions.sessions.value.firstOrNull { it.generation == generation }
+            // Будить координатор имеет смысл только если сессия всё ещё ждёт
+            // ответа. Иначе таймер опоздал: ответ давно получен, интерфейс мог
+            // быть уже захвачен, и запись «истекло ожидание разрешения»
+            // читалась бы в отчёте как происшествие, которым она не является.
+            // Гонку между этой проверкой и вызовом разрешает сам координатор,
+            // возвращая IGNORE.
+            val session = usbSessions.sessions.value
+                .firstOrNull { it.generation == generation }
+                ?.takeIf { it.state == UsbSessionState.PERMISSION_PENDING }
                 ?: return@launch
             usbSessions.onPermissionTimeout(
                 generation = generation,
