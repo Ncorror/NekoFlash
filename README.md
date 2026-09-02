@@ -71,6 +71,9 @@ Current baseline:
 - `:usb:android` — the Android USB host: descriptor mapping, discovery,
   attach/detach receivers, permission requests, interface claim and release, and
   bulk endpoint I/O.
+- `:protocol:adb` — ADB packet framing: the 24-byte header codec, the payload
+  checksum rules and the hardware-proven inbound framing invariant, with a
+  single-reader packet reader and a serialized packet writer.
 
 Modules are added only when they represent a real ownership boundary. USB, ADB,
 Fastboot, Recovery and vendor modules are introduced in their roadmap phases,

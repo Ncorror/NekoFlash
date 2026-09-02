@@ -13,7 +13,7 @@
 
 ## Phase 1 — bootstrap нового repository — COMPLETE / PASS
 
-Phase 1 closure CI: **VERIFIED / PASS** (2026-08-28). Подтверждены 7 core unit tests, Android Lint `0 errors`, debug APK assembly, checked-in verified Gradle Wrapper `9.5.0`, AGP `9.3.2`, launcher/adaptive/monochrome icon, explicit no-backup/D2D policy и executable repository/localization hygiene checks. Остались только два осознанных informational lint warnings: `targetSdk 36` при `compileSdk 37` и наличие более новой Gradle версии; они не подавляются без отдельного behavior/toolchain review.
+Phase 1 closure CI: **VERIFIED / PASS** (2026-08-28). Подтверждены 7 core unit tests, Android Lint `0 errors`, debug APK assembly, checked-in verified Gradle Wrapper `9.5.0`, AGP `9.3.2`, launcher/adaptive/monochrome icon, explicit no-backup/D2D policy и executable repository/localization hygiene checks. Остались только осознанные informational lint warnings: `targetSdk 36` при `compileSdk 37`, наличие более новой версии Gradle и, с сентября 2026, более новой версии AGP; они не подавляются и не обновляются без отдельного behavior/toolchain review.
 
 - package/application identity;
 - Gradle/Compose baseline;
@@ -72,6 +72,7 @@ rule, `04_CAPABILITY_MATRIX_RU.md`). Колонка «Где» заполняе�
 | Пункт | Статус | Где |
 |---|---|---|
 | Ввод-вывод на захваченном интерфейсе | **нет** | контракт `UsbTransportHandle.receive`/`send`, `UsbTransferResult`, `UsbTransferArguments` в `usb:api` и реализация через `bulkTransfer` в `usb:android` есть; production-кода, который их вызывает, ещё нет — до CNXN вызывать нечему |
+| Рамка пакета ADB | **нет** | `protocol:adb`: `AdbPacketHeader` (24 байта, `magic`, диапазон длины по объявленному нами `maxdata`), `AdbChecksum`, `AdbInboundFraming` с доказанным на `vayu` инвариантом, `AdbPacketReader` и `AdbPacketWriter` поверх `UsbTransportHandle`. Модуль ни от кого не вызывается: транспорт, который его заведёт, — следующий пункт |
 | CNXN/AUTH | **нет** | — |
 | single physical reader | **нет** | — |
 | `AdbStreamRouter` | **нет** | — |
@@ -97,14 +98,25 @@ rule, `04_CAPABILITY_MATRIX_RU.md`). Колонка «Где» заполняе�
 `adb/transport/AdbUsbTransport.kt`, а не по памяти о протоколе):
 
 - запись хост → устройство дробится на куски по 16 КиБ и повторяется, пока не
-  отправлено всё; в обратную сторону дробление объявленного payload запрещено;
+  отправлено всё; в обратную сторону дробление объявленного payload запрещено —
+  **сделано** в `AdbPacketWriter` и `AdbPacketReader`;
 - заголовок в 24 байта читается до полного набора, и прерванный на середине
-  заголовок — это потеря рамки, а не таймаут;
+  заголовок — это потеря рамки, а не таймаут — **сделано**;
 - объявленный payload читается одной операцией приёма, короткий результат —
-  fail-closed;
-- `maxdata` объявляется по уровню API: 16 КиБ до API 28, 1 МиБ начиная с него;
-- таймауты A2: 5000 мс на приём и на передачу, 10000 мс на ожидание подписи
-  AUTH.
+  fail-closed — **сделано**;
+- `maxdata` объявляется по уровню API: 16 КиБ до API 28, 1 МиБ начиная с него —
+  **сделано** в `AdbInboundFraming`; сам `CNXN` его ещё никому не объявляет;
+- таймауты A2: 5000 мс на приём и на передачу — **сделано**; 10000 мс на
+  ожидание подписи AUTH придёт вместе с handshake.
+
+Стилевая часть гейта `scripts/ci/check_kotlin_style.sh` по-прежнему разбирает
+только `app/src` и `core`, как это было и при появлении модулей `usb:*`. Гейт
+границ модулей на `protocol/adb` заведён. Новый модуль прогнан против полной
+стилевой конфигурации вручную: он даёт только замечания `MagicNumber` на
+смещения полей проводного формата и битовые сдвиги в чтении little-endian.
+Расширять стилевое покрытие на `usb` и `protocol` имеет смысл, но это отдельное
+решение: оно требует либо исключения для кодеков, либо именования сдвигов, и
+принимать его молча внутри changeset'а про рамку пакета неправильно.
 
 Порядок изменён намеренно и записан: правило из `16_AGENT_OPERATING_PROMPT_RU.md`
 не запрещает менять порядок, оно запрещает делать это молча.
