@@ -541,6 +541,10 @@ class UsbSessionCoordinatorTest {
         }
     }
 
+    /**
+     * За фейком нет устройства, и ввод-вывод в координаторе не участвует:
+     * передача честно не состоится, а не притворится удачной.
+     */
     private class FakeHandle(
         override val candidate: UsbInterfaceCandidate,
     ) : UsbTransportHandle {
@@ -548,6 +552,34 @@ class UsbSessionCoordinatorTest {
 
         override val held: Boolean
             get() = !released
+
+        override fun receive(
+            destination: ByteArray,
+            offset: Int,
+            length: Int,
+            timeoutMillis: Int,
+        ): UsbTransferResult = transfer(destination.size, offset, length, timeoutMillis)
+
+        override fun send(
+            source: ByteArray,
+            offset: Int,
+            length: Int,
+            timeoutMillis: Int,
+        ): UsbTransferResult = transfer(source.size, offset, length, timeoutMillis)
+
+        private fun transfer(
+            bufferSize: Int,
+            offset: Int,
+            length: Int,
+            timeoutMillis: Int,
+        ): UsbTransferResult {
+            UsbTransferArguments.validate(bufferSize, offset, length, timeoutMillis)
+            return if (released) {
+                UsbTransferResult.Failed(UsbTransferFailure.NOT_HELD)
+            } else {
+                UsbTransferResult.Failed(UsbTransferFailure.NOT_COMPLETED)
+            }
+        }
 
         override fun close() {
             released = true

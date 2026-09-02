@@ -8,6 +8,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbDeviceConnection
+import android.hardware.usb.UsbEndpoint
 import android.hardware.usb.UsbInterface
 import android.hardware.usb.UsbManager
 import android.os.Build
@@ -17,6 +18,9 @@ import io.github.ncorror.nekoflash.usb.api.UsbClaimResult
 import io.github.ncorror.nekoflash.usb.api.UsbHost
 import io.github.ncorror.nekoflash.usb.api.UsbInterfaceCandidate
 import io.github.ncorror.nekoflash.usb.api.UsbPermissionCallbackIdentity
+import io.github.ncorror.nekoflash.usb.api.UsbTransferArguments
+import io.github.ncorror.nekoflash.usb.api.UsbTransferFailure
+import io.github.ncorror.nekoflash.usb.api.UsbTransferResult
 import io.github.ncorror.nekoflash.usb.api.UsbTransportHandle
 
 /**
@@ -28,9 +32,9 @@ import io.github.ncorror.nekoflash.usb.api.UsbTransportHandle
  * идентичность target, владение сессиями и разбор ответа на запрос разрешения
  * живут в `usb:api` и покрыты тестами.
  *
- * Наблюдение построено на слушателе, а не на `Flow`: зависимость на корутины
- * появится вместе с транспортным вводом-выводом, где она действительно нужна,
- * и будет подтверждена сборкой в тот же момент. Обёртка в `Flow` — задача
+ * Наблюдение построено на слушателе, а не на `Flow`, а ввод-вывод —
+ * блокирующий: корутины появятся там, где они действительно нужны, — в
+ * протокольном движке с единственным читающим циклом. Обёртка в `Flow` — задача
  * слоя выше.
  *
  * Контекст должен быть областью приложения: владение USB переживает
@@ -150,6 +154,11 @@ public class AndroidUsbHost(
             ?: return UsbClaimResult.Failed(UsbClaimFailure.DEVICE_GONE)
         val usbInterface = device.getInterfaceOrNull(candidate.interfaceIndex)
             ?: return UsbClaimResult.Failed(UsbClaimFailure.DEVICE_GONE)
+        val endpointIn = usbInterface.findEndpoint(candidate.endpointIn.address)
+        val endpointOut = usbInterface.findEndpoint(candidate.endpointOut.address)
+        if (endpointIn == null || endpointOut == null) {
+            return UsbClaimResult.Failed(UsbClaimFailure.ENDPOINTS_MISSING)
+        }
         val connection = usbManager.openDevice(device)
             ?: return UsbClaimResult.Failed(UsbClaimFailure.OPEN_REFUSED)
 
@@ -158,7 +167,7 @@ public class AndroidUsbHost(
             return UsbClaimResult.Failed(UsbClaimFailure.INTERFACE_REFUSED)
         }
         return UsbClaimResult.Claimed(
-            AndroidUsbTransportHandle(connection, usbInterface, candidate),
+            AndroidUsbTransportHandle(connection, usbInterface, candidate, endpointIn, endpointOut),
         )
     }
 
@@ -166,20 +175,84 @@ public class AndroidUsbHost(
         if (index in 0 until interfaceCount) getInterface(index) else null
 
     /**
+     * Платформенный эндпоинт по адресу из дескриптора.
+     *
+     * Поиск идёт по адресу, а не по порядковому номеру: порядок объявления
+     * участвовал в подборе пары, но адрес — то, что действительно принадлежит
+     * эндпоинту.
+     */
+    private fun UsbInterface.findEndpoint(address: Int): UsbEndpoint? =
+        (0 until endpointCount).map(::getEndpoint).firstOrNull { it.address == address }
+
+    /**
      * Удерживаемый интерфейс на стороне Android.
      *
      * Освобождение защищено от исключений: устройство может исчезнуть между
      * захватом и освобождением, и это обычный ход событий, а не сбой.
+     *
+     * Решений здесь нет ни одного: проверка окна передачи живёт в `usb:api` и
+     * покрыта тестами, а всё, что осталось, — один вызов платформы и перевод
+     * его результата в контракт.
+     *
+     * Признак освобождения объявлен `@Volatile`: приём и передача идут из
+     * разных потоков, и освобождение должно быть видно им обоим сразу.
      */
     private class AndroidUsbTransportHandle(
         private val connection: UsbDeviceConnection,
         private val usbInterface: UsbInterface,
         override val candidate: UsbInterfaceCandidate,
+        private val endpointIn: UsbEndpoint,
+        private val endpointOut: UsbEndpoint,
     ) : UsbTransportHandle {
+        @Volatile
         private var released = false
 
         override val held: Boolean
             get() = !released
+
+        override fun receive(
+            destination: ByteArray,
+            offset: Int,
+            length: Int,
+            timeoutMillis: Int,
+        ): UsbTransferResult = transfer(endpointIn, destination, offset, length, timeoutMillis)
+
+        override fun send(
+            source: ByteArray,
+            offset: Int,
+            length: Int,
+            timeoutMillis: Int,
+        ): UsbTransferResult = transfer(endpointOut, source, offset, length, timeoutMillis)
+
+        /**
+         * Одна передача — один вызов платформы.
+         *
+         * Цикла дочитывания здесь нет и не будет: именно он ломал приём в A2.
+         * Отрицательный результат платформа отдаёт и на таймаут, и на ошибку, и
+         * на исчезнувшее устройство, поэтому он переводится в единственную
+         * честную причину, а не в угаданную.
+         *
+         * Публичные USB Host API до API 28 не принимают передачу больше 16 КиБ.
+         * Ограничение платформенное, но живёт оно в протокольной политике,
+         * которая объявляет peer'у согласованный `maxdata`: транспорт не вправе
+         * решать за протокол, каким должен быть размер рамки.
+         */
+        private fun transfer(
+            endpoint: UsbEndpoint,
+            buffer: ByteArray,
+            offset: Int,
+            length: Int,
+            timeoutMillis: Int,
+        ): UsbTransferResult {
+            UsbTransferArguments.validate(buffer.size, offset, length, timeoutMillis)
+            if (released) return UsbTransferResult.Failed(UsbTransferFailure.NOT_HELD)
+            val transferred = connection.bulkTransfer(endpoint, buffer, offset, length, timeoutMillis)
+            return if (transferred < 0) {
+                UsbTransferResult.Failed(UsbTransferFailure.NOT_COMPLETED)
+            } else {
+                UsbTransferResult.Completed(transferred)
+            }
+        }
 
         override fun close() {
             if (released) return

@@ -10,7 +10,7 @@ Recovery and vendor workflows.
 - Phase 0: complete; A2 final inbound framing gate passed and A2 is frozen.
 - Phase 1: complete; clean application/bootstrap foundation verified by CI.
 - Phase 2: complete; USB + Target/Session ownership verified on hardware.
-- Phase 3: next; ADB transport and protocol engines.
+- Phase 3: in progress; ADB transport and protocol engines.
 - Legacy and A2 are reference/evidence only.
 
 ## Product rule
@@ -66,9 +66,11 @@ Current baseline:
 - `:core:diagnostics` — structured diagnostics foundation and evidence bundle writer.
 - `:core:operation` — operation identity, mutation boundary and outcome contracts.
 - `:usb:api` — platform independent USB contracts: descriptors, interface
-  classification, target identity, session ownership, permission policy.
+  classification, target identity, session ownership, permission policy and the
+  raw bulk transfer contract of a claimed interface.
 - `:usb:android` — the Android USB host: descriptor mapping, discovery,
-  attach/detach receivers, permission requests, interface claim and release.
+  attach/detach receivers, permission requests, interface claim and release, and
+  bulk endpoint I/O.
 
 Modules are added only when they represent a real ownership boundary. USB, ADB,
 Fastboot, Recovery and vendor modules are introduced in their roadmap phases,

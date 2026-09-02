@@ -60,15 +60,40 @@ Phase 1 closure CI: **VERIFIED / PASS** (2026-08-28). Подтверждены 7
 
 ## Phase 3 — настоящий ADB foundation + Terminal
 
-- CNXN/AUTH;
-- single physical reader;
-- AdbStreamRouter;
-- generic `openService`;
-- `shell,v2`;
-- legacy fallback;
-- interactive PTY shell;
-- real terminal UI;
-- concurrent stream tests.
+Список пунктов заменён таблицей с колонкой статуса — той же формы, что в Phase 2.
+Голый список эту форму уже однажды не удержал: отметки укрупнялись, список
+расходился с действительностью, и пропущенный пункт был замечен со стороны.
+
+Отметка «готово» ставится только по факту работающего production-пути: контракт,
+который никто не вызывает, готовым пунктом не считается (capability completeness
+rule, `04_CAPABILITY_MATRIX_RU.md`). Колонка «Где» заполняется и у незакрытых
+пунктов — она показывает, что уже есть и чего не хватает.
+
+| Пункт | Статус | Где |
+|---|---|---|
+| Ввод-вывод на захваченном интерфейсе | **нет** | контракт `UsbTransportHandle.receive`/`send`, `UsbTransferResult`, `UsbTransferArguments` в `usb:api` и реализация через `bulkTransfer` в `usb:android` есть; production-кода, который их вызывает, ещё нет — до CNXN вызывать нечему |
+| CNXN/AUTH | **нет** | — |
+| single physical reader | **нет** | — |
+| `AdbStreamRouter` | **нет** | — |
+| generic `openService` | **нет** | — |
+| `shell,v2` | **нет** | — |
+| legacy fallback | **нет** | — |
+| interactive PTY shell | **нет** | — |
+| real terminal UI | **нет** | — |
+| concurrent stream tests | **нет** | — |
+
+Первым пунктом стоит ввод-вывод, которого не было в исходном списке. Причина не
+в удобстве: доказанный на `vayu` inbound framing invariant — это правило про
+одну операцию приёма (`03_PROTOCOL_AND_SAFETY_INVARIANTS_RU.md` §4), и перенести
+его некуда, пока операции приёма не существует. Ответ на `CNXN` нечем прочитать
+раньше, чем у захваченного интерфейса появятся `receive` и `send`.
+
+Сам инвариант живёт не здесь: `usb:api` сообщает число перенесённых байт и не
+судит о рамке. Решение, что короткий приём объявленного payload — это потерянная
+рамка, принадлежит `protocol:adb` и приходит вместе с ним.
+
+Порядок изменён намеренно и записан: правило из `16_AGENT_OPERATING_PROMPT_RU.md`
+не запрещает менять порядок, оно запрещает делать это молча.
 
 Это первый главный product milestone: **USB → ADB → настоящий профессиональный Shell**.
 
