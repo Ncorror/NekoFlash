@@ -41,7 +41,9 @@ public enum class UsbTransferFailure {
      * различие означало бы солгать о причине. Слой выше различает их по
      * собственному состоянию: ожидание, в котором не пришло ни байта, — обычный
      * таймаут, а обрыв посреди уже начатого пакета — потеря рамки. Так же это
-     * устроено в A2 (`adb/transport/AdbUsbTransport.kt`, `readHeaderDirect`).
+     * устроено в A2 (`adb/transport/AdbUsbTransport.kt`, `readHeaderDirect`), и
+     * прямо записано в Legacy (`FastbootProtocol.readPacket`): «bulkTransfer
+     * возвращает <=0 и по обычному timeout».
      */
     NOT_COMPLETED,
 }

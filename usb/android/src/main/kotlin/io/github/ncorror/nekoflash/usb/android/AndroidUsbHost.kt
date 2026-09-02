@@ -247,10 +247,42 @@ public class AndroidUsbHost(
             UsbTransferArguments.validate(buffer.size, offset, length, timeoutMillis)
             if (released) return UsbTransferResult.Failed(UsbTransferFailure.NOT_HELD)
             val transferred = connection.bulkTransfer(endpoint, buffer, offset, length, timeoutMillis)
-            return if (transferred < 0) {
-                UsbTransferResult.Failed(UsbTransferFailure.NOT_COMPLETED)
-            } else {
-                UsbTransferResult.Completed(transferred)
+            if (transferred >= 0) return UsbTransferResult.Completed(transferred)
+            if (endpoint === endpointOut) clearEndpointHalt(endpoint)
+            return UsbTransferResult.Failed(UsbTransferFailure.NOT_COMPLETED)
+        }
+
+        /**
+         * Снимает halted-состояние эндпоинта передачи после неудачной отправки.
+         *
+         * Перенесено из Legacy (`AdbProtocol.bulkWriteFully`) и A2
+         * (`adb/transport/AdbUsbTransport.kt`), где сделано одинаково и с прямо
+         * названной причиной: без сброса все последующие передачи на этом
+         * эндпоинте продолжают проваливаться после одного сбоя, даже маленькие.
+         * В Android USB Host API нет `clearStall`, поэтому шлётся стандартный
+         * `CLEAR_FEATURE(ENDPOINT_HALT)` через нулевой эндпоинт.
+         *
+         * Это не повтор: ни один байт заново не отправляется, а неудача всё
+         * равно возвращается вызывающему. Сброс лишь возвращает эндпоинт в
+         * состояние, в котором следующая попытка вообще имеет смысл; будет ли
+         * она — решает протокольный слой.
+         *
+         * На приёме halt не снимается: так же поступают оба архива, и читающий
+         * слой вместо этого закрывается fail-closed. Придумывать здесь
+         * симметрию, которой нет ни в одном источнике, нельзя.
+         */
+        private fun clearEndpointHalt(endpoint: UsbEndpoint) {
+            if (released) return
+            runCatching {
+                connection.controlTransfer(
+                    CLEAR_FEATURE_TO_ENDPOINT,
+                    REQUEST_CLEAR_FEATURE,
+                    FEATURE_ENDPOINT_HALT,
+                    endpoint.address,
+                    null,
+                    0,
+                    CLEAR_HALT_TIMEOUT_MS,
+                )
             }
         }
 
@@ -259,6 +291,19 @@ public class AndroidUsbHost(
             released = true
             runCatching { connection.releaseInterface(usbInterface) }
             runCatching { connection.close() }
+        }
+
+        private companion object {
+            /** Стандартный запрос, хост → устройство, получатель — эндпоинт. */
+            const val CLEAR_FEATURE_TO_ENDPOINT = 0x02
+
+            /** `bRequest` = `CLEAR_FEATURE`. */
+            const val REQUEST_CLEAR_FEATURE = 0x01
+
+            /** `wValue` = `ENDPOINT_HALT`. */
+            const val FEATURE_ENDPOINT_HALT = 0x00
+
+            const val CLEAR_HALT_TIMEOUT_MS = 500
         }
     }
 
