@@ -3,6 +3,7 @@ package io.github.ncorror.nekoflash.protocol.adb
 import java.math.BigInteger
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.security.MessageDigest
 import java.security.interfaces.RSAPublicKey
 
 /**
@@ -79,6 +80,20 @@ public object AdbPublicKeyFormat {
      */
     public fun authPayload(publicKey: RSAPublicKey): ByteArray =
         "${keyLine(publicKey)}\u0000".toByteArray(Charsets.US_ASCII)
+
+    /**
+     * Отпечаток ключа для сличения прогонов между собой.
+     *
+     * SHA-256 от той же структуры, что уходит устройству. Это **не** та строка,
+     * которую показывает диалог авторизации на экране устройства: её формат
+     * задаёт `adbd`, и выдавать одно за другое нельзя. Отпечаток нужен для
+     * другого — увидеть в журнале, тот же это ключ, что в прошлый раз, или
+     * новый.
+     */
+    public fun fingerprint(publicKey: RSAPublicKey): String =
+        MessageDigest.getInstance("SHA-256")
+            .digest(encode(publicKey))
+            .joinToString(separator = "") { byte -> "%02x".format(byte) }
 
     private fun ByteBuffer.putWords(value: BigInteger) {
         repeat(RSA_WORDS) { index ->

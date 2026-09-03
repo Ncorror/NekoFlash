@@ -229,10 +229,33 @@ class AdbHandshakeTest {
 
         val messages = sink.snapshot().map { it.message }
         assertEquals(
-            listOf("cnxn_sent", "auth_required", "auth_signature_sent", "auth_public_key_sent", "connected"),
+            listOf(
+                "cnxn_sent",
+                "auth_required",
+                "host_key",
+                "auth_signature_sent",
+                "auth_public_key_sent",
+                "connected",
+            ),
             messages,
         )
         assertTrue(sink.snapshot().all { it.category == AdbHandshake.DIAGNOSTIC_CATEGORY })
+    }
+
+    /**
+     * Происхождение ключа записывается там же, где идёт авторизация: иначе
+     * диалог в неожиданный момент нечем объяснить.
+     */
+    @Test
+    fun hostKeyProvenanceIsRecorded() = withKeyStore { keyStore ->
+        val sink = InMemoryDiagnosticSink()
+        val device = ScriptedDevice(authToken(), cnxn(DEVICE_BANNER))
+
+        device.handshake(keyStore, diagnostics = sink).connect()
+
+        val event = sink.snapshot().first { it.message == "host_key" }
+        assertEquals(AdbKeyOrigin.GENERATED.name, event.fields["origin"])
+        assertEquals(keyStore.fingerprint(), event.fields["fingerprint"])
     }
 
     @Test

@@ -270,6 +270,41 @@ class AdbKeyStoreTest {
         assertEquals("$fileLine\u0000", payload.toString(Charsets.US_ASCII))
     }
 
+    /** Первый запуск создаёт ключ, второй его читает: для устройства это тот же хост. */
+    @Test
+    fun originTellsWhetherTheKeyWasCreatedOrRead() = withTempDirectory { directory ->
+        val first = AdbKeyStore(directory)
+        assertEquals(AdbKeyOrigin.NOT_TOUCHED, first.origin)
+        first.keyPair()
+        assertEquals(AdbKeyOrigin.GENERATED, first.origin)
+
+        val second = AdbKeyStore(directory)
+        second.keyPair()
+
+        assertEquals(AdbKeyOrigin.LOADED, second.origin)
+    }
+
+    @Test
+    fun fingerprintSurvivesAcrossInstancesOverTheSameFolder() = withTempDirectory { directory ->
+        assertEquals(AdbKeyStore(directory).fingerprint(), AdbKeyStore(directory).fingerprint())
+    }
+
+    /** Потерянный каталог означает новый ключ, и отпечаток это показывает. */
+    @Test
+    fun aFreshFolderProducesADifferentFingerprint() = withTempDirectory { first ->
+        withTempDirectory { second ->
+            assertNotEquals(AdbKeyStore(first).fingerprint(), AdbKeyStore(second).fingerprint())
+        }
+    }
+
+    @Test
+    fun fingerprintIsASha256Digest() = withTempDirectory { directory ->
+        val fingerprint = AdbKeyStore(directory).fingerprint()
+
+        assertEquals(64, fingerprint.length)
+        assertTrue(fingerprint.all { it in "0123456789abcdef" })
+    }
+
     @Test
     fun signedTokenVerifiesAgainstTheStoredPublicKey() = withTempDirectory { directory ->
         val keyStore = AdbKeyStore(directory)

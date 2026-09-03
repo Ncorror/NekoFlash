@@ -25,12 +25,47 @@ import java.util.Base64
  * `adbkey.pub` тоже сохранены: по ним ключ, созданный старой версией
  * приложения, продолжает работать.
  */
+/** Откуда взялся ключ хоста в этом запуске. */
+public enum class AdbKeyOrigin {
+    /** Ключ ещё не понадобился. */
+    NOT_TOUCHED,
+
+    /** Прочитан с диска: устройство, знавшее его раньше, узнает его снова. */
+    LOADED,
+
+    /**
+     * Создан заново, потому что файла не было.
+     *
+     * Для устройства это **новый хост**: оно спросит подтверждения, даже если
+     * прошлый ключ уже был авторизован. Чаще всего означает, что каталог
+     * приложения был очищен — например, переустановкой.
+     */
+    GENERATED,
+}
+
+/** Что известно о ключе хоста после того, как он понадобился. */
+public data class AdbKeyProvenance(
+    val origin: AdbKeyOrigin,
+    val fingerprint: String,
+)
+
 public class AdbKeyStore(private val directory: File) {
     private val privateKeyFile = File(directory, PRIVATE_KEY_FILE_NAME)
     private val publicKeyFile = File(directory, PUBLIC_KEY_FILE_NAME)
 
     @Volatile
     private var cached: KeyPair? = null
+
+    /**
+     * Откуда взялся ключ.
+     *
+     * Нужно журналу: без этого невозможно отличить «устройство забыло хост» от
+     * «хост потерял ключ», а вопрос этот возникает каждый раз, когда диалог
+     * авторизации появляется там, где его не ждали.
+     */
+    @Volatile
+    public var origin: AdbKeyOrigin = AdbKeyOrigin.NOT_TOUCHED
+        private set
 
     /**
      * Возвращает ключ хоста, создавая его при первом обращении.
@@ -49,7 +84,13 @@ public class AdbKeyStore(private val directory: File) {
             throw IllegalStateException("Could not create the ADB key folder: ${directory.absolutePath}")
         }
 
-        val keyPair = if (privateKeyFile.exists()) loadKeyPair() else generateAndSaveKeyPair()
+        val keyPair = if (privateKeyFile.exists()) {
+            origin = AdbKeyOrigin.LOADED
+            loadKeyPair()
+        } else {
+            origin = AdbKeyOrigin.GENERATED
+            generateAndSaveKeyPair()
+        }
         writePublicKeyFileIfNeeded(keyPair)
         cached = keyPair
         return keyPair
@@ -66,6 +107,22 @@ public class AdbKeyStore(private val directory: File) {
 
     /** Путь к файлу публичного ключа: показывается пользователю, не содержит секрета. */
     public fun publicKeyPath(): String = publicKeyFile.absolutePath
+
+    /** Отпечаток публичного ключа для сличения прогонов. */
+    public fun fingerprint(): String = AdbPublicKeyFormat.fingerprint(publicKey())
+
+    /**
+     * Происхождение ключа и его отпечаток вместе.
+     *
+     * Одним вызовом, потому что порознь их легко перепутать местами: [origin]
+     * известно только после того, как ключ действительно понадобился, и
+     * прочитанное раньше времени значение сказало бы `NOT_TOUCHED` про ключ,
+     * который вот-вот будет создан. Ровно на этом споткнулась первая версия.
+     */
+    public fun provenance(): AdbKeyProvenance {
+        val fingerprint = fingerprint()
+        return AdbKeyProvenance(origin = origin, fingerprint = fingerprint)
+    }
 
     private fun loadKeyPair(): KeyPair {
         val encoded = Base64.getDecoder().decode(privateKeyFile.readText().trim())

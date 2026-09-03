@@ -127,6 +127,7 @@ public class AdbHandshake(
             return failed(AdbHandshakeFailure.UNSUPPORTED_AUTH_TYPE, "type=${first.arg0}")
         }
         emit("auth_required")
+        emitHostKeyProvenance()
 
         var publicKeySent = false
         val signature = runCatching { keyStore.signToken(first.payload) }
@@ -200,6 +201,31 @@ public class AdbHandshake(
         if (sent !is AdbWriteOutcome.Sent) return sendFailure(sent, "AUTH RSAPUBLICKEY")
         emit("auth_public_key_sent", mapOf("path" to keyStore.publicKeyPath()))
         return null
+    }
+
+    /**
+     * Сообщает журналу, откуда взялся ключ хоста и какой он.
+     *
+     * Без этой записи диалог авторизации в неожиданный момент невозможно
+     * разобрать: непонятно, устройство забыло хост или хост потерял ключ.
+     * Прогон 2026-09-03 упёрся ровно в этот вопрос (`07` §6.15).
+     */
+    private fun emitHostKeyProvenance() {
+        val described = runCatching { keyStore.provenance() }
+        emit(
+            "host_key",
+            described.fold(
+                onSuccess = { provenance ->
+                    mapOf(
+                        "origin" to provenance.origin.name,
+                        "fingerprint" to provenance.fingerprint,
+                    )
+                },
+                onFailure = { error ->
+                    mapOf("unavailable" to (error.message ?: error.javaClass.simpleName))
+                },
+            ),
+        )
     }
 
     private fun connected(packet: AdbPacket): AdbHandshakeOutcome {

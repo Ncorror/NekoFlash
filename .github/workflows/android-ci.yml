@@ -43,6 +43,26 @@ jobs:
       - name: Verify checked-in Gradle wrapper
         run: ./gradlew --version
 
+      # Без постоянного ключа каждая сборка подписана по-новому: установить её
+      # поверх прежней нельзя, приложение приходится удалять, и вместе с
+      # приватным каталогом исчезает ключ хоста ADB (docs/07 §6.15).
+      # Секрета может не быть — тогда шаг ничего не делает и сборка остаётся
+      # прежней. Ключ пишется во временный каталог раннера и в дерево не
+      # попадает.
+      - name: Materialise the debug signing key
+        env:
+          DEBUG_KEYSTORE_BASE64: ${{ secrets.NEKOFLASH_DEBUG_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DEBUG_KEYSTORE_BASE64:-}" ]; then
+            echo "debug signing: secret is not set, the build keeps a throwaway key"
+            exit 0
+          fi
+          keystore="$RUNNER_TEMP/nekoflash-debug.keystore"
+          printf '%s' "$DEBUG_KEYSTORE_BASE64" | base64 -d > "$keystore"
+          echo "NEKOFLASH_DEBUG_KEYSTORE=$keystore" >> "$GITHUB_ENV"
+          echo "debug signing: using the stable key from the repository secret"
+
       - name: Test, lint and build debug APK
         run: ./gradlew test lint assembleDebug --no-daemon --stacktrace
 

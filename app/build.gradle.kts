@@ -5,9 +5,44 @@ plugins {
     alias(libs.plugins.compose.compiler)
 }
 
+// Отладочная подпись из окружения.
+//
+// Без неё AGP создаёт `debug.keystore` там, где его нет, — а на чистом раннере
+// CI его нет никогда. Каждая сборка выходит подписанной другим ключом,
+// установка поверх прежней невозможна, приложение приходится удалять, и вместе
+// с приватным каталогом исчезает ключ хоста ADB. Устройство после этого видит
+// новый хост и снова спрашивает подтверждения (`docs/07` §6.15).
+//
+// Значения читаются через `providers`, а не `System.getenv`: с включённым
+// configuration cache прямое чтение окружения не отслеживается как вход
+// конфигурации, и Gradle переиспользовал бы кеш, собранный без ключа.
+//
+// Ключ в дерево не кладётся: гейт гигиены запрещает `*.keystore` среди
+// отслеживаемых файлов, и запрещает правильно. Если переменной нет, поведение
+// прежнее.
+val debugKeystorePath = providers.environmentVariable("NEKOFLASH_DEBUG_KEYSTORE")
+val debugKeystorePassword = providers.environmentVariable("NEKOFLASH_DEBUG_KEYSTORE_PASSWORD")
+val debugKeyAlias = providers.environmentVariable("NEKOFLASH_DEBUG_KEY_ALIAS")
+val debugKeyPassword = providers.environmentVariable("NEKOFLASH_DEBUG_KEY_PASSWORD")
+
 android {
     namespace = "io.github.ncorror.nekoflash"
     compileSdk = 37
+
+    signingConfigs {
+        if (debugKeystorePath.isPresent) {
+            getByName("debug") {
+                storeFile = file(debugKeystorePath.get())
+                // Пароли отладочного хранилища по соглашению platform-tools:
+                // `android` и `androiddebugkey`. Секретом они не являются и
+                // ничего не защищают, поэтому лежат значениями по умолчанию, а
+                // не третьим и четвёртым секретом репозитория.
+                storePassword = debugKeystorePassword.getOrElse("android")
+                keyAlias = debugKeyAlias.getOrElse("androiddebugkey")
+                keyPassword = debugKeyPassword.getOrElse("android")
+            }
+        }
+    }
 
     defaultConfig {
         applicationId = "io.github.ncorror.nekoflash"
