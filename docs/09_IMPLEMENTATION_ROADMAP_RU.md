@@ -73,7 +73,7 @@ rule, `04_CAPABILITY_MATRIX_RU.md`). Колонка «Где» заполняе�
 |---|---|---|
 | Ввод-вывод на захваченном интерфейсе | **нет** | контракт `UsbTransportHandle.receive`/`send`, `UsbTransferResult`, `UsbTransferArguments` в `usb:api` и реализация через `bulkTransfer` в `usb:android` есть; production-кода, который их вызывает, ещё нет — до CNXN вызывать нечему |
 | Рамка пакета ADB | **нет** | `protocol:adb`: `AdbPacketHeader` (24 байта, `magic`, диапазон длины по объявленному нами `maxdata`), `AdbChecksum`, `AdbInboundFraming` с доказанным на `vayu` инвариантом, `AdbPacketReader` и `AdbPacketWriter` поверх `UsbTransportHandle`. Модуль ни от кого не вызывается: транспорт, который его заведёт, — следующий пункт |
-| CNXN/AUTH | **нет** | — |
+| CNXN/AUTH | **нет** | ключ хоста готов: `AdbKeyStore` (постоянный RSA-2048, имена файлов platform-tools), `AdbPublicKeyFormat` (структура mincrypt `android_pubkey`), `AdbTokenSigner` (токен подписывается как готовый дайджест SHA-1, без повторного хеширования). Самого рукопожатия нет: ни `CNXN`, ни разбора баннера, ни состояния авторизации |
 | single physical reader | **нет** | — |
 | `AdbStreamRouter` | **нет** | — |
 | generic `openService` | **нет** | — |
