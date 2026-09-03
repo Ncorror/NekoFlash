@@ -276,23 +276,31 @@ private fun SessionCard(
             )
 
             if (session.state == UsbSessionState.READY || session.state == UsbSessionState.CLAIMED) {
-                Button(onClick = if (claimed) onRelease else onClaim) {
-                    Text(
-                        stringResource(
-                            if (claimed) R.string.usb_release else R.string.usb_claim,
-                        ),
-                    )
-                }
-                Text(
-                    text = stringResource(R.string.usb_claim_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                )
+                // У интерфейса ADB владение одно: подключение захватывает
+                // интерфейс, отключение отпускает. Отдельная кнопка захвата
+                // была вторым органом управления тем же ресурсом, и прогон
+                // 2026-09-03 показал, к чему это приводит: интерфейс отпущен,
+                // а экран продолжает утверждать, что ADB подключён.
+                // Захват без протокольного обмена ничего не даёт, поэтому
+                // терять здесь нечего.
                 if (session.candidate.kind == UsbInterfaceKind.ADB) {
                     AdbLinkSection(
                         session = session,
                         adbLink = adbLink,
                         onAdbConnect = onAdbConnect,
                         onAdbDisconnect = onAdbDisconnect,
+                    )
+                } else {
+                    Button(onClick = if (claimed) onRelease else onClaim) {
+                        Text(
+                            stringResource(
+                                if (claimed) R.string.usb_release else R.string.usb_claim,
+                            ),
+                        )
+                    }
+                    Text(
+                        text = stringResource(R.string.usb_claim_hint),
+                        style = MaterialTheme.typography.bodySmall,
                     )
                 }
             }

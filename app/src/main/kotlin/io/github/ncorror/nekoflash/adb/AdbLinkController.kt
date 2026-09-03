@@ -7,9 +7,14 @@ import io.github.ncorror.nekoflash.protocol.adb.AdbHandshakeFailure
 import io.github.ncorror.nekoflash.protocol.adb.AdbHandshakeOutcome
 import io.github.ncorror.nekoflash.protocol.adb.AdbKeyStore
 import io.github.ncorror.nekoflash.protocol.adb.AdbPeerMode
+import io.github.ncorror.nekoflash.usb.api.UsbAutoConnectPolicy
 import io.github.ncorror.nekoflash.usb.api.UsbClaimResult
+import io.github.ncorror.nekoflash.usb.api.UsbSession
 import io.github.ncorror.nekoflash.usb.api.UsbSessionCoordinator
+import io.github.ncorror.nekoflash.usb.api.UsbInterfaceKind
+import io.github.ncorror.nekoflash.usb.api.UsbSessionState
 import java.util.concurrent.Executor
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -59,8 +64,18 @@ public sealed interface AdbLinkState {
  * должен быть один. Одновременно запущенные рукопожатия разрушили бы кадр
  * ещё до того, как появился бы маршрутизатор потоков.
  *
- * Ничего не подключается само. Пользователь нажимает — приложение подключается;
- * так же устроен и захват интерфейса.
+ * Подключение происходит само, как только устройство готово: приложение
+ * существует ради работы с устройством, и требовать нажатия ради того, что
+ * всё равно будет нажато, — не осторожность, а лишний шаг. Так это было
+ * устроено и в Legacy.
+ *
+ * У автоматизма есть две границы, и обе перенесены из Legacy, а не придуманы.
+ * Первая: подключение автоматично только для интерфейсов, в которых мы
+ * уверены (`UsbAutoConnectPolicy`) — захват исключителен, и отбирать чужое
+ * устройство по одному лишь совпадению класса `0xFF` нельзя. Вторая: попытка
+ * делается **один раз на поколение сессии**. Отключившись вручную,
+ * пользователь остаётся отключённым; неудачное рукопожатие не повторяется по
+ * кругу. Новая попытка — это новое подключение устройства.
  */
 public class AdbLinkController(
     private val coordinator: UsbSessionCoordinator,
@@ -70,6 +85,15 @@ public class AdbLinkController(
     private val diagnostics: DiagnosticSink = DiagnosticSink { },
 ) {
     private val mutableState = MutableStateFlow<AdbLinkState>(AdbLinkState.Idle)
+
+    /**
+     * Поколения, к которым автоматически подключаться больше не нужно.
+     *
+     * Попытка была: она удалась, провалилась или пользователь отключился сам.
+     * Множество живёт до конца процесса, а поколения монотонны и не
+     * переиспользуются, так что перепутать их между устройствами нельзя.
+     */
+    private val handled = ConcurrentHashMap.newKeySet<Long>()
 
     /** Состояние соединения. Экран подписывается и ничего не опрашивает. */
     public val state: StateFlow<AdbLinkState> = mutableState.asStateFlow()
@@ -82,11 +106,12 @@ public class AdbLinkController(
      * экран.
      */
     public fun connect(generation: SessionGeneration) {
-        if (mutableState.value is AdbLinkState.Connecting ||
-            mutableState.value is AdbLinkState.WaitingForAuthorization
-        ) {
+        // Второе подключение поверх живого — это второй CNXN и второй читатель.
+        // Оба запрещены контрактом, поэтому отказ здесь, а не попытка.
+        if (mutableState.value !is AdbLinkState.Idle && mutableState.value !is AdbLinkState.Failed) {
             return
         }
+        handled.add(generation.value)
         mutableState.value = AdbLinkState.Connecting(generation)
 
         when (val claim = coordinator.claim(generation)) {
@@ -112,6 +137,7 @@ public class AdbLinkController(
      * а не второй `CNXN` в том же соединении.
      */
     public fun disconnect(generation: SessionGeneration) {
+        handled.add(generation.value)
         coordinator.release(generation)
         mutableState.value = AdbLinkState.Idle
     }
@@ -154,6 +180,74 @@ public class AdbLinkController(
                 )
             }
         }
+    }
+
+    /**
+     * Сверяет соединение с действительным состоянием сессий USB.
+     *
+     * Соединение существует ровно столько, сколько удерживается интерфейс.
+     * Отпустить его можно не только кнопкой «Отключиться»: устройство могли
+     * выдернуть, сессию — закрыть, интерфейс — освободить другим путём. Во всех
+     * этих случаях `UsbTransportHandle` уже закрыт, и оставлять на экране
+     * «подключено» значит выдавать несуществующее за существующее.
+     *
+     * Прогон 2026-09-03 показал это ровно так: после освобождения интерфейса
+     * экран продолжал утверждать, что ADB подключён (`07` §6.12).
+     */
+    public fun onUsbSessionsChanged(sessions: List<UsbSession>) {
+        dropLinkIfInterfaceNoLongerHeld(sessions)
+        connectToNewlyReadyDevice(sessions)
+    }
+
+    private fun dropLinkIfInterfaceNoLongerHeld(sessions: List<UsbSession>) {
+        when (val state = mutableState.value) {
+            AdbLinkState.Idle -> Unit
+
+            // Живое соединение существует ровно столько, сколько удерживается
+            // интерфейс.
+            is AdbLinkState.Connecting -> dropUnless(state.generation, sessions, ::isHeld)
+            is AdbLinkState.WaitingForAuthorization -> dropUnless(state.generation, sessions, ::isHeld)
+            is AdbLinkState.Connected -> dropUnless(state.generation, sessions, ::isHeld)
+
+            // Причина отказа остаётся на экране до тех пор, пока устройство то
+            // же самое: она единственное, что есть у пользователя для разбора.
+            // Но пережить это устройство она не должна — иначе одна неудача
+            // отменила бы автоподключение до перезапуска приложения.
+            is AdbLinkState.Failed -> dropUnless(state.generation, sessions, ::isPresent)
+        }
+    }
+
+    private fun dropUnless(
+        generation: SessionGeneration,
+        sessions: List<UsbSession>,
+        alive: (UsbSession) -> Boolean,
+    ) {
+        if (sessions.none { it.generation == generation && alive(it) }) {
+            mutableState.value = AdbLinkState.Idle
+        }
+    }
+
+    private fun isHeld(session: UsbSession): Boolean =
+        !session.closed && session.state == UsbSessionState.CLAIMED
+
+    private fun isPresent(session: UsbSession): Boolean = !session.closed
+
+    /**
+     * Подключается к устройству, которое только что стало готовым.
+     *
+     * Занятость проверяется по состоянию, а не по флагу: пока идёт одно
+     * рукопожатие, второе начинать нельзя — физический читатель один.
+     */
+    private fun connectToNewlyReadyDevice(sessions: List<UsbSession>) {
+        if (mutableState.value !is AdbLinkState.Idle) return
+        val candidate = sessions.firstOrNull { session ->
+            !session.closed &&
+                session.state == UsbSessionState.READY &&
+                session.candidate.kind == UsbInterfaceKind.ADB &&
+                UsbAutoConnectPolicy.allowsAutomaticConnect(session.candidate) &&
+                !handled.contains(session.generation.value)
+        } ?: return
+        connect(candidate.generation)
     }
 
     /**

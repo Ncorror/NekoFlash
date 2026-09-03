@@ -125,6 +125,12 @@ public class NekoFlashApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         usbSessions.start()
+        // Соединение ADB живо ровно пока удерживается интерфейс. Наблюдение
+        // заведено здесь, а не внутри контроллера: владелец USB живёт на уровне
+        // приложения, и подписываться на него должен тот, кто им владеет.
+        scope.launch {
+            usbSessions.sessions.collect { sessions -> adbLink.onUsbSessionsChanged(sessions) }
+        }
     }
 
     private companion object {

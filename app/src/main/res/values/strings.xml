@@ -52,7 +52,7 @@
 
     <string name="adb_connect">Connect over ADB</string>
     <string name="adb_disconnect">Disconnect</string>
-    <string name="adb_connect_hint">Connecting claims the interface and runs the ADB handshake. The device may ask you to allow debugging from this host; the request appears on the device screen.</string>
+    <string name="adb_connect_hint">A recognised device is connected automatically: the interface is claimed and the ADB handshake runs. The device may ask you to allow debugging from this host. Disconnecting stays in effect until the device is reattached.</string>
     <string name="adb_state_label">ADB link</string>
     <string name="adb_state_idle">Not connected</string>
     <string name="adb_state_connecting">Handshake in progress</string>
