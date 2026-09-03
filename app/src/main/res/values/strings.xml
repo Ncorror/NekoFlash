@@ -50,4 +50,19 @@
 
     <string name="mode_requires_handshake">Protocol mode is unknown until a handshake. Descriptors distinguish an ADB class interface from a Fastboot class one, but not Android from Recovery or Sideload, nor bootloader Fastboot from fastbootd.</string>
 
+    <string name="adb_connect">Connect over ADB</string>
+    <string name="adb_disconnect">Disconnect</string>
+    <string name="adb_connect_hint">Connecting claims the interface and runs the ADB handshake. The device may ask you to allow debugging from this host; the request appears on the device screen.</string>
+    <string name="adb_state_label">ADB link</string>
+    <string name="adb_state_idle">Not connected</string>
+    <string name="adb_state_connecting">Handshake in progress</string>
+    <string name="adb_state_waiting">Waiting for you to allow debugging on the device</string>
+    <string name="adb_state_connected">Connected: %1$s</string>
+    <string name="adb_state_failed">Handshake failed: %1$s (%2$s)</string>
+    <string name="adb_features_label">Peer features</string>
+    <string name="adb_features_none">The peer reported no features</string>
+    <string name="peer_mode_device">Android system</string>
+    <string name="peer_mode_recovery">Recovery</string>
+    <string name="peer_mode_sideload">Sideload</string>
+    <string name="peer_mode_unknown">Unknown peer, banner prefix not recognised</string>
 </resources>

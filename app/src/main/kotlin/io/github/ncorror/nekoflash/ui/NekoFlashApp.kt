@@ -23,6 +23,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.github.ncorror.nekoflash.R
+import io.github.ncorror.nekoflash.adb.AdbLinkState
+import io.github.ncorror.nekoflash.core.model.SessionGeneration
+import io.github.ncorror.nekoflash.protocol.adb.AdbPeerMode
 import io.github.ncorror.nekoflash.usb.api.TargetIdentitySource
 import io.github.ncorror.nekoflash.usb.api.UsbInterfaceKind
 import io.github.ncorror.nekoflash.usb.api.UsbMatchConfidence
@@ -34,9 +37,12 @@ import io.github.ncorror.nekoflash.usb.api.UsbSessionState
 fun NekoFlashApp(
     sessions: List<UsbSession> = emptyList(),
     exportStatus: String? = null,
+    adbLink: AdbLinkState = AdbLinkState.Idle,
     onRescanUsb: () -> Unit = {},
     onClaim: (UsbSession) -> Unit = {},
     onRelease: (UsbSession) -> Unit = {},
+    onAdbConnect: (UsbSession) -> Unit = {},
+    onAdbDisconnect: (UsbSession) -> Unit = {},
     onExportDiagnostics: () -> Unit = {},
 ) {
     Scaffold(
@@ -69,9 +75,12 @@ fun NekoFlashApp(
                     Workspace(
                         sessions = sessions,
                         exportStatus = exportStatus,
+                        adbLink = adbLink,
                         onRescanUsb = onRescanUsb,
                         onClaim = onClaim,
                         onRelease = onRelease,
+                        onAdbConnect = onAdbConnect,
+                        onAdbDisconnect = onAdbDisconnect,
                         onExportDiagnostics = onExportDiagnostics,
                         modifier = Modifier.weight(1f),
                     )
@@ -80,9 +89,12 @@ fun NekoFlashApp(
                 Workspace(
                     sessions = sessions,
                     exportStatus = exportStatus,
+                    adbLink = adbLink,
                     onRescanUsb = onRescanUsb,
                     onClaim = onClaim,
                     onRelease = onRelease,
+                    onAdbConnect = onAdbConnect,
+                    onAdbDisconnect = onAdbDisconnect,
                     onExportDiagnostics = onExportDiagnostics,
                     modifier = Modifier.fillMaxSize(),
                 )
@@ -111,9 +123,12 @@ private fun ProjectNavigation(modifier: Modifier = Modifier) {
 private fun Workspace(
     sessions: List<UsbSession>,
     exportStatus: String?,
+    adbLink: AdbLinkState,
     onRescanUsb: () -> Unit,
     onClaim: (UsbSession) -> Unit,
     onRelease: (UsbSession) -> Unit,
+    onAdbConnect: (UsbSession) -> Unit,
+    onAdbDisconnect: (UsbSession) -> Unit,
     onExportDiagnostics: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -129,8 +144,11 @@ private fun Workspace(
         )
         SessionList(
             sessions = sessions,
+            adbLink = adbLink,
             onClaim = onClaim,
             onRelease = onRelease,
+            onAdbConnect = onAdbConnect,
+            onAdbDisconnect = onAdbDisconnect,
         )
         ActionsCard(
             exportStatus = exportStatus,
@@ -144,8 +162,11 @@ private fun Workspace(
 @Composable
 private fun SessionList(
     sessions: List<UsbSession>,
+    adbLink: AdbLinkState,
     onClaim: (UsbSession) -> Unit,
     onRelease: (UsbSession) -> Unit,
+    onAdbConnect: (UsbSession) -> Unit,
+    onAdbDisconnect: (UsbSession) -> Unit,
 ) {
     if (sessions.isEmpty()) {
         Text(
@@ -157,8 +178,11 @@ private fun SessionList(
     sessions.forEach { session ->
         SessionCard(
             session = session,
+            adbLink = adbLink,
             onClaim = { onClaim(session) },
             onRelease = { onRelease(session) },
+            onAdbConnect = { onAdbConnect(session) },
+            onAdbDisconnect = { onAdbDisconnect(session) },
         )
     }
     Text(
@@ -215,8 +239,11 @@ private fun BuildBaselineCard() {
 @Composable
 private fun SessionCard(
     session: UsbSession,
+    adbLink: AdbLinkState,
     onClaim: () -> Unit,
     onRelease: () -> Unit,
+    onAdbConnect: () -> Unit,
+    onAdbDisconnect: () -> Unit,
 ) {
     // Удерживается ли интерфейс, видно по самому состоянию сессии. Отдельный
     // список захваченных был бы вторым источником истины о том же самом.
@@ -260,10 +287,95 @@ private fun SessionCard(
                     text = stringResource(R.string.usb_claim_hint),
                     style = MaterialTheme.typography.bodySmall,
                 )
+                if (session.candidate.kind == UsbInterfaceKind.ADB) {
+                    AdbLinkSection(
+                        session = session,
+                        adbLink = adbLink,
+                        onAdbConnect = onAdbConnect,
+                        onAdbDisconnect = onAdbDisconnect,
+                    )
+                }
             }
         }
     }
 }
+
+/**
+ * Состояние ADB-соединения для конкретной сессии.
+ *
+ * Показывается только у этой сессии: соединение принадлежит одному поколению,
+ * и показывать его состояние рядом с чужим устройством означало бы сказать
+ * неправду о том, к чему относится «подключено».
+ */
+@Composable
+private fun AdbLinkSection(
+    session: UsbSession,
+    adbLink: AdbLinkState,
+    onAdbConnect: () -> Unit,
+    onAdbDisconnect: () -> Unit,
+) {
+    val linkForThisSession = adbLink.takeIf { it.generationOrNull() == session.generation }
+    val connected = linkForThisSession is AdbLinkState.Connected
+    val busy = linkForThisSession is AdbLinkState.Connecting ||
+        linkForThisSession is AdbLinkState.WaitingForAuthorization
+
+    LabelledValue(
+        label = stringResource(R.string.adb_state_label),
+        value = adbLinkText(linkForThisSession),
+    )
+    if (linkForThisSession is AdbLinkState.Connected) {
+        LabelledValue(
+            label = stringResource(R.string.adb_features_label),
+            value = linkForThisSession.features.sorted().joinToString(", ").ifEmpty {
+                stringResource(R.string.adb_features_none)
+            },
+        )
+    }
+    Button(
+        onClick = if (connected) onAdbDisconnect else onAdbConnect,
+        enabled = !busy,
+    ) {
+        Text(
+            stringResource(
+                if (connected) R.string.adb_disconnect else R.string.adb_connect,
+            ),
+        )
+    }
+    Text(
+        text = stringResource(R.string.adb_connect_hint),
+        style = MaterialTheme.typography.bodySmall,
+    )
+}
+
+private fun AdbLinkState.generationOrNull(): SessionGeneration? = when (this) {
+    AdbLinkState.Idle -> null
+    is AdbLinkState.Connecting -> generation
+    is AdbLinkState.WaitingForAuthorization -> generation
+    is AdbLinkState.Connected -> generation
+    is AdbLinkState.Failed -> generation
+}
+
+@Composable
+private fun adbLinkText(state: AdbLinkState?): String = when (state) {
+    null, AdbLinkState.Idle -> stringResource(R.string.adb_state_idle)
+    is AdbLinkState.Connecting -> stringResource(R.string.adb_state_connecting)
+    is AdbLinkState.WaitingForAuthorization -> stringResource(R.string.adb_state_waiting)
+    is AdbLinkState.Connected ->
+        stringResource(R.string.adb_state_connected, localizedPeerMode(state.peerMode))
+
+    is AdbLinkState.Failed ->
+        stringResource(R.string.adb_state_failed, state.reason.name, state.detail)
+}
+
+@Composable
+private fun localizedPeerMode(mode: AdbPeerMode): String = stringResource(
+    when (mode) {
+        AdbPeerMode.DEVICE -> R.string.peer_mode_device
+        AdbPeerMode.RECOVERY -> R.string.peer_mode_recovery
+        AdbPeerMode.SIDELOAD -> R.string.peer_mode_sideload
+        AdbPeerMode.UNKNOWN -> R.string.peer_mode_unknown
+    },
+)
 
 @Composable
 private fun LabelledValue(label: String, value: String) {

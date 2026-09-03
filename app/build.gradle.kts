@@ -51,6 +51,7 @@ dependencies {
     implementation(project(":core:operation"))
     implementation(project(":usb:api"))
     implementation(project(":usb:android"))
+    implementation(project(":protocol:adb"))
     implementation(libs.kotlinx.coroutines.core)
 
     implementation(libs.androidx.core.ktx)

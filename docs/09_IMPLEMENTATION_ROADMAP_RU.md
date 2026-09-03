@@ -73,7 +73,7 @@ rule, `04_CAPABILITY_MATRIX_RU.md`). Колонка «Где» заполняе�
 |---|---|---|
 | Ввод-вывод на захваченном интерфейсе | **нет** | контракт `UsbTransportHandle.receive`/`send`, `UsbTransferResult`, `UsbTransferArguments` в `usb:api` и реализация через `bulkTransfer` в `usb:android` есть; production-кода, который их вызывает, ещё нет — до CNXN вызывать нечему |
 | Рамка пакета ADB | **нет** | `protocol:adb`: `AdbPacketHeader` (24 байта, `magic`, диапазон длины по объявленному нами `maxdata`), `AdbChecksum`, `AdbInboundFraming` с доказанным на `vayu` инвариантом, `AdbPacketReader` и `AdbPacketWriter` поверх `UsbTransportHandle`. Модуль ни от кого не вызывается: транспорт, который его заведёт, — следующий пункт |
-| CNXN/AUTH | **нет** | логика целиком есть: `AdbKeyStore`, `AdbPublicKeyFormat`, `AdbTokenSigner`, `AdbConnectionBanner` и `AdbHandshake` с порядком и таймаутами из архивов. Не хватает единственного: production-кода, который захватывает интерфейс и запускает рукопожатие. До первого аппаратного прогона по docs/07 §6 пункт не закрывается — ни подпись, ни объявленный `maxdata`, ни поведение при отказе авторизации ничем, кроме железа, не проверяются |
+| CNXN/AUTH | **ждёт железа** | путь собран целиком: экран → `AdbLinkController` → захват интерфейса → `AdbConnection` → `AdbHandshake`. Код вызывается production-путём, но пункт не закрыт: критерий прогона — `07_TESTING_CI_HARDWARE_EVIDENCE_RU.md` §6.12, и до PASS на устройстве отметки «готово» здесь не будет |
 | single physical reader | **нет** | — |
 | `AdbStreamRouter` | **нет** | — |
 | generic `openService` | **нет** | — |

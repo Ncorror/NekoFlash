@@ -2,11 +2,14 @@ package io.github.ncorror.nekoflash
 
 import android.app.Application
 import android.net.Uri
+import android.os.Build
 import io.github.ncorror.nekoflash.core.diagnostics.DiagnosticBundle
 import io.github.ncorror.nekoflash.core.diagnostics.DiagnosticBundleResult
 import io.github.ncorror.nekoflash.core.diagnostics.InMemoryDiagnosticSink
 import io.github.ncorror.nekoflash.core.model.SessionGeneration
+import io.github.ncorror.nekoflash.adb.AdbLinkController
 import io.github.ncorror.nekoflash.diagnostics.HostFacts
+import io.github.ncorror.nekoflash.protocol.adb.AdbKeyStore
 import io.github.ncorror.nekoflash.usb.android.AndroidUsbHost
 import io.github.ncorror.nekoflash.usb.api.UsbDiagnosticReport
 import io.github.ncorror.nekoflash.usb.api.UsbPermissionCallbackIdentity
@@ -18,8 +21,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.io.File
 import java.time.Instant
 import java.util.UUID
+import java.util.concurrent.Executors
 
 /**
  * Владелец USB на уровне приложения.
@@ -61,6 +66,35 @@ public class NekoFlashApplication : Application() {
         )
     }
 
+    /**
+     * Ключ хоста ADB.
+     *
+     * Лежит в приватном каталоге приложения: устройство помнит хост по
+     * отпечатку публичного ключа, и терять его между запусками нельзя.
+     */
+    private val adbKeys by lazy { AdbKeyStore(File(filesDir, ADB_KEY_FOLDER)) }
+
+    /**
+     * Единственный поток протокольного обмена.
+     *
+     * Ровно один: контракт требует единственного физического читателя
+     * входящего потока, и пул с несколькими потоками эту гарантию бы отменил.
+     */
+    private val adbThread by lazy {
+        Executors.newSingleThreadExecutor { runnable -> Thread(runnable, "nekoflash-adb") }
+    }
+
+    /** Состояние ADB-соединения. Экран подписывается на него. */
+    public val adbLink: AdbLinkController by lazy {
+        AdbLinkController(
+            coordinator = usbSessions,
+            keyStore = adbKeys,
+            apiLevel = Build.VERSION.SDK_INT,
+            executor = adbThread,
+            diagnostics = events,
+        )
+    }
+
     /** Имя файла, предлагаемое системному диалогу сохранения. */
     public fun suggestedDiagnosticsFileName(): String =
         DiagnosticBundle.suggestedFileName(Instant.now())
@@ -91,6 +125,11 @@ public class NekoFlashApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         usbSessions.start()
+    }
+
+    private companion object {
+        /** Каталог ключа ADB внутри приватного хранилища приложения. */
+        const val ADB_KEY_FOLDER = "adb"
     }
 
     /**

@@ -45,4 +45,19 @@
 
     <string name="mode_requires_handshake">Протокольный режим неизвестен до handshake. Дескрипторы отличают интерфейс класса ADB от класса Fastboot, но не обычный Android от Recovery или Sideload и не bootloader Fastboot от fastbootd.</string>
 
+    <string name="adb_connect">Подключиться по ADB</string>
+    <string name="adb_disconnect">Отключиться</string>
+    <string name="adb_connect_hint">Подключение захватывает интерфейс и проводит рукопожатие ADB. Устройство может спросить, разрешить ли отладку с этого хоста; запрос появится на его экране.</string>
+    <string name="adb_state_label">Соединение ADB</string>
+    <string name="adb_state_idle">Не подключено</string>
+    <string name="adb_state_connecting">Идёт рукопожатие</string>
+    <string name="adb_state_waiting">Ожидание: разрешите отладку на экране устройства</string>
+    <string name="adb_state_connected">Подключено: %1$s</string>
+    <string name="adb_state_failed">Рукопожатие не состоялось: %1$s (%2$s)</string>
+    <string name="adb_features_label">Возможности peer\'а</string>
+    <string name="adb_features_none">Peer не сообщил ни одной возможности</string>
+    <string name="peer_mode_device">Система Android</string>
+    <string name="peer_mode_recovery">Recovery</string>
+    <string name="peer_mode_sideload">Sideload</string>
+    <string name="peer_mode_unknown">Неизвестный peer, префикс баннера не распознан</string>
 </resources>

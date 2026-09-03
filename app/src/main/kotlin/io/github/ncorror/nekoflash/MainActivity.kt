@@ -25,9 +25,11 @@ class MainActivity : ComponentActivity() {
         // должно теряться при повороте экрана или пересоздании активности.
         val application = application as NekoFlashApplication
         val coordinator = application.usbSessions
+        val adbLink = application.adbLink
 
         setContent {
             val sessions by coordinator.sessions.collectAsState()
+            val linkState by adbLink.state.collectAsState()
             var exportStatus by remember { mutableStateOf<String?>(null) }
 
             val savedTemplate = stringResource(R.string.diagnostics_export_done)
@@ -53,6 +55,7 @@ class MainActivity : ComponentActivity() {
                 NekoFlashApp(
                     sessions = sessions,
                     exportStatus = exportStatus,
+                    adbLink = linkState,
                     onRescanUsb = { coordinator.scanAttachedDevices() },
                     onClaim = { session ->
                         val result = coordinator.claim(session.generation)
@@ -61,6 +64,8 @@ class MainActivity : ComponentActivity() {
                         }
                     },
                     onRelease = { session -> coordinator.release(session.generation) },
+                    onAdbConnect = { session -> adbLink.connect(session.generation) },
+                    onAdbDisconnect = { session -> adbLink.disconnect(session.generation) },
                     onExportDiagnostics = {
                         saveLauncher.launch(application.suggestedDiagnosticsFileName())
                     },
