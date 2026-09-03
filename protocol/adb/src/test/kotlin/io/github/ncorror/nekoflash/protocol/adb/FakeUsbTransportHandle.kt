@@ -35,6 +35,9 @@ internal class FakeUsbTransportHandle(
     /** Окна всех выполненных приёмов: длина каждой запрошенной операции. */
     val receiveWindows: MutableList<Int> = mutableListOf()
 
+    /** Таймаут каждой операции приёма: рукопожатие меняет его по ходу. */
+    val receiveTimeouts: MutableList<Int> = mutableListOf()
+
     /** Байты, ушедшие через [send], в порядке отправки. */
     val sentBytes: MutableList<ByteArray> = mutableListOf()
 
@@ -53,6 +56,7 @@ internal class FakeUsbTransportHandle(
     ): UsbTransferResult {
         UsbTransferArguments.validate(destination.size, offset, length, timeoutMillis)
         receiveWindows += length
+        receiveTimeouts += timeoutMillis
         val transfer = inbound.removeFirstOrNull()
             ?: return UsbTransferResult.Failed(UsbTransferFailure.NOT_COMPLETED)
         return when (transfer) {
@@ -122,6 +126,43 @@ internal class FakeUsbTransportHandle(
             endpointOut = ENDPOINT_OUT,
         )
     }
+}
+
+/** Кадр, собранный обратно из того, что ушло в [FakeUsbTransportHandle.send]. */
+internal data class SentPacket(
+    val command: Long,
+    val arg0: Int,
+    val arg1: Int,
+    val payload: ByteArray,
+)
+
+/**
+ * Восстанавливает отправленные кадры из последовательности передач.
+ *
+ * Писатель отправляет заголовок и следом payload, возможно кусками, поэтому
+ * собрать кадр обратно можно только по объявленной в заголовке длине — что
+ * заодно проверяет, что заголовок и payload действительно согласованы.
+ */
+internal fun FakeUsbTransportHandle.sentFrames(): List<SentPacket> {
+    val frames = mutableListOf<SentPacket>()
+    var index = 0
+    while (index < sentBytes.size) {
+        val headerBytes = sentBytes[index]
+        index += 1
+        val decoded = AdbPacketHeader.decode(headerBytes, AdbInboundFraming.MODERN_MAX_PAYLOAD_BYTES)
+        require(decoded is AdbHeaderDecoding.Decoded) { "writer produced an undecodable header: $decoded" }
+        val header = decoded.header
+        val payload = ByteArray(header.payloadLength)
+        var collected = 0
+        while (collected < header.payloadLength) {
+            val part = sentBytes[index]
+            index += 1
+            part.copyInto(payload, collected)
+            collected += part.size
+        }
+        frames += SentPacket(header.command, header.arg0, header.arg1, payload)
+    }
+    return frames
 }
 
 /** Собирает 24-байтный заголовок для теста. */
