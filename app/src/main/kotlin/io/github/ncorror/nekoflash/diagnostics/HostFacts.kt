@@ -52,6 +52,16 @@ public object HostFacts {
         put("host.serial", HOST_SERIAL_UNAVAILABLE)
     }
 
+    /**
+     * Сообщает ли платформа о поддержке host-режима USB.
+     *
+     * Без него `getDeviceList` пуст на любом аппарате, и приложению нечего
+     * показывать. Факт попадает в evidence, чтобы «ничего не видно» можно было
+     * отличить от «система говорит, что host-режима нет».
+     */
+    private fun usbHostFeature(context: Context): String =
+        context.packageManager.hasSystemFeature("android.hardware.usb.host").toString()
+
     private fun appVersion(context: Context): Map<String, String> = try {
         val info = context.packageManager.getPackageInfo(context.packageName, 0)
         mapOf(
@@ -71,16 +81,6 @@ public object HostFacts {
      * Помогает сопоставить несколько отчётов с одного хоста между собой.
      */
     @SuppressLint("HardwareIds")
-    /**
-     * Сообщает ли платформа о поддержке host-режима USB.
-     *
-     * Без него `getDeviceList` пуст на любом аппарате, и приложению нечего
-     * показывать. Факт попадает в evidence, чтобы «ничего не видно» можно было
-     * отличить от «система говорит, что host-режима нет».
-     */
-    private fun usbHostFeature(context: Context): String =
-        context.packageManager.hasSystemFeature("android.hardware.usb.host").toString()
-
     private fun androidId(context: Context): String =
         runCatching {
             Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
