@@ -3,6 +3,7 @@ package io.github.ncorror.nekoflash.protocol.adb
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -188,6 +189,40 @@ class AdbStreamRouterTest {
         val step = opened.router.onPacket(packet(AdbCommand.CLSE, arg0 = REMOTE_ID, arg1 = opened.localId))
 
         assertTrue(step.events.single() is AdbStreamEvent.Stale)
+    }
+
+    /**
+     * Тест из A2 (`stale close is acknowledged without closing current stream`).
+     * Ответ чужому потоку не должен задевать наш: устройство запаздывает с
+     * закрытиями чаще, чем кажется.
+     */
+    @Test
+    fun staleCloseDoesNotTouchTheCurrentStream() {
+        val opened = openedStream()
+
+        val step = opened.router.onPacket(packet(AdbCommand.CLSE, arg0 = 9, arg1 = 77))
+
+        assertEquals(AdbCommand.CLSE, step.outbound.single().command)
+        assertTrue(step.events.single() is AdbStreamEvent.Stale)
+        assertEquals(setOf(opened.localId), opened.router.activeStreamIds)
+        assertNotNull(opened.router.writeRequest(opened.localId, "still open".toByteArray()))
+    }
+
+    /**
+     * Тест из A2 (`stale write is closed instead of contaminating current
+     * stream`): чужие данные не должны попасть в наш поток.
+     */
+    @Test
+    fun staleWriteDoesNotContaminateTheCurrentStream() {
+        val opened = openedStream()
+
+        val step = opened.router.onPacket(
+            packet(AdbCommand.WRTE, arg0 = 9, arg1 = 77, payload = "not ours".toByteArray()),
+        )
+
+        assertTrue(step.events.none { it is AdbStreamEvent.Data })
+        assertEquals(AdbCommand.CLSE, step.outbound.single().command)
+        assertEquals(setOf(opened.localId), opened.router.activeStreamIds)
     }
 
     @Test
