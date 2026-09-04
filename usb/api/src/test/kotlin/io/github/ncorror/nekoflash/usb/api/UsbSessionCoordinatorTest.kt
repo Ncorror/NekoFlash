@@ -438,6 +438,9 @@ class UsbSessionCoordinatorTest {
 
         assertEquals(
             listOf(
+                // Скан теперь сообщает результат первым делом: пустой журнал
+                // невозможно отличить от неработающего приложения.
+                "scan_completed",
                 "session_opened",
                 "permission_requested",
                 "permission_granted",
@@ -478,7 +481,7 @@ class UsbSessionCoordinatorTest {
         coordinator.start()
         coordinator.onPermissionResult(deviceA, granted = false)
 
-        assertEquals(listOf("device_ignored_no_usable_interface"), sink.snapshot().map { it.message })
+        assertEquals(listOf("scan_completed", "device_ignored_no_usable_interface"), sink.snapshot().map { it.message })
         assertEquals("permission_denied", denied.snapshot().last().message)
     }
 
@@ -545,6 +548,51 @@ class UsbSessionCoordinatorTest {
      * За фейком нет устройства, и ввод-вывод в координаторе не участвует:
      * передача честно не состоится, а не притворится удачной.
      */
+    /**
+     * Скан обязан сообщать результат и тогда, когда система не отдала ничего:
+     * молчание в этом месте неотличимо от сломанного приложения.
+     */
+    @Test
+    fun scanWithoutAnyDeviceIsStillReported() {
+        val events = InMemoryDiagnosticSink()
+        val coordinator = coordinatorWith(FakeUsbHost(attached = emptyList()), events)
+
+        coordinator.scanAttachedDevices()
+
+        assertEquals(0, coordinator.lastScan.value.visibleDevices)
+        assertTrue(coordinator.lastScan.value.scanned)
+        val scan = events.snapshot().single { it.message == "scan_completed" }
+        assertEquals("0", scan.fields["visibleDevices"])
+    }
+
+    @Test
+    fun scanCountsWhatTheSystemReturned() {
+        val coordinator = UsbSessionCoordinator(FakeUsbHost(attached = listOf(deviceA, deviceB)))
+
+        coordinator.scanAttachedDevices()
+
+        assertEquals(2, coordinator.lastScan.value.visibleDevices)
+        assertEquals(2, coordinator.lastScan.value.newDevices)
+    }
+
+    @Test
+    fun repeatedScanSeparatesKnownDevicesFromNewOnes() {
+        val coordinator = UsbSessionCoordinator(FakeUsbHost(attached = listOf(deviceA)))
+        coordinator.scanAttachedDevices()
+
+        coordinator.scanAttachedDevices()
+
+        assertEquals(1, coordinator.lastScan.value.visibleDevices)
+        assertEquals(0, coordinator.lastScan.value.newDevices)
+        assertEquals(1, coordinator.lastScan.value.knownDevices)
+    }
+
+    /** До первого разбора «ноль устройств» сказать нельзя. */
+    @Test
+    fun scanSummaryStartsAsNeverScanned() {
+        assertFalse(UsbSessionCoordinator(FakeUsbHost(attached = emptyList())).lastScan.value.scanned)
+    }
+
     private class FakeHandle(
         override val candidate: UsbInterfaceCandidate,
     ) : UsbTransportHandle {

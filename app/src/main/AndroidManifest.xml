@@ -1,5 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+        Объявление host-режима USB. Платформа требует его от приложений,
+        работающих с USB Host API, и без него часть систем не доставляет
+        USB_DEVICE_ATTACHED и не показывает устройства в getDeviceList.
+
+        required="false" намеренно: при "true" установка блокируется на любом
+        аппарате, который о фиче не сообщает, даже если OTG у него работает.
+        Наличие фичи проверяется на месте и попадает в evidence, а не решает
+        за пользователя, можно ли поставить приложение.
+    -->
+    <uses-feature
+        android:name="android.hardware.usb.host"
+        android:required="false" />
+
     <application
         android:name=".NekoFlashApplication"
         android:allowBackup="false"

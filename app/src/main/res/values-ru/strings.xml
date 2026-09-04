@@ -60,4 +60,8 @@
     <string name="peer_mode_recovery">Recovery</string>
     <string name="peer_mode_sideload">Sideload</string>
     <string name="peer_mode_unknown">Неизвестный peer, префикс баннера не распознан</string>
+    <string name="usb_scan_never">Устройства ещё не разбирались.</string>
+    <string name="usb_scan_none">Система не сообщает ни об одном USB-устройстве. Проверьте OTG, кабель и переходник: пока устройства нет, разрешение спрашивать не о чем.</string>
+    <string name="usb_scan_unusable">Система сообщает об устройствах: %1$d. Ни в одном из них нет интерфейса ADB или Fastboot.</string>
+    <string name="usb_host_feature_missing">Хост не сообщает о поддержке host-режима USB, поэтому разбирать устройства нечем.</string>
 </resources>

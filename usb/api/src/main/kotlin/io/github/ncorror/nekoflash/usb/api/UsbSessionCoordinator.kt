@@ -3,7 +3,9 @@ package io.github.ncorror.nekoflash.usb.api
 import io.github.ncorror.nekoflash.core.diagnostics.DiagnosticEvent
 import io.github.ncorror.nekoflash.core.diagnostics.DiagnosticSink
 import io.github.ncorror.nekoflash.core.model.SessionGeneration
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import java.time.Instant
 
 /**
@@ -48,6 +50,8 @@ public class UsbSessionCoordinator(
     private val clock: () -> Instant = Instant::now,
 ) : UsbHost.Listener {
     private val handles = java.util.concurrent.ConcurrentHashMap<Long, UsbTransportHandle>()
+
+    private val mutableLastScan = MutableStateFlow(UsbScanSummary.NEVER_SCANNED)
 
     /** Незавершённые сессии. Для показа на экране и для владельцев операций. */
     public val sessions: StateFlow<List<UsbSession>>
@@ -125,6 +129,15 @@ public class UsbSessionCoordinator(
         scanAttachedDevices()
     }
 
+    /**
+     * Итог последнего разбора подключённых устройств.
+     *
+     * Отдельно от списка сессий: пустой список не отвечает на вопрос, есть ли
+     * устройство вообще. Экран, показывающий «устройств нет», обязан уметь
+     * сказать, чего именно нет — устройства или подходящего интерфейса.
+     */
+    public val lastScan: StateFlow<UsbScanSummary> = mutableLastScan.asStateFlow()
+
     /** Прекращает наблюдение. Открытые сессии не закрываются: устройства никуда не делись. */
     public fun stop() {
         host.stop()
@@ -138,9 +151,27 @@ public class UsbSessionCoordinator(
      */
     public fun scanAttachedDevices() {
         val known = registry.activeSessions.value.map { it.candidate.device.deviceName }.toSet()
-        host.devices()
-            .filterNot { it.deviceName in known }
-            .forEach(::onDeviceAttached)
+        val visible = host.devices()
+        val fresh = visible.filterNot { it.deviceName in known }
+        // Итог скана записывается всегда, в том числе когда система не отдала
+        // ни одного устройства. Молчание в этом месте невозможно отличить от
+        // сломанного приложения: разбор 2026-09-04 упёрся ровно в это —
+        // выгруженный evidence был пуст, и по нему нельзя было сказать, видит
+        // ли система устройство вообще.
+        mutableLastScan.value = UsbScanSummary(
+            visibleDevices = visible.size,
+            newDevices = fresh.size,
+            knownDevices = visible.size - fresh.size,
+        )
+        emit(
+            message = "scan_completed",
+            fields = mapOf(
+                "visibleDevices" to visible.size.toString(),
+                "newDevices" to fresh.size.toString(),
+                "knownDevices" to (visible.size - fresh.size).toString(),
+            ),
+        )
+        fresh.forEach(::onDeviceAttached)
     }
 
     override fun onDeviceAttached(device: UsbDeviceDescriptor) {

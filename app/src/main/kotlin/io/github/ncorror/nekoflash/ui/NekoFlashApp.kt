@@ -27,6 +27,7 @@ import io.github.ncorror.nekoflash.adb.AdbLinkState
 import io.github.ncorror.nekoflash.core.model.SessionGeneration
 import io.github.ncorror.nekoflash.protocol.adb.AdbPeerMode
 import io.github.ncorror.nekoflash.usb.api.TargetIdentitySource
+import io.github.ncorror.nekoflash.usb.api.UsbScanSummary
 import io.github.ncorror.nekoflash.usb.api.UsbInterfaceKind
 import io.github.ncorror.nekoflash.usb.api.UsbMatchConfidence
 import io.github.ncorror.nekoflash.usb.api.UsbSession
@@ -36,6 +37,8 @@ import io.github.ncorror.nekoflash.usb.api.UsbSessionState
 @Composable
 fun NekoFlashApp(
     sessions: List<UsbSession> = emptyList(),
+    scan: UsbScanSummary = UsbScanSummary.NEVER_SCANNED,
+    usbHostSupported: Boolean = true,
     exportStatus: String? = null,
     adbLink: AdbLinkState = AdbLinkState.Idle,
     onRescanUsb: () -> Unit = {},
@@ -45,6 +48,26 @@ fun NekoFlashApp(
     onAdbDisconnect: (UsbSession) -> Unit = {},
     onExportDiagnostics: () -> Unit = {},
 ) {
+    // Рабочая область одинакова в обеих раскладках и отличается только тем,
+    // как занимает место. Список аргументов длинный, и два его экземпляра уже
+    // однажды разъехались, поэтому он существует в одном месте.
+    val workspace: @Composable (Modifier) -> Unit = { modifier ->
+        Workspace(
+            sessions = sessions,
+            scan = scan,
+            usbHostSupported = usbHostSupported,
+            exportStatus = exportStatus,
+            adbLink = adbLink,
+            onRescanUsb = onRescanUsb,
+            onClaim = onClaim,
+            onRelease = onRelease,
+            onAdbConnect = onAdbConnect,
+            onAdbDisconnect = onAdbDisconnect,
+            onExportDiagnostics = onExportDiagnostics,
+            modifier = modifier,
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -72,32 +95,10 @@ fun NekoFlashApp(
                             .width(240.dp)
                             .fillMaxSize(),
                     )
-                    Workspace(
-                        sessions = sessions,
-                        exportStatus = exportStatus,
-                        adbLink = adbLink,
-                        onRescanUsb = onRescanUsb,
-                        onClaim = onClaim,
-                        onRelease = onRelease,
-                        onAdbConnect = onAdbConnect,
-                        onAdbDisconnect = onAdbDisconnect,
-                        onExportDiagnostics = onExportDiagnostics,
-                        modifier = Modifier.weight(1f),
-                    )
+                    workspace(Modifier.weight(1f))
                 }
             } else {
-                Workspace(
-                    sessions = sessions,
-                    exportStatus = exportStatus,
-                    adbLink = adbLink,
-                    onRescanUsb = onRescanUsb,
-                    onClaim = onClaim,
-                    onRelease = onRelease,
-                    onAdbConnect = onAdbConnect,
-                    onAdbDisconnect = onAdbDisconnect,
-                    onExportDiagnostics = onExportDiagnostics,
-                    modifier = Modifier.fillMaxSize(),
-                )
+                workspace(Modifier.fillMaxSize())
             }
         }
     }
@@ -122,6 +123,8 @@ private fun ProjectNavigation(modifier: Modifier = Modifier) {
 @Composable
 private fun Workspace(
     sessions: List<UsbSession>,
+    scan: UsbScanSummary,
+    usbHostSupported: Boolean,
     exportStatus: String?,
     adbLink: AdbLinkState,
     onRescanUsb: () -> Unit,
@@ -144,6 +147,8 @@ private fun Workspace(
         )
         SessionList(
             sessions = sessions,
+            scan = scan,
+            usbHostSupported = usbHostSupported,
             adbLink = adbLink,
             onClaim = onClaim,
             onRelease = onRelease,
@@ -162,6 +167,8 @@ private fun Workspace(
 @Composable
 private fun SessionList(
     sessions: List<UsbSession>,
+    scan: UsbScanSummary,
+    usbHostSupported: Boolean,
     adbLink: AdbLinkState,
     onClaim: (UsbSession) -> Unit,
     onRelease: (UsbSession) -> Unit,
@@ -172,6 +179,13 @@ private fun SessionList(
         Text(
             text = stringResource(R.string.sessions_empty),
             style = MaterialTheme.typography.bodyLarge,
+        )
+        // Пустой список сам по себе ничего не объясняет. Разбор 2026-09-04
+        // показал цену этого молчания: по выгруженному evidence нельзя было
+        // сказать, видит ли система устройство вообще.
+        Text(
+            text = emptyStateReason(scan, usbHostSupported),
+            style = MaterialTheme.typography.bodySmall,
         )
         return
     }
@@ -384,6 +398,20 @@ private fun localizedPeerMode(mode: AdbPeerMode): String = stringResource(
         AdbPeerMode.UNKNOWN -> R.string.peer_mode_unknown
     },
 )
+
+/**
+ * Почему список пуст.
+ *
+ * Отсутствие host-режима важнее всего остального: без него разбирать нечего, и
+ * говорить про кабель было бы неправдой.
+ */
+@Composable
+private fun emptyStateReason(scan: UsbScanSummary, usbHostSupported: Boolean): String = when {
+    !usbHostSupported -> stringResource(R.string.usb_host_feature_missing)
+    !scan.scanned -> stringResource(R.string.usb_scan_never)
+    scan.visibleDevices == 0 -> stringResource(R.string.usb_scan_none)
+    else -> stringResource(R.string.usb_scan_unusable, scan.visibleDevices)
+}
 
 @Composable
 private fun LabelledValue(label: String, value: String) {

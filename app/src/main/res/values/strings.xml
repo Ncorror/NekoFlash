@@ -65,4 +65,8 @@
     <string name="peer_mode_recovery">Recovery</string>
     <string name="peer_mode_sideload">Sideload</string>
     <string name="peer_mode_unknown">Unknown peer, banner prefix not recognised</string>
+    <string name="usb_scan_never">Devices have not been examined yet.</string>
+    <string name="usb_scan_none">The system reports no USB devices at all. Check OTG, the cable and the adapter: without a device there is nothing to ask permission for.</string>
+    <string name="usb_scan_unusable">The system reports %1$d USB device(s), but none of them exposes an ADB or Fastboot interface.</string>
+    <string name="usb_host_feature_missing">This host reports no USB host mode support, so no device can be examined.</string>
 </resources>

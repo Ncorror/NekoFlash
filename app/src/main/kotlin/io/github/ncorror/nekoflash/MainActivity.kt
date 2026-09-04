@@ -1,5 +1,6 @@
 package io.github.ncorror.nekoflash
 
+import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -30,6 +31,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val sessions by coordinator.sessions.collectAsState()
             val linkState by adbLink.state.collectAsState()
+            val scan by coordinator.lastScan.collectAsState()
             var exportStatus by remember { mutableStateOf<String?>(null) }
 
             val savedTemplate = stringResource(R.string.diagnostics_export_done)
@@ -54,6 +56,8 @@ class MainActivity : ComponentActivity() {
             NekoFlashTheme {
                 NekoFlashApp(
                     sessions = sessions,
+                    scan = scan,
+                    usbHostSupported = packageManager.hasSystemFeature(PackageManager.FEATURE_USB_HOST),
                     exportStatus = exportStatus,
                     adbLink = linkState,
                     onRescanUsb = { coordinator.scanAttachedDevices() },
