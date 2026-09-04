@@ -1,0 +1,265 @@
+package io.github.ncorror.nekoflash.protocol.adb
+
+import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class AdbStreamRouterTest {
+    @Test
+    fun openRequestCarriesTheServiceNameAsACString() {
+        val (localId, packet) = AdbStreamRouter().openRequest("shell:getprop ro.product.device")
+
+        assertEquals(AdbCommand.OPEN, packet.command)
+        assertEquals(localId, packet.arg0)
+        assertEquals(0, packet.arg1)
+        assertEquals(0, packet.payload.last().toInt())
+        assertEquals("shell:getprop ro.product.device", packet.payload.dropLast(1).toByteArray().decodeToString())
+    }
+
+    @Test
+    fun localIdsStartAtOneBecauseZeroMeansNoStream() {
+        assertEquals(1, AdbStreamRouter().openRequest("shell:id").first)
+    }
+
+    /** Переиспользование идентификатора выдало бы чужие данные за свои. */
+    @Test
+    fun localIdsAreNotReusedAfterAStreamClosed() {
+        val router = AdbStreamRouter()
+        val (first, _) = router.openRequest("shell:id")
+        router.onPacket(packet(AdbCommand.CLSE, arg0 = 7, arg1 = first))
+
+        val (second, _) = router.openRequest("shell:id")
+
+        assertNotEquals(first, second)
+    }
+
+    @Test
+    fun okayOpensTheStreamAndNamesTheRemoteId() {
+        val router = AdbStreamRouter()
+        val (localId, _) = router.openRequest("shell:id")
+
+        val step = router.onPacket(packet(AdbCommand.OKAY, arg0 = 42, arg1 = localId))
+
+        assertEquals(listOf(AdbStreamEvent.Opened(localId, 42)), step.events)
+        assertTrue(step.outbound.isEmpty())
+    }
+
+    /** Каждый WRTE подтверждается немедленно: это backpressure ADB. */
+    @Test
+    fun everyWriteIsAcknowledgedAtOnce() {
+        val router = openedStream()
+        val payload = "hello".toByteArray()
+
+        val step = router.router.onPacket(
+            packet(AdbCommand.WRTE, arg0 = REMOTE_ID, arg1 = router.localId, payload = payload),
+        )
+
+        assertEquals(1, step.outbound.size)
+        assertEquals(AdbCommand.OKAY, step.outbound[0].command)
+        assertEquals(router.localId, step.outbound[0].arg0)
+        assertEquals(REMOTE_ID, step.outbound[0].arg1)
+        assertArrayEquals(payload, (step.events[0] as AdbStreamEvent.Data).payload)
+    }
+
+    /**
+     * `WRTE` до `OKAY` подтверждается, но данными потока не считается: поток
+     * ещё не открыт, и отдавать это вызывающему нельзя.
+     */
+    @Test
+    fun writeBeforeOkayIsAcknowledgedButNotDelivered() {
+        val router = AdbStreamRouter()
+        val (localId, _) = router.openRequest("shell:id")
+
+        val step = router.onPacket(
+            packet(AdbCommand.WRTE, arg0 = REMOTE_ID, arg1 = localId, payload = "early".toByteArray()),
+        )
+
+        assertEquals(AdbCommand.OKAY, step.outbound.single().command)
+        assertTrue(step.events.none { it is AdbStreamEvent.Data })
+        assertTrue(step.events.single() is AdbStreamEvent.Stale)
+    }
+
+    /**
+     * Пакет неизвестного потока нельзя молча пропустить: устройство останется
+     * ждать подтверждения от потока, которого нет.
+     */
+    @Test
+    fun writeForAnUnknownStreamIsAnsweredWithClose() {
+        val step = AdbStreamRouter().onPacket(packet(AdbCommand.WRTE, arg0 = 9, arg1 = 77))
+
+        val reply = step.outbound.single()
+        assertEquals(AdbCommand.CLSE, reply.command)
+        assertEquals(77, reply.arg0)
+        assertEquals(9, reply.arg1)
+    }
+
+    @Test
+    fun closeForAnUnknownStreamIsAnsweredWithClose() {
+        val step = AdbStreamRouter().onPacket(packet(AdbCommand.CLSE, arg0 = 9, arg1 = 77))
+
+        assertEquals(AdbCommand.CLSE, step.outbound.single().command)
+    }
+
+    /** На чужой OKAY отвечать нечем, и отвечать не надо. */
+    @Test
+    fun okayForAnUnknownStreamIsIgnoredWithoutAReply() {
+        val step = AdbStreamRouter().onPacket(packet(AdbCommand.OKAY, arg0 = 9, arg1 = 77))
+
+        assertTrue(step.outbound.isEmpty())
+        assertTrue(step.events.single() is AdbStreamEvent.Stale)
+    }
+
+    @Test
+    fun closeAfterOkayCompletesTheStreamAndIsAcknowledged() {
+        val opened = openedStream()
+
+        val step = opened.router.onPacket(packet(AdbCommand.CLSE, arg0 = REMOTE_ID, arg1 = opened.localId))
+
+        assertEquals(
+            listOf(AdbStreamEvent.Closed(opened.localId, AdbStreamClosure.COMPLETED)),
+            step.events,
+        )
+        assertEquals(AdbCommand.CLSE, step.outbound.single().command)
+    }
+
+    /** Закрытие без единого OKAY — это отказ сервиса, а не пустой ответ. */
+    @Test
+    fun closeBeforeOkayIsReportedAsRejection() {
+        val router = AdbStreamRouter()
+        val (localId, _) = router.openRequest("shell:nosuchservice")
+
+        val step = router.onPacket(packet(AdbCommand.CLSE, arg0 = REMOTE_ID, arg1 = localId))
+
+        assertEquals(
+            listOf(AdbStreamEvent.Closed(localId, AdbStreamClosure.REJECTED)),
+            step.events,
+        )
+    }
+
+    @Test
+    fun okayOnAnAlreadyOpenStreamIsAWriteAcknowledgementAndProducesNothing() {
+        val opened = openedStream()
+
+        val step = opened.router.onPacket(packet(AdbCommand.OKAY, arg0 = REMOTE_ID, arg1 = opened.localId))
+
+        assertTrue(step.outbound.isEmpty())
+        assertTrue(step.events.isEmpty())
+    }
+
+    @Test
+    fun writingIsPossibleOnlyAfterTheStreamOpened() {
+        val router = AdbStreamRouter()
+        val (localId, _) = router.openRequest("shell:cat")
+
+        assertNull(router.writeRequest(localId, "x".toByteArray()))
+
+        router.onPacket(packet(AdbCommand.OKAY, arg0 = REMOTE_ID, arg1 = localId))
+        val write = router.writeRequest(localId, "x".toByteArray())
+
+        assertEquals(AdbCommand.WRTE, write?.command)
+        assertEquals(REMOTE_ID, write?.arg1)
+    }
+
+    @Test
+    fun writingToAnUnknownStreamIsRefusedRatherThanPretended() {
+        assertNull(AdbStreamRouter().writeRequest(404, "x".toByteArray()))
+    }
+
+    @Test
+    fun localCloseRemovesTheStreamAndAsksTheDeviceToClose() {
+        val opened = openedStream()
+
+        val close = opened.router.closeRequest(opened.localId)
+
+        assertEquals(AdbCommand.CLSE, close?.command)
+        assertEquals(REMOTE_ID, close?.arg1)
+        assertTrue(opened.router.activeStreamIds.isEmpty())
+    }
+
+    /** Ответное CLSE устройства приходит уже на неизвестный поток — это норма. */
+    @Test
+    fun deviceReplyAfterLocalCloseIsTreatedAsStale() {
+        val opened = openedStream()
+        opened.router.closeRequest(opened.localId)
+
+        val step = opened.router.onPacket(packet(AdbCommand.CLSE, arg0 = REMOTE_ID, arg1 = opened.localId))
+
+        assertTrue(step.events.single() is AdbStreamEvent.Stale)
+    }
+
+    @Test
+    fun packetsThatBelongToTheHandshakeAreUnexpectedHere() {
+        val step = AdbStreamRouter().onPacket(packet(AdbCommand.CNXN))
+
+        assertTrue(step.events.single() is AdbStreamEvent.Unexpected)
+    }
+
+    @Test
+    fun twoStreamsAreRoutedIndependently() {
+        val router = AdbStreamRouter()
+        val (first, _) = router.openRequest("shell:one")
+        val (second, _) = router.openRequest("shell:two")
+        router.onPacket(packet(AdbCommand.OKAY, arg0 = 11, arg1 = first))
+        router.onPacket(packet(AdbCommand.OKAY, arg0 = 22, arg1 = second))
+
+        val step = router.onPacket(
+            packet(AdbCommand.WRTE, arg0 = 22, arg1 = second, payload = "two".toByteArray()),
+        )
+
+        assertEquals(second, (step.events.single() as AdbStreamEvent.Data).localId)
+        assertEquals(setOf(first, second), router.activeStreamIds)
+    }
+
+    @Test
+    fun abandoningTheTransportClosesEveryStreamWithoutSendingAnything() {
+        val router = AdbStreamRouter()
+        val (first, _) = router.openRequest("shell:one")
+        val (second, _) = router.openRequest("shell:two")
+
+        val step = router.abandonAll()
+
+        assertTrue(step.outbound.isEmpty())
+        assertEquals(
+            listOf(
+                AdbStreamEvent.Closed(first, AdbStreamClosure.LOCAL),
+                AdbStreamEvent.Closed(second, AdbStreamClosure.LOCAL),
+            ),
+            step.events,
+        )
+        assertTrue(router.activeStreamIds.isEmpty())
+    }
+
+    @Test
+    fun blankServiceNameIsRejected() {
+        var rejected = false
+        try {
+            AdbStreamRouter().openRequest("   ")
+        } catch (_: IllegalArgumentException) {
+            rejected = true
+        }
+        assertTrue(rejected)
+    }
+
+    private class Opened(val router: AdbStreamRouter, val localId: Int)
+
+    private companion object {
+        const val REMOTE_ID = 42
+
+        fun openedStream(): Opened {
+            val router = AdbStreamRouter()
+            val (localId, _) = router.openRequest("shell:id")
+            router.onPacket(packet(AdbCommand.OKAY, arg0 = REMOTE_ID, arg1 = localId))
+            return Opened(router, localId)
+        }
+
+        fun packet(
+            command: Long,
+            arg0: Int = 0,
+            arg1: Int = 0,
+            payload: ByteArray = ByteArray(0),
+        ) = AdbPacket(command, arg0, arg1, payload)
+    }
+}
