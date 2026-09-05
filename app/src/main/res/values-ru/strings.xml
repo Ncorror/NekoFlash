@@ -71,4 +71,7 @@
     <string name="shell_empty_output">Команда ничего не вывела.</string>
     <string name="shell_failed">Команда не выполнилась: %1$s</string>
     <string name="shell_note">Команда выполняется в неинтерактивной оболочке и завершается сама. Вывод ограничен 64 КиБ, на вызов отведено 30 секунд.</string>
+    <string name="shell_stderr">stderr</string>
+    <string name="shell_exit_code">Код возврата: %1$d</string>
+    <string name="shell_exit_unknown">Код возврата недоступен: устройство не поддерживает shell,v2.</string>
 </resources>

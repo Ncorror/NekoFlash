@@ -80,6 +80,7 @@ public class AdbServiceCall(
         service: String,
         maxOutputBytes: Int = DEFAULT_MAX_OUTPUT_BYTES,
         timeoutMillis: Int = DEFAULT_TIMEOUT_MS,
+        payloadOnOpen: ByteArray? = null,
     ): AdbServiceOutcome {
         require(maxOutputBytes > 0) { "ADB service output cap must be positive: $maxOutputBytes" }
         require(timeoutMillis > 0) { "ADB service timeout must be positive: $timeoutMillis" }
@@ -103,7 +104,7 @@ public class AdbServiceCall(
                     step.outbound.forEach { packet ->
                         send(packet)?.let { failure -> return abandon(localId, failure) }
                     }
-                    resolve(localId, step, output, service)?.let { outcome -> return outcome }
+                    resolve(localId, step, output, service, payloadOnOpen)?.let { outcome -> return outcome }
                 }
 
                 // Тишина — обычное состояние ожидания: сервис думает. Решает
@@ -136,12 +137,21 @@ public class AdbServiceCall(
         step: AdbRouterStep,
         output: ByteArrayBuilder,
         service: String,
+        payloadOnOpen: ByteArray?,
     ): AdbServiceOutcome? {
         for (event in step.events) {
             when (event) {
                 is AdbStreamEvent.Opened ->
                     if (event.localId == localId) {
                         emit("service_opened", mapOf("service" to service, "remote" to event.remoteId.toString()))
+                        // Отправляется только после OKAY: до него потока ещё нет,
+                        // и адресовать пакет некуда.
+                        if (payloadOnOpen != null) {
+                            val write = router.writeRequest(localId, payloadOnOpen)
+                            if (write != null) {
+                                send(write)?.let { failure -> return abandon(localId, failure) }
+                            }
+                        }
                     }
 
                 is AdbStreamEvent.Data ->

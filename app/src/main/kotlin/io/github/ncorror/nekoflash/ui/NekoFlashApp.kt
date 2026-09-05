@@ -427,10 +427,23 @@ private fun ShellSection(command: AdbCommandState, onRunCommand: (String) -> Uni
             value = stringResource(R.string.shell_running, command.command),
         )
 
-        is AdbCommandState.Finished -> LabelledValue(
-            label = command.command,
-            value = command.output.ifBlank { stringResource(R.string.shell_empty_output) },
-        )
+        is AdbCommandState.Finished -> {
+            LabelledValue(
+                label = command.command,
+                value = command.output.ifBlank { stringResource(R.string.shell_empty_output) },
+            )
+            if (command.errorOutput.isNotBlank()) {
+                LabelledValue(
+                    label = stringResource(R.string.shell_stderr),
+                    value = command.errorOutput,
+                )
+            }
+            Text(
+                text = command.exitCode?.let { code -> stringResource(R.string.shell_exit_code, code) }
+                    ?: stringResource(R.string.shell_exit_unknown),
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
 
         is AdbCommandState.Failed -> LabelledValue(
             label = command.command,

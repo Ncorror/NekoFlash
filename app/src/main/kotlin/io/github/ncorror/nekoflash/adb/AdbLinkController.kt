@@ -7,7 +7,7 @@ import io.github.ncorror.nekoflash.protocol.adb.AdbHandshakeFailure
 import io.github.ncorror.nekoflash.protocol.adb.AdbHandshakeOutcome
 import io.github.ncorror.nekoflash.protocol.adb.AdbKeyStore
 import io.github.ncorror.nekoflash.protocol.adb.AdbPeerMode
-import io.github.ncorror.nekoflash.protocol.adb.AdbServiceOutcome
+import io.github.ncorror.nekoflash.protocol.adb.AdbShellOutcome
 import io.github.ncorror.nekoflash.usb.api.UsbAutoConnectPolicy
 import io.github.ncorror.nekoflash.usb.api.UsbClaimResult
 import io.github.ncorror.nekoflash.usb.api.UsbSession
@@ -61,8 +61,19 @@ public sealed interface AdbCommandState {
     /** Команда выполняется. */
     public data class Running(val command: String) : AdbCommandState
 
-    /** Команда закончилась, вывод получен. */
-    public data class Finished(val command: String, val output: String) : AdbCommandState
+    /**
+     * Команда закончилась.
+     *
+     * [exitCode] отсутствует, когда устройство не поддерживает `shell,v2`: там
+     * кода возврата нет вовсе, и подставлять ноль означало бы сообщить об
+     * успехе, о котором ничего не известно.
+     */
+    public data class Finished(
+        val command: String,
+        val output: String,
+        val errorOutput: String,
+        val exitCode: Int?,
+    ) : AdbCommandState
 
     /** Команда не выполнилась. */
     public data class Failed(val command: String, val reason: String) : AdbCommandState
@@ -151,10 +162,16 @@ public class AdbLinkController(
 
         mutableCommand.value = AdbCommandState.Running(trimmed)
         executor.execute {
-            val outcome = runCatching { live.call("shell:$trimmed") }
+            val outcome = runCatching { live.shell(trimmed) }
             mutableCommand.value = when (val result = outcome.getOrNull()) {
-                is AdbServiceOutcome.Completed -> AdbCommandState.Finished(trimmed, result.text())
-                is AdbServiceOutcome.Failed -> AdbCommandState.Failed(
+                is AdbShellOutcome.Finished -> AdbCommandState.Finished(
+                    command = trimmed,
+                    output = result.output.stdout.trimEnd('\n', '\r'),
+                    errorOutput = result.output.stderr.trimEnd('\n', '\r'),
+                    exitCode = result.output.exitCode,
+                )
+
+                is AdbShellOutcome.Failed -> AdbCommandState.Failed(
                     trimmed,
                     "${result.reason.name}: ${result.detail}",
                 )

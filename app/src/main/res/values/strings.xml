@@ -76,4 +76,7 @@
     <string name="shell_empty_output">The command produced no output.</string>
     <string name="shell_failed">Command failed: %1$s</string>
     <string name="shell_note">The command runs in a non-interactive shell and ends on its own. Output is capped at 64 KiB and the call has a 30 second deadline.</string>
+    <string name="shell_stderr">stderr</string>
+    <string name="shell_exit_code">Exit code: %1$d</string>
+    <string name="shell_exit_unknown">Exit code is unavailable: the device does not support shell,v2.</string>
 </resources>
