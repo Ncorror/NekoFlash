@@ -30,6 +30,22 @@ public class AdbConnection(
 
     private val reader = AdbPacketReader(handle, advertisedMaxPayload)
     private val writer = AdbPacketWriter(handle)
+
+    /**
+     * Маршрутизатор один на соединение.
+     *
+     * Идентификаторы потоков выдаёт он, и второй экземпляр начал бы выдавать их
+     * заново — устройство получило бы два разных потока под одним номером.
+     */
+    private val router = AdbStreamRouter()
+
+    private val services = AdbServiceCall(
+        reader = reader,
+        writer = writer,
+        router = router,
+        diagnostics = diagnostics,
+    )
+
     private val handshake = AdbHandshake(
         reader = reader,
         writer = writer,
@@ -45,4 +61,18 @@ public class AdbConnection(
      * таймаутов рукопожатия: при ожидании подтверждения диалога это до минуты.
      */
     public fun connect(): AdbHandshakeOutcome = handshake.connect()
+
+    /**
+     * Вызывает сервис и ждёт его вывод.
+     *
+     * Блокирует вызывающий поток. Вызовы обязаны идти по одному: читатель
+     * физически один, и два одновременных вызова разобрали бы пакеты друг
+     * друга. Сериализацию обеспечивает владелец соединения — у него для этого
+     * есть исполнитель с единственным потоком.
+     */
+    public fun call(
+        service: String,
+        maxOutputBytes: Int = AdbServiceCall.DEFAULT_MAX_OUTPUT_BYTES,
+        timeoutMillis: Int = AdbServiceCall.DEFAULT_TIMEOUT_MS,
+    ): AdbServiceOutcome = services.run(service, maxOutputBytes, timeoutMillis)
 }

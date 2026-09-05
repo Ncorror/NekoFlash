@@ -13,16 +13,20 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.github.ncorror.nekoflash.R
+import io.github.ncorror.nekoflash.adb.AdbCommandState
 import io.github.ncorror.nekoflash.adb.AdbLinkState
 import io.github.ncorror.nekoflash.core.model.SessionGeneration
 import io.github.ncorror.nekoflash.protocol.adb.AdbPeerMode
@@ -41,11 +45,13 @@ fun NekoFlashApp(
     usbHostSupported: Boolean = true,
     exportStatus: String? = null,
     adbLink: AdbLinkState = AdbLinkState.Idle,
+    adbCommand: AdbCommandState = AdbCommandState.None,
     onRescanUsb: () -> Unit = {},
     onClaim: (UsbSession) -> Unit = {},
     onRelease: (UsbSession) -> Unit = {},
     onAdbConnect: (UsbSession) -> Unit = {},
     onAdbDisconnect: (UsbSession) -> Unit = {},
+    onRunCommand: (String) -> Unit = {},
     onExportDiagnostics: () -> Unit = {},
 ) {
     // Рабочая область одинакова в обеих раскладках и отличается только тем,
@@ -58,11 +64,13 @@ fun NekoFlashApp(
             usbHostSupported = usbHostSupported,
             exportStatus = exportStatus,
             adbLink = adbLink,
+            adbCommand = adbCommand,
             onRescanUsb = onRescanUsb,
             onClaim = onClaim,
             onRelease = onRelease,
             onAdbConnect = onAdbConnect,
             onAdbDisconnect = onAdbDisconnect,
+            onRunCommand = onRunCommand,
             onExportDiagnostics = onExportDiagnostics,
             modifier = modifier,
         )
@@ -127,11 +135,13 @@ private fun Workspace(
     usbHostSupported: Boolean,
     exportStatus: String?,
     adbLink: AdbLinkState,
+    adbCommand: AdbCommandState,
     onRescanUsb: () -> Unit,
     onClaim: (UsbSession) -> Unit,
     onRelease: (UsbSession) -> Unit,
     onAdbConnect: (UsbSession) -> Unit,
     onAdbDisconnect: (UsbSession) -> Unit,
+    onRunCommand: (String) -> Unit,
     onExportDiagnostics: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -150,10 +160,12 @@ private fun Workspace(
             scan = scan,
             usbHostSupported = usbHostSupported,
             adbLink = adbLink,
+            adbCommand = adbCommand,
             onClaim = onClaim,
             onRelease = onRelease,
             onAdbConnect = onAdbConnect,
             onAdbDisconnect = onAdbDisconnect,
+            onRunCommand = onRunCommand,
         )
         ActionsCard(
             exportStatus = exportStatus,
@@ -170,10 +182,12 @@ private fun SessionList(
     scan: UsbScanSummary,
     usbHostSupported: Boolean,
     adbLink: AdbLinkState,
+    adbCommand: AdbCommandState,
     onClaim: (UsbSession) -> Unit,
     onRelease: (UsbSession) -> Unit,
     onAdbConnect: (UsbSession) -> Unit,
     onAdbDisconnect: (UsbSession) -> Unit,
+    onRunCommand: (String) -> Unit,
 ) {
     if (sessions.isEmpty()) {
         Text(
@@ -193,10 +207,12 @@ private fun SessionList(
         SessionCard(
             session = session,
             adbLink = adbLink,
+            adbCommand = adbCommand,
             onClaim = { onClaim(session) },
             onRelease = { onRelease(session) },
             onAdbConnect = { onAdbConnect(session) },
             onAdbDisconnect = { onAdbDisconnect(session) },
+            onRunCommand = onRunCommand,
         )
     }
     Text(
@@ -254,10 +270,12 @@ private fun BuildBaselineCard() {
 private fun SessionCard(
     session: UsbSession,
     adbLink: AdbLinkState,
+    adbCommand: AdbCommandState,
     onClaim: () -> Unit,
     onRelease: () -> Unit,
     onAdbConnect: () -> Unit,
     onAdbDisconnect: () -> Unit,
+    onRunCommand: (String) -> Unit,
 ) {
     // Удерживается ли интерфейс, видно по самому состоянию сессии. Отдельный
     // список захваченных был бы вторым источником истины о том же самом.
@@ -301,8 +319,10 @@ private fun SessionCard(
                     AdbLinkSection(
                         session = session,
                         adbLink = adbLink,
+                        adbCommand = adbCommand,
                         onAdbConnect = onAdbConnect,
                         onAdbDisconnect = onAdbDisconnect,
+                        onRunCommand = onRunCommand,
                     )
                 } else {
                     Button(onClick = if (claimed) onRelease else onClaim) {
@@ -333,8 +353,10 @@ private fun SessionCard(
 private fun AdbLinkSection(
     session: UsbSession,
     adbLink: AdbLinkState,
+    adbCommand: AdbCommandState,
     onAdbConnect: () -> Unit,
     onAdbDisconnect: () -> Unit,
+    onRunCommand: (String) -> Unit,
 ) {
     val linkForThisSession = adbLink.takeIf { it.generationOrNull() == session.generation }
     val connected = linkForThisSession is AdbLinkState.Connected
@@ -365,6 +387,58 @@ private fun AdbLinkSection(
     }
     Text(
         text = stringResource(R.string.adb_connect_hint),
+        style = MaterialTheme.typography.bodySmall,
+    )
+    if (connected) {
+        ShellSection(command = adbCommand, onRunCommand = onRunCommand)
+    }
+}
+
+/**
+ * Неинтерактивная оболочка.
+ *
+ * Показывается только у подключённого устройства: команда без соединения
+ * никуда не уйдёт, а кнопка, которая ничего не делает, врёт о состоянии.
+ */
+@Composable
+private fun ShellSection(command: AdbCommandState, onRunCommand: (String) -> Unit) {
+    val input = remember { mutableStateOf("") }
+    val running = command is AdbCommandState.Running
+
+    OutlinedTextField(
+        value = input.value,
+        onValueChange = { text -> input.value = text },
+        label = { Text(stringResource(R.string.shell_label)) },
+        placeholder = { Text(stringResource(R.string.shell_hint)) },
+        singleLine = true,
+        enabled = !running,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    Button(
+        onClick = { onRunCommand(input.value) },
+        enabled = !running && input.value.isNotBlank(),
+    ) {
+        Text(stringResource(R.string.shell_run))
+    }
+    when (command) {
+        AdbCommandState.None -> Unit
+        is AdbCommandState.Running -> LabelledValue(
+            label = stringResource(R.string.shell_label),
+            value = stringResource(R.string.shell_running, command.command),
+        )
+
+        is AdbCommandState.Finished -> LabelledValue(
+            label = command.command,
+            value = command.output.ifBlank { stringResource(R.string.shell_empty_output) },
+        )
+
+        is AdbCommandState.Failed -> LabelledValue(
+            label = command.command,
+            value = stringResource(R.string.shell_failed, command.reason),
+        )
+    }
+    Text(
+        text = stringResource(R.string.shell_note),
         style = MaterialTheme.typography.bodySmall,
     )
 }

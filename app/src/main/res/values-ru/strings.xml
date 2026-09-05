@@ -64,4 +64,11 @@
     <string name="usb_scan_none">Система не сообщает ни об одном USB-устройстве. Проверьте OTG, кабель и переходник: пока устройства нет, разрешение спрашивать не о чем.</string>
     <string name="usb_scan_unusable">Система сообщает об устройствах: %1$d. Ни в одном из них нет интерфейса ADB или Fastboot.</string>
     <string name="usb_host_feature_missing">Хост не сообщает о поддержке host-режима USB, поэтому разбирать устройства нечем.</string>
+    <string name="shell_label">Оболочка</string>
+    <string name="shell_hint">Команда, например getprop ro.product.device</string>
+    <string name="shell_run">Выполнить</string>
+    <string name="shell_running">Выполняется %1$s…</string>
+    <string name="shell_empty_output">Команда ничего не вывела.</string>
+    <string name="shell_failed">Команда не выполнилась: %1$s</string>
+    <string name="shell_note">Команда выполняется в неинтерактивной оболочке и завершается сама. Вывод ограничен 64 КиБ, на вызов отведено 30 секунд.</string>
 </resources>

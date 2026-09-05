@@ -74,8 +74,51 @@ class AdbConnectionTest {
         )
     }
 
+    /**
+     * Маршрутизатор один на соединение: второй начал бы выдавать идентификаторы
+     * заново, и устройство получило бы два потока под одним номером.
+     */
+    @Test
+    fun consecutiveCallsUseDistinctStreamIds() = withKeyStore { keyStore ->
+        val handle = FakeUsbTransportHandle(
+            inbound = mutableListOf(
+                *serviceExchange(localId = 1, output = "first"),
+                *serviceExchange(localId = 2, output = "second"),
+            ),
+        )
+        val connection = AdbConnection(handle, keyStore, apiLevel = 36)
+
+        val first = connection.call("shell:one") as AdbServiceOutcome.Completed
+        val second = connection.call("shell:two") as AdbServiceOutcome.Completed
+
+        assertEquals("first", first.text())
+        assertEquals("second", second.text())
+        val opens = handle.sentFrames().filter { it.command == AdbCommand.OPEN }
+        assertEquals(listOf(1, 2), opens.map { it.arg0 })
+    }
+
     private companion object {
         val BANNER = "recovery::ro.product.name=vayu\u0000".toByteArray()
+
+        /** Полный обмен одного сервиса: подтверждение, вывод, закрытие. */
+        fun serviceExchange(localId: Int, output: String): Array<FakeUsbTransportHandle.Transfer> {
+            val payload = output.toByteArray()
+            return arrayOf(
+                FakeUsbTransportHandle.Transfer.Completed(
+                    AdbPacketHeader.SIZE_BYTES,
+                    header(AdbCommand.OKAY, arg0 = 100 + localId, arg1 = localId),
+                ),
+                FakeUsbTransportHandle.Transfer.Completed(
+                    AdbPacketHeader.SIZE_BYTES,
+                    header(AdbCommand.WRTE, arg0 = 100 + localId, arg1 = localId, payload = payload),
+                ),
+                FakeUsbTransportHandle.Transfer.Completed(payload.size, payload),
+                FakeUsbTransportHandle.Transfer.Completed(
+                    AdbPacketHeader.SIZE_BYTES,
+                    header(AdbCommand.CLSE, arg0 = 100 + localId, arg1 = localId),
+                ),
+            )
+        }
 
         fun withKeyStore(block: (AdbKeyStore) -> Unit) {
             val directory: File = Files.createTempDirectory("nekoflash-connection").toFile()

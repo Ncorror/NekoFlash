@@ -7,6 +7,7 @@ import io.github.ncorror.nekoflash.protocol.adb.AdbHandshakeFailure
 import io.github.ncorror.nekoflash.protocol.adb.AdbHandshakeOutcome
 import io.github.ncorror.nekoflash.protocol.adb.AdbKeyStore
 import io.github.ncorror.nekoflash.protocol.adb.AdbPeerMode
+import io.github.ncorror.nekoflash.protocol.adb.AdbServiceOutcome
 import io.github.ncorror.nekoflash.usb.api.UsbAutoConnectPolicy
 import io.github.ncorror.nekoflash.usb.api.UsbClaimResult
 import io.github.ncorror.nekoflash.usb.api.UsbSession
@@ -52,6 +53,21 @@ public sealed interface AdbLinkState {
     ) : AdbLinkState
 }
 
+/** Что происходит с последней командой. */
+public sealed interface AdbCommandState {
+    /** Команд ещё не было. */
+    public data object None : AdbCommandState
+
+    /** Команда выполняется. */
+    public data class Running(val command: String) : AdbCommandState
+
+    /** Команда закончилась, вывод получен. */
+    public data class Finished(val command: String, val output: String) : AdbCommandState
+
+    /** Команда не выполнилась. */
+    public data class Failed(val command: String, val reason: String) : AdbCommandState
+}
+
 /**
  * Владелец ADB-соединения на уровне приложения.
  *
@@ -86,6 +102,18 @@ public class AdbLinkController(
 ) {
     private val mutableState = MutableStateFlow<AdbLinkState>(AdbLinkState.Idle)
 
+    private val mutableCommand = MutableStateFlow<AdbCommandState>(AdbCommandState.None)
+
+    /**
+     * Живое соединение.
+     *
+     * Хранится, потому что после рукопожатия оно продолжает быть нужным: через
+     * него идут команды. Обнуляется вместе со сбросом состояния — соединение
+     * поверх отпущенного интерфейса недействительно.
+     */
+    @Volatile
+    private var connection: AdbConnection? = null
+
     /**
      * Поколения, к которым автоматически подключаться больше не нужно.
      *
@@ -97,6 +125,47 @@ public class AdbLinkController(
 
     /** Состояние соединения. Экран подписывается и ничего не опрашивает. */
     public val state: StateFlow<AdbLinkState> = mutableState.asStateFlow()
+
+    /** Состояние последней команды. */
+    public val command: StateFlow<AdbCommandState> = mutableCommand.asStateFlow()
+
+    /**
+     * Выполняет команду в неинтерактивной оболочке устройства.
+     *
+     * Уходит на тот же единственный поток, что и рукопожатие: читатель один, и
+     * две команды одновременно разобрали бы пакеты друг друга. Очередь
+     * получается сама собой — исполнитель последовательный.
+     *
+     * Команда выполняется как есть. Приложение не проверяет, что она делает:
+     * оболочка на то и оболочка. Предохранители лежат в правилах мутации
+     * (`docs/03`), а не в списке разрешённых команд.
+     */
+    public fun runCommand(command: String) {
+        val trimmed = command.trim()
+        val live = connection
+        // Пустая команда, отсутствующее соединение и уже идущая команда — три
+        // разные причины ничего не делать, и ни одна из них не ошибка.
+        if (trimmed.isEmpty() || live == null || mutableCommand.value is AdbCommandState.Running) {
+            return
+        }
+
+        mutableCommand.value = AdbCommandState.Running(trimmed)
+        executor.execute {
+            val outcome = runCatching { live.call("shell:$trimmed") }
+            mutableCommand.value = when (val result = outcome.getOrNull()) {
+                is AdbServiceOutcome.Completed -> AdbCommandState.Finished(trimmed, result.text())
+                is AdbServiceOutcome.Failed -> AdbCommandState.Failed(
+                    trimmed,
+                    "${result.reason.name}: ${result.detail}",
+                )
+
+                null -> AdbCommandState.Failed(
+                    trimmed,
+                    outcome.exceptionOrNull()?.let { it.message ?: it.javaClass.simpleName } ?: "unknown",
+                )
+            }
+        }
+    }
 
     /**
      * Захватывает интерфейс сессии и проводит рукопожатие.
@@ -139,6 +208,19 @@ public class AdbLinkController(
     public fun disconnect(generation: SessionGeneration) {
         handled.add(generation.value)
         coordinator.release(generation)
+        forgetConnection()
+    }
+
+    /**
+     * Забывает соединение вместе с его состоянием.
+     *
+     * Вывод последней команды тоже уходит: он относился к устройству, которого
+     * больше нет, и оставлять его на экране значило бы приписывать его
+     * следующему.
+     */
+    private fun forgetConnection() {
+        connection = null
+        mutableCommand.value = AdbCommandState.None
         mutableState.value = AdbLinkState.Idle
     }
 
@@ -157,12 +239,15 @@ public class AdbLinkController(
 
         val outcome = runCatching { connection.connect() }
         mutableState.value = when (val result = outcome.getOrNull()) {
-            is AdbHandshakeOutcome.Connected -> AdbLinkState.Connected(
-                generation = generation,
-                peerMode = result.banner.peerMode,
-                banner = result.banner.banner,
-                features = result.banner.features,
-            )
+            is AdbHandshakeOutcome.Connected -> {
+                this.connection = connection
+                AdbLinkState.Connected(
+                    generation = generation,
+                    peerMode = result.banner.peerMode,
+                    banner = result.banner.banner,
+                    features = result.banner.features,
+                )
+            }
 
             is AdbHandshakeOutcome.Failed -> {
                 releaseAfterFailure(generation)
@@ -223,7 +308,7 @@ public class AdbLinkController(
         alive: (UsbSession) -> Boolean,
     ) {
         if (sessions.none { it.generation == generation && alive(it) }) {
-            mutableState.value = AdbLinkState.Idle
+            forgetConnection()
         }
     }
 

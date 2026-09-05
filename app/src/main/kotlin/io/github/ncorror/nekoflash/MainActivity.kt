@@ -32,6 +32,7 @@ class MainActivity : ComponentActivity() {
             val sessions by coordinator.sessions.collectAsState()
             val linkState by adbLink.state.collectAsState()
             val scan by coordinator.lastScan.collectAsState()
+            val commandState by adbLink.command.collectAsState()
             var exportStatus by remember { mutableStateOf<String?>(null) }
 
             val savedTemplate = stringResource(R.string.diagnostics_export_done)
@@ -60,6 +61,7 @@ class MainActivity : ComponentActivity() {
                     usbHostSupported = packageManager.hasSystemFeature(PackageManager.FEATURE_USB_HOST),
                     exportStatus = exportStatus,
                     adbLink = linkState,
+                    adbCommand = commandState,
                     onRescanUsb = { coordinator.scanAttachedDevices() },
                     onClaim = { session ->
                         val result = coordinator.claim(session.generation)
@@ -70,6 +72,7 @@ class MainActivity : ComponentActivity() {
                     onRelease = { session -> coordinator.release(session.generation) },
                     onAdbConnect = { session -> adbLink.connect(session.generation) },
                     onAdbDisconnect = { session -> adbLink.disconnect(session.generation) },
+                    onRunCommand = adbLink::runCommand,
                     onExportDiagnostics = {
                         saveLauncher.launch(application.suggestedDiagnosticsFileName())
                     },
