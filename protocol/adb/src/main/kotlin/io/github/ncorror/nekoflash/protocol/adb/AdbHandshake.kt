@@ -238,7 +238,11 @@ public class AdbHandshake(
                 "peerMode" to banner.peerMode.name,
                 "peerVersion" to packet.arg0.toHex(),
                 "peerMaxPayload" to packet.arg1.toString(),
-                "features" to banner.features.size.toString(),
+                // Список, а не количество: по числу невозможно сказать,
+                // объявил ли peer shell_v2, а от этого зависит, какой веткой
+                // пойдёт команда. Разбор прогона в Recovery 2026-09-05
+                // упёрся ровно в это.
+                "features" to banner.features.sorted().joinToString(separator = ","),
             ),
         )
         return AdbHandshakeOutcome.Connected(banner, packet.arg0, packet.arg1)

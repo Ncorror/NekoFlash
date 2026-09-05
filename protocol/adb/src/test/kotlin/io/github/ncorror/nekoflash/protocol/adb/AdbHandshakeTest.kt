@@ -33,6 +33,15 @@ class AdbConnectionBannerTest {
         assertEquals(AdbPeerMode.UNKNOWN, AdbConnectionBanner.parse("bootloader::x\u0000".toByteArray()).peerMode)
     }
 
+    /** Peer вправе не прислать ни одного свойства перед списком возможностей. */
+    @Test
+    fun featuresAreFoundEvenWithoutPropertiesBeforeThem() {
+        val banner = AdbConnectionBanner.parse("recovery::features=cmd,stat_v2\u0000".toByteArray())
+
+        assertEquals(setOf("cmd", "stat_v2"), banner.features)
+        assertEquals(AdbPeerMode.RECOVERY, banner.peerMode)
+    }
+
     @Test
     fun bannerWithoutFeaturesGivesAnEmptySet() {
         val banner = AdbConnectionBanner.parse("device::ro.product.name=vayu\u0000".toByteArray())
@@ -256,6 +265,21 @@ class AdbHandshakeTest {
         val event = sink.snapshot().first { it.message == "host_key" }
         assertEquals(AdbKeyOrigin.GENERATED.name, event.fields["origin"])
         assertEquals(keyStore.fingerprint(), event.fields["fingerprint"])
+    }
+
+    /**
+     * По количеству возможностей нельзя сказать, есть ли `shell_v2`, а от
+     * этого зависит, какой веткой пойдёт команда.
+     */
+    @Test
+    fun connectedEventNamesThePeerFeatures() = withKeyStore { keyStore ->
+        val sink = InMemoryDiagnosticSink()
+        val device = ScriptedDevice(cnxn("device::ro.product.name=vayu;features=shell_v2,cmd\u0000"))
+
+        device.handshake(keyStore, diagnostics = sink).connect()
+
+        val connected = sink.snapshot().single { it.message == "connected" }
+        assertEquals("cmd,shell_v2", connected.fields["features"])
     }
 
     @Test

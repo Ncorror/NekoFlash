@@ -59,15 +59,29 @@ public data class AdbConnectionBanner(
             else -> AdbPeerMode.UNKNOWN
         }
 
-        private fun featuresOf(banner: String): Set<String> = banner
-            .split(';')
-            .firstOrNull { it.startsWith(FEATURES_PREFIX) }
-            ?.substringAfter(FEATURES_PREFIX)
-            .orEmpty()
-            .split(',')
-            .map(String::trim)
-            .filter(String::isNotEmpty)
-            .toSet()
+        /**
+         * Возможности ищутся по вхождению `features=`, а не только среди
+         * частей, разделённых `;`.
+         *
+         * Оба архива берут именно отдельную часть, и для баннера обычной
+         * системы это одно и то же: там перед `features=` всегда есть свойства
+         * и точка с запятой. Но peer вправе прислать `recovery::features=cmd`
+         * без единого свойства, и тогда прежний разбор сообщил бы, что
+         * возможностей нет вовсе, а команда ушла бы устаревшей веткой.
+         * Расширение ничего не меняет для проверенного на железе баннера и
+         * закрывает форму, которую мы просто не встречали.
+         */
+        private fun featuresOf(banner: String): Set<String> {
+            val start = banner.indexOf(FEATURES_PREFIX)
+            if (start < 0) return emptySet()
+            return banner
+                .substring(start + FEATURES_PREFIX.length)
+                .substringBefore(';')
+                .split(',')
+                .map(String::trim)
+                .filter(String::isNotEmpty)
+                .toSet()
+        }
 
         private const val FEATURES_PREFIX = "features="
     }
