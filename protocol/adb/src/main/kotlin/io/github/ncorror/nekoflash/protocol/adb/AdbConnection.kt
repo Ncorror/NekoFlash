@@ -138,6 +138,24 @@ public class AdbConnection(
         timeoutMillis: Int = AdbServiceCall.DEFAULT_TIMEOUT_MS,
     ): AdbServiceOutcome = services.run(service, maxOutputBytes, timeoutMillis)
 
+    /**
+     * Открывает живую оболочку.
+     *
+     * Пока сессия открыта, [shell] и [call] по этому соединению вызывать
+     * нельзя: физический читатель один, и одноразовая команда разобрала бы
+     * пакеты сессии. Запрет держит владелец соединения — здесь он не
+     * проверяется, потому что проверять пришлось бы состояние чужого потока
+     * исполнения.
+     */
+    public fun interactiveShell(diagnostics: DiagnosticSink = DiagnosticSink { }): AdbInteractiveShell =
+        AdbInteractiveShell(
+            reader = reader,
+            writer = writer,
+            router = router,
+            useShellV2 = supportsShellV2,
+            diagnostics = diagnostics,
+        )
+
     private companion object {
         const val SHELL_V2_FEATURE = "shell_v2"
     }
