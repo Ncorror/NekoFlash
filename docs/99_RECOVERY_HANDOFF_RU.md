@@ -37,12 +37,16 @@
 
 A2 read-only framing gate на `vayu` для commit `a2479b333ee2f25b0bc86a530d948c48a3423a68` завершён: **PASS**.
 
-Phase 0, Phase 1 и Phase 2 — COMPLETE. Legacy/A2 frozen.
+Phase 0, Phase 1, Phase 2 и Phase 3 — COMPLETE. Legacy/A2 frozen.
 
 Phase 2 закрыта аппаратным прогоном: discovery, permission с выдачей и отказом, идентичность target с уточнением серийным номером, `SessionGeneration`, detach и re-enumeration, захват и освобождение интерфейса, выгрузка evidence. Критерий PASS и полная таблица проверок — `07_TESTING_CI_HARDWARE_EVIDENCE_RU.md` §6.10.
 
-Модулей шесть: `:app`, `:core:model`, `:core:diagnostics`, `:core:operation`, `:usb:api`, `:usb:android`. Тестов 131.
+Модулей семь: `:app`, `:core:model`, `:core:diagnostics`, `:core:operation`, `:usb:api`, `:usb:android`, `:protocol:adb`. Тестов 324.
 
-Текущая работа — **Phase 3: настоящий ADB foundation + Terminal**. Первым делом переносится доказанный на `vayu` inbound framing invariant из A2 — он обязателен и записан в `00_START_HERE_RU.md`.
+Phase 3 закрыта аппаратными прогонами: рукопожатие с авторизацией и с отказом, автоподключение, все три режима ADB, `shell,v2` с кодом возврата, откат на legacy shell, интерактивная оболочка и терминал. Гейты — `07_TESTING_CI_HARDWARE_EVIDENCE_RU.md` §6.13–§6.29.
+
+Текущая работа — **Phase 4: ADB professional services**. Sync core, push/pull, install, reboot, raw services.
+
+Порядок фаз читать в `09_IMPLEMENTATION_ROADMAP_RU.md`, а не по памяти: Fastboot — Phase 5, Recovery и Sideload — Phase 7.
 
 Актуальный статус каждого пункта фазы всегда смотреть в чеклисте `09_IMPLEMENTATION_ROADMAP_RU.md`, а не в этом файле: чеклист обновляется тем же changeset, что и код.

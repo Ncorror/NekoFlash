@@ -109,8 +109,9 @@ Android USB permission, ADB RSA-авторизация, заблокирован
 осознанно: A2 запирал набор сервисов списком, потому что генерического
 `openService` у него не было, а он нужен для терминала; предохранитель тут не
 список сервисов, а правила мутации из `03_PROTOCOL_AND_SAFETY_INVARIANTS_RU.md`.
-`single reader publishes complete packet then stops on closed source` придёт
-вместе с самим читающим циклом, которого пока нет.
+`single reader publishes complete packet then stops on closed source` покрыт с
+появлением читающего цикла: `AdbInteractiveShellTest` проверяет и завершение
+сессии на закрытом источнике, и то, что после этого качать нечего.
 
 Если реализуешь что-то, для чего в таблице нет строки, — сначала поищи по имени capability в обоих архивах (`unzip -l`/`grep -r` по распакованному дереву), и только если ничего релевантного нет — проектируй с нуля, явно отметив это в PR/changeset.
 
