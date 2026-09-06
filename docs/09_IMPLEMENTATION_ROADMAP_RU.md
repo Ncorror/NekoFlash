@@ -147,14 +147,20 @@ rule, `04_CAPABILITY_MATRIX_RU.md`). Колонка «Где» заполняе�
 
 ## Phase 4 — ADB professional services
 
-- Sync core;
-- push/pull;
-- install/install-multiple strategy;
-- reboot;
-- raw services;
-- forward/reverse, если current protocol layer готов;
-- file/transfer UI;
-- large-file and process-death tests.
+Список заменён таблицей со статусами по образцу Phase 3. Отметка «готово»
+ставится только по факту работающего production-пути, подтверждённого на
+устройстве.
+
+| Пункт | Статус | Где |
+|---|---|---|
+| Sync core | **частично** | рамка сервиса `sync:` перенесена: `AdbSyncProtocol` (идентификатор и little-endian значение, чей смысл зависит от идентификатора), `AdbSyncStat` с различением «нет файла» и «отказано», `AdbStreamBuffer` для чтения точными порциями. Сессии `sync:` ещё нет — она следующая |
+| push/pull | **нет** | — |
+| install/install-multiple | **нет** | — |
+| reboot | **нет** | — |
+| raw services | **нет** | `AdbServiceCall` уже вызывает произвольный сервис; здесь нужен доступ к этому из UI |
+| forward/reverse | **нет** | по документу — «если current protocol layer готов» |
+| file/transfer UI | **нет** | — |
+| large-file and process-death tests | **нет** | — |
 
 ## Phase 5 — Fastboot generic engine
 
