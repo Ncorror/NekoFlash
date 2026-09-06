@@ -14,6 +14,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
 import io.github.ncorror.nekoflash.ui.NekoFlashApp
+import io.github.ncorror.nekoflash.adb.AdbLinkController
+import io.github.ncorror.nekoflash.ui.TerminalActions
 import io.github.ncorror.nekoflash.ui.theme.NekoFlashTheme
 import io.github.ncorror.nekoflash.usb.api.UsbClaimResult
 
@@ -33,6 +35,7 @@ class MainActivity : ComponentActivity() {
             val linkState by adbLink.state.collectAsState()
             val scan by coordinator.lastScan.collectAsState()
             val commandState by adbLink.command.collectAsState()
+            val terminalState by adbLink.terminal.collectAsState()
             var exportStatus by remember { mutableStateOf<String?>(null) }
 
             val savedTemplate = stringResource(R.string.diagnostics_export_done)
@@ -62,6 +65,8 @@ class MainActivity : ComponentActivity() {
                     exportStatus = exportStatus,
                     adbLink = linkState,
                     adbCommand = commandState,
+                    terminal = terminalState,
+                    terminalActions = terminalActions(adbLink),
                     onRescanUsb = { coordinator.scanAttachedDevices() },
                     onClaim = { session ->
                         val result = coordinator.claim(session.generation)
@@ -81,3 +86,11 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+
+/** Действия терминала собраны отдельно: в теле экрана они только шумят. */
+private fun terminalActions(link: AdbLinkController) = TerminalActions(
+    onStart = link::startShell,
+    onSend = link::sendShellInput,
+    onInterrupt = link::interruptShell,
+    onStop = link::stopShell,
+)

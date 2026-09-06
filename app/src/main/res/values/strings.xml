@@ -79,4 +79,13 @@
     <string name="shell_stderr">stderr</string>
     <string name="shell_exit_code">Exit code: %1$d</string>
     <string name="shell_exit_unknown">Exit code is unavailable: the device does not support shell,v2.</string>
+    <string name="terminal_label">Interactive shell</string>
+    <string name="terminal_start">Open shell</string>
+    <string name="terminal_stop">Close shell</string>
+    <string name="terminal_send">Send</string>
+    <string name="terminal_interrupt">Ctrl+C</string>
+    <string name="terminal_input_hint">Line to send to the shell</string>
+    <string name="terminal_waiting">The shell is open and waiting for input.</string>
+    <string name="terminal_ended">Session ended: %1$s</string>
+    <string name="terminal_note">The shell stays open until you close it, so single commands are unavailable meanwhile: there is exactly one reader. Escape sequences are shown as they arrive; they are not interpreted yet.</string>
 </resources>

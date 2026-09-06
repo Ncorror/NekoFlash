@@ -116,6 +116,14 @@ public class AdbLinkController(
     private val mutableCommand = MutableStateFlow<AdbCommandState>(AdbCommandState.None)
 
     /**
+     * Владелец интерактивных сессий.
+     *
+     * Отдельный класс: этот следит за жизнью транспорта, тот — за жизнью одной
+     * сессии оболочки, и заканчиваются они по разным причинам.
+     */
+    private val shellSessions = AdbTerminalController(executor, diagnostics)
+
+    /**
      * Живое соединение.
      *
      * Хранится, потому что после рукопожатия оно продолжает быть нужным: через
@@ -140,6 +148,44 @@ public class AdbLinkController(
     /** Состояние последней команды. */
     public val command: StateFlow<AdbCommandState> = mutableCommand.asStateFlow()
 
+    /** Состояние интерактивной оболочки. */
+    public val terminal: StateFlow<AdbTerminalState> = shellSessions.state
+
+    /**
+     * Открывает интерактивную оболочку по этому соединению.
+     *
+     * Пока она жива, одноразовые команды недоступны: читатель один, и команда
+     * разобрала бы пакеты сессии.
+     */
+    public fun startShell() {
+        val live = connection ?: return
+        if (busy()) return
+        shellSessions.start(live)
+    }
+
+    /** Передаёт строку в оболочку. */
+    public fun sendShellInput(text: String) {
+        shellSessions.sendInput(text)
+    }
+
+    /** Прерывает текущую команду в оболочке, не закрывая её. */
+    public fun interruptShell() {
+        shellSessions.interrupt()
+    }
+
+    /** Закрывает оболочку. */
+    public fun stopShell() {
+        shellSessions.stop()
+    }
+
+    /**
+     * Занят ли единственный поток обмена.
+     *
+     * Живая оболочка и идущая команда занимают его одинаково.
+     */
+    private fun busy(): Boolean =
+        shellSessions.active || mutableCommand.value is AdbCommandState.Running
+
     /**
      * Выполняет команду в неинтерактивной оболочке устройства.
      *
@@ -154,11 +200,9 @@ public class AdbLinkController(
     public fun runCommand(command: String) {
         val trimmed = command.trim()
         val live = connection
-        // Пустая команда, отсутствующее соединение и уже идущая команда — три
-        // разные причины ничего не делать, и ни одна из них не ошибка.
-        if (trimmed.isEmpty() || live == null || mutableCommand.value is AdbCommandState.Running) {
-            return
-        }
+        // Пустая команда, отсутствующее соединение и занятый поток обмена —
+        // три разные причины ничего не делать, и ни одна из них не ошибка.
+        if (trimmed.isEmpty() || live == null || busy()) return
 
         mutableCommand.value = AdbCommandState.Running(trimmed)
         executor.execute {
@@ -236,6 +280,7 @@ public class AdbLinkController(
      * следующему.
      */
     private fun forgetConnection() {
+        shellSessions.stop()
         connection = null
         mutableCommand.value = AdbCommandState.None
         mutableState.value = AdbLinkState.Idle

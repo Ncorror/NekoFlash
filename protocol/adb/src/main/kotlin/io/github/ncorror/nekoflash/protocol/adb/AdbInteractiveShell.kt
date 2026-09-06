@@ -36,6 +36,13 @@ public sealed interface AdbShellEvent {
  * физический читатель один, и одноразовая команда разобрала бы её пакеты.
  * Запрет обеспечивает владелец соединения.
  *
+ * Внутри класса потоков **два**: читающий цикл зовёт [pump], а ввод приходит
+ * оттуда, где его печатают. Приём и передача идут по разным эндпоинтам и могут
+ * идти одновременно, но состояние маршрутизатора и порядок записи у них общие,
+ * поэтому всё, что их касается, защищено замком. Само ожидание пакета остаётся
+ * снаружи замка: держать его все 250 мс значило бы задерживать каждое нажатие
+ * клавиши на это время.
+ *
  * Устройство с `shell,v2` получает `shell,v2,pty:` — настоящий терминал с
  * разделением потоков. Без него остаётся `shell:`, где нет ни разделения, ни
  * кода возврата; так же выбирает Legacy.
@@ -50,8 +57,15 @@ public class AdbInteractiveShell(
 ) {
     private val frames = AdbShellFrameBuffer()
 
+    /** Защищает маршрутизатор, писателя и состояние сессии. */
+    private val lock = Any()
+
     private var localId: Int = 0
+
+    @Volatile
     private var opened = false
+
+    @Volatile
     private var finished = false
 
     /** Открыта ли сессия и имеет ли смысл её качать. */
@@ -65,7 +79,7 @@ public class AdbInteractiveShell(
      * открытия придёт позже, отдельным шагом: устройство отвечает `OKAY`, когда
      * сочтёт нужным.
      */
-    public fun open(): Boolean {
+    public fun open(): Boolean = synchronized(lock) {
         val service = if (useShellV2) SERVICE_PTY else SERVICE_LEGACY
         val (id, packet) = router.openRequest(service)
         localId = id
@@ -87,7 +101,7 @@ public class AdbInteractiveShell(
     public fun sendInput(text: String): Boolean = sendInput(text.toByteArray(Charsets.UTF_8))
 
     /** Тот же ввод байтами: для управляющих символов вроде `Ctrl+C`. */
-    public fun sendInput(bytes: ByteArray): Boolean {
+    public fun sendInput(bytes: ByteArray): Boolean = synchronized(lock) {
         if (!opened || finished) return false
         val payload = if (useShellV2) AdbShellProtocol.encode(AdbShellProtocol.ID_STDIN, bytes) else bytes
         val packet = router.writeRequest(localId, payload) ?: return false
@@ -100,7 +114,7 @@ public class AdbInteractiveShell(
      * В `shell,v2` это отдельная рамка; в обычном `shell:` конца ввода нет, и
      * притворяться, что он отправлен, нельзя.
      */
-    public fun closeInput(): Boolean {
+    public fun closeInput(): Boolean = synchronized(lock) {
         if (!useShellV2 || !opened || finished) return false
         val packet = router.writeRequest(localId, AdbShellProtocol.closeStdinFrame()) ?: return false
         return send(packet)
@@ -116,22 +130,31 @@ public class AdbInteractiveShell(
     public fun pump(timeoutMillis: Int = PUMP_TIMEOUT_MS): List<AdbShellEvent> {
         if (!active) return emptyList()
 
-        return when (val outcome = reader.read(timeoutMillis)) {
-            // Тишина — обычное состояние оболочки, которая ждёт ввода.
-            AdbReadOutcome.Idle -> drainFrames()
+        // Ожидание снаружи замка: пока идёт приём, ввод должен уходить без
+        // задержки.
+        val outcome = reader.read(timeoutMillis)
+        return synchronized(lock) {
+            if (finished) {
+                emptyList()
+            } else {
+                when (outcome) {
+                    // Тишина — обычное состояние оболочки, которая ждёт ввода.
+                    AdbReadOutcome.Idle -> drainFrames()
 
-            AdbReadOutcome.Closed -> finish(AdbShellEvent.Broken("transport closed"))
+                    AdbReadOutcome.Closed -> finish(AdbShellEvent.Broken("transport closed"))
 
-            is AdbReadOutcome.Failed -> finish(
-                AdbShellEvent.Broken("${outcome.reason.name} ${outcome.detail}"),
-            )
+                    is AdbReadOutcome.Failed -> finish(
+                        AdbShellEvent.Broken("${outcome.reason.name} ${outcome.detail}"),
+                    )
 
-            is AdbReadOutcome.Received -> handle(outcome.packet)
+                    is AdbReadOutcome.Received -> handle(outcome.packet)
+                }
+            }
         }
     }
 
     /** Закрывает поток. Устройство узнает, что оболочка больше не нужна. */
-    public fun close() {
+    public fun close(): Unit = synchronized(lock) {
         if (localId == 0 || finished) return
         finished = true
         router.closeRequest(localId)?.let(::send)
@@ -203,6 +226,7 @@ public class AdbInteractiveShell(
         }
     }
 
+    /** Вызывается уже под замком: [close] берёт его повторно, что разрешено. */
     private fun finish(event: AdbShellEvent): List<AdbShellEvent> {
         if (finished) return emptyList()
         close()

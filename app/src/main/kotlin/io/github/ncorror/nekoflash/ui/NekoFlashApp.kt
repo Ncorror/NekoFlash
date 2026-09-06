@@ -27,6 +27,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.github.ncorror.nekoflash.R
 import io.github.ncorror.nekoflash.adb.AdbCommandState
+import io.github.ncorror.nekoflash.adb.AdbTerminalState
 import io.github.ncorror.nekoflash.adb.AdbLinkState
 import io.github.ncorror.nekoflash.core.model.SessionGeneration
 import io.github.ncorror.nekoflash.protocol.adb.AdbPeerMode
@@ -46,12 +47,14 @@ fun NekoFlashApp(
     exportStatus: String? = null,
     adbLink: AdbLinkState = AdbLinkState.Idle,
     adbCommand: AdbCommandState = AdbCommandState.None,
+    terminal: AdbTerminalState = AdbTerminalState(),
     onRescanUsb: () -> Unit = {},
     onClaim: (UsbSession) -> Unit = {},
     onRelease: (UsbSession) -> Unit = {},
     onAdbConnect: (UsbSession) -> Unit = {},
     onAdbDisconnect: (UsbSession) -> Unit = {},
     onRunCommand: (String) -> Unit = {},
+    terminalActions: TerminalActions = TerminalActions(),
     onExportDiagnostics: () -> Unit = {},
 ) {
     // Рабочая область одинакова в обеих раскладках и отличается только тем,
@@ -65,6 +68,8 @@ fun NekoFlashApp(
             exportStatus = exportStatus,
             adbLink = adbLink,
             adbCommand = adbCommand,
+            terminal = terminal,
+            terminalActions = terminalActions,
             onRescanUsb = onRescanUsb,
             onClaim = onClaim,
             onRelease = onRelease,
@@ -136,6 +141,8 @@ private fun Workspace(
     exportStatus: String?,
     adbLink: AdbLinkState,
     adbCommand: AdbCommandState,
+    terminal: AdbTerminalState,
+    terminalActions: TerminalActions,
     onRescanUsb: () -> Unit,
     onClaim: (UsbSession) -> Unit,
     onRelease: (UsbSession) -> Unit,
@@ -161,6 +168,8 @@ private fun Workspace(
             usbHostSupported = usbHostSupported,
             adbLink = adbLink,
             adbCommand = adbCommand,
+            terminal = terminal,
+            terminalActions = terminalActions,
             onClaim = onClaim,
             onRelease = onRelease,
             onAdbConnect = onAdbConnect,
@@ -183,6 +192,8 @@ private fun SessionList(
     usbHostSupported: Boolean,
     adbLink: AdbLinkState,
     adbCommand: AdbCommandState,
+    terminal: AdbTerminalState,
+    terminalActions: TerminalActions,
     onClaim: (UsbSession) -> Unit,
     onRelease: (UsbSession) -> Unit,
     onAdbConnect: (UsbSession) -> Unit,
@@ -208,6 +219,8 @@ private fun SessionList(
             session = session,
             adbLink = adbLink,
             adbCommand = adbCommand,
+            terminal = terminal,
+            terminalActions = terminalActions,
             onClaim = { onClaim(session) },
             onRelease = { onRelease(session) },
             onAdbConnect = { onAdbConnect(session) },
@@ -271,6 +284,8 @@ private fun SessionCard(
     session: UsbSession,
     adbLink: AdbLinkState,
     adbCommand: AdbCommandState,
+    terminal: AdbTerminalState,
+    terminalActions: TerminalActions,
     onClaim: () -> Unit,
     onRelease: () -> Unit,
     onAdbConnect: () -> Unit,
@@ -320,6 +335,8 @@ private fun SessionCard(
                         session = session,
                         adbLink = adbLink,
                         adbCommand = adbCommand,
+                        terminal = terminal,
+                        terminalActions = terminalActions,
                         onAdbConnect = onAdbConnect,
                         onAdbDisconnect = onAdbDisconnect,
                         onRunCommand = onRunCommand,
@@ -354,6 +371,8 @@ private fun AdbLinkSection(
     session: UsbSession,
     adbLink: AdbLinkState,
     adbCommand: AdbCommandState,
+    terminal: AdbTerminalState,
+    terminalActions: TerminalActions,
     onAdbConnect: () -> Unit,
     onAdbDisconnect: () -> Unit,
     onRunCommand: (String) -> Unit,
@@ -390,8 +409,72 @@ private fun AdbLinkSection(
         style = MaterialTheme.typography.bodySmall,
     )
     if (connected) {
-        ShellSection(command = adbCommand, onRunCommand = onRunCommand)
+        ShellSection(
+            command = adbCommand,
+            terminalActive = terminal.active,
+            onRunCommand = onRunCommand,
+        )
+        TerminalSection(terminal = terminal, actions = terminalActions)
     }
+}
+
+/** Действия интерактивной оболочки. Собраны вместе, чтобы не плодить параметры. */
+data class TerminalActions(
+    val onStart: () -> Unit = {},
+    val onSend: (String) -> Unit = {},
+    val onInterrupt: () -> Unit = {},
+    val onStop: () -> Unit = {},
+)
+
+/**
+ * Интерактивная оболочка.
+ *
+ * Пока сессия жива, она занимает единственный поток обмена, поэтому одиночные
+ * команды в это время недоступны — и об этом сказано на экране, а не оставлено
+ * догадкам.
+ */
+@Composable
+private fun TerminalSection(terminal: AdbTerminalState, actions: TerminalActions) {
+    val input = remember { mutableStateOf("") }
+
+    LabelledValue(
+        label = stringResource(R.string.terminal_label),
+        value = terminal.output.ifBlank {
+            terminal.ended?.let { reason -> stringResource(R.string.terminal_ended, reason) }
+                ?: stringResource(R.string.terminal_waiting)
+        },
+    )
+    if (terminal.active) {
+        OutlinedTextField(
+            value = input.value,
+            onValueChange = { text -> input.value = text },
+            label = { Text(stringResource(R.string.terminal_input_hint)) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Button(
+            onClick = {
+                actions.onSend(input.value)
+                input.value = ""
+            },
+        ) {
+            Text(stringResource(R.string.terminal_send))
+        }
+        Button(onClick = actions.onInterrupt) {
+            Text(stringResource(R.string.terminal_interrupt))
+        }
+        Button(onClick = actions.onStop) {
+            Text(stringResource(R.string.terminal_stop))
+        }
+    } else {
+        Button(onClick = actions.onStart) {
+            Text(stringResource(R.string.terminal_start))
+        }
+    }
+    Text(
+        text = stringResource(R.string.terminal_note),
+        style = MaterialTheme.typography.bodySmall,
+    )
 }
 
 /**
@@ -401,9 +484,13 @@ private fun AdbLinkSection(
  * никуда не уйдёт, а кнопка, которая ничего не делает, врёт о состоянии.
  */
 @Composable
-private fun ShellSection(command: AdbCommandState, onRunCommand: (String) -> Unit) {
+private fun ShellSection(
+    command: AdbCommandState,
+    terminalActive: Boolean,
+    onRunCommand: (String) -> Unit,
+) {
     val input = remember { mutableStateOf("") }
-    val running = command is AdbCommandState.Running
+    val running = command is AdbCommandState.Running || terminalActive
 
     OutlinedTextField(
         value = input.value,

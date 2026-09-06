@@ -74,4 +74,13 @@
     <string name="shell_stderr">stderr</string>
     <string name="shell_exit_code">Код возврата: %1$d</string>
     <string name="shell_exit_unknown">Код возврата недоступен: устройство не поддерживает shell,v2.</string>
+    <string name="terminal_label">Интерактивная оболочка</string>
+    <string name="terminal_start">Открыть оболочку</string>
+    <string name="terminal_stop">Закрыть оболочку</string>
+    <string name="terminal_send">Отправить</string>
+    <string name="terminal_interrupt">Ctrl+C</string>
+    <string name="terminal_input_hint">Строка для оболочки</string>
+    <string name="terminal_waiting">Оболочка открыта и ждёт ввода.</string>
+    <string name="terminal_ended">Сессия завершена: %1$s</string>
+    <string name="terminal_note">Оболочка живёт, пока её не закрыть, поэтому одиночные команды в это время недоступны: читатель ровно один. Управляющие последовательности показываются как есть, они пока не разбираются.</string>
 </resources>
