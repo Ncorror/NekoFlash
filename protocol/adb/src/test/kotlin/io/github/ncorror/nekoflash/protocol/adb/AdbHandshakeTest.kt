@@ -157,6 +157,33 @@ class AdbHandshakeTest {
         assertEquals(AdbHandshakeFailure.AUTHORIZATION_NOT_CONFIRMED, outcome.reason)
     }
 
+    /**
+     * Платформа возвращает управление и раньше срока, поэтому в журнал идёт
+     * настоящее время ожидания. «Ждал минуту» и «ждал полминуты» — это разница
+     * между «человек не подошёл» и «человек нажал отмену».
+     */
+    @Test
+    fun refusalReportsHowLongItActuallyWaited() = withKeyStore { keyStore ->
+        val device = ScriptedDevice(authToken(), authToken(), silence())
+        val elapsed = StepwiseClock(stepNanos = 7_000_000_000L)
+
+        val outcome = device.handshake(keyStore, elapsed = elapsed)
+            .connect() as AdbHandshakeOutcome.Failed
+
+        assertTrue(outcome.detail, outcome.detail.contains("7000ms of 60000ms"))
+    }
+
+    /** Каждое обращение сдвигает время на один шаг. */
+    private class StepwiseClock(private val stepNanos: Long) : () -> Long {
+        private var nanos = 0L
+
+        override fun invoke(): Long {
+            val current = nanos
+            nanos += stepNanos
+            return current
+        }
+    }
+
     @Test
     fun deviceThatKeepsAskingForeverIsGivenUpOn() = withKeyStore { keyStore ->
         val tokens = Array(AdbHandshake.AUTH_RESPONSE_LIMIT + 2) { authToken() }
@@ -320,12 +347,14 @@ class AdbHandshakeTest {
             keyStore: AdbKeyStore,
             localMaxPayload: Int = MAX_PAYLOAD,
             diagnostics: InMemoryDiagnosticSink? = null,
+            elapsed: (() -> Long)? = null,
         ) = AdbHandshake(
             reader = sharedReader,
             writer = sharedWriter,
             keyStore = keyStore,
             localMaxPayload = localMaxPayload,
             diagnostics = diagnostics ?: InMemoryDiagnosticSink(),
+            elapsedNanos = elapsed ?: { 0L },
         )
     }
 

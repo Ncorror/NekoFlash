@@ -79,6 +79,7 @@ public class AdbHandshake(
     private val localMaxPayload: Int,
     private val diagnostics: DiagnosticSink = DiagnosticSink { },
     private val clock: () -> Instant = { Clock.systemUTC().instant() },
+    private val elapsedNanos: () -> Long = { System.nanoTime() },
 ) {
     private var attempted = false
 
@@ -145,6 +146,7 @@ public class AdbHandshake(
 
         repeat(AUTH_RESPONSE_LIMIT) {
             val timeout = if (publicKeySent) AUTH_CONFIRMATION_TIMEOUT_MS else AUTH_SIGNATURE_TIMEOUT_MS
+            val startedAt = elapsedNanos()
             val packet = when (val outcome = reader.read(timeout)) {
                 is AdbReadOutcome.Received -> outcome.packet
                 AdbReadOutcome.Idle -> return failed(
@@ -153,7 +155,13 @@ public class AdbHandshake(
                     } else {
                         AdbHandshakeFailure.NO_RESPONSE
                     },
-                    "waited ${timeout}ms",
+                    // Сколько ждали на самом деле, а не сколько собирались.
+                    // Платформа возвращает управление и раньше срока: отказ в
+                    // диалоге 2026-09-06 пришёл через 27 секунд, а журнал
+                    // сообщал про 60 (`07` §6.29). Разница между «ждал минуту»
+                    // и «ждал полминуты» — это разница между «человек не
+                    // подошёл» и «человек нажал отмену».
+                    "waited ${(elapsedNanos() - startedAt) / NANOS_PER_MILLI}ms of ${timeout}ms",
                 )
 
                 else -> return readFailure(outcome, "AUTH response")
@@ -309,6 +317,8 @@ public class AdbHandshake(
 
         /** Сколько ответов подряд разбирается, прежде чем ожидание признаётся напрасным. */
         public const val AUTH_RESPONSE_LIMIT: Int = 12
+
+        private const val NANOS_PER_MILLI = 1_000_000L
 
         /** Значения из A2 и Legacy. */
         public const val RESPONSE_TIMEOUT_MS: Int = 10_000
