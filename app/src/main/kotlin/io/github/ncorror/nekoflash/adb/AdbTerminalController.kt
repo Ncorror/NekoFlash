@@ -11,8 +11,12 @@ import kotlinx.coroutines.flow.asStateFlow
 
 /** Состояние интерактивной оболочки. */
 public data class AdbTerminalState(
-    /** Идёт ли сессия. */
+    /** Идёт ли открытие, живая сессия или её корректное закрытие. */
     val active: Boolean = false,
+    /** Подтвердило ли устройство `OPEN`; только после этого допустим ввод. */
+    val ready: Boolean = false,
+    /** Запрошено ли закрытие; reader остаётся занят до завершения CLSE. */
+    val closing: Boolean = false,
     /** Накопленный вывод. */
     val output: String = "",
     /** Чем закончилась последняя сессия, если она закончилась. */
@@ -26,17 +30,25 @@ public data class AdbTerminalState(
  * этот — за жизнью одной сессии. Внутри у них разное время жизни и разные
  * причины заканчиваться.
  *
- * Читающий цикл занимает [executor] целиком и держит его, пока сессия жива. Это
- * не расточительство, а прямое следствие контракта: физический читатель должен
- * быть один, и пока он занят оболочкой, заняться чем-то ещё он не может.
- * Поэтому владелец соединения обязан спрашивать [active] перед любой
- * одноразовой командой.
+ * [readerExecutor] занят читающим циклом, пока сессия жива. Физический reader
+ * остаётся ровно один. Ввод и закрытие идут через отдельный [writerExecutor]:
+ * Android `bulkTransfer` блокирующий и может ждать секунды, поэтому ни одна
+ * операция терминала не выполняется на UI thread. Порядок записей и состояние
+ * маршрутизатора сериализует замок внутри [AdbInteractiveShell].
  */
 public class AdbTerminalController(
-    private val executor: Executor,
+    private val readerExecutor: Executor,
+    private val writerExecutor: Executor,
     private val diagnostics: DiagnosticSink = DiagnosticSink { },
 ) {
     private val mutableState = MutableStateFlow(AdbTerminalState())
+    private val lifecycleLock = Any()
+
+    private var nextRequestId = 0L
+    private var activeRequestId: Long? = null
+    private var readerRequestId: Long? = null
+    private var shellRequestId: Long? = null
+    private var closeScheduledRequestId: Long? = null
 
     @Volatile
     private var shell: AdbInteractiveShell? = null
@@ -44,82 +56,168 @@ public class AdbTerminalController(
     /** Состояние сессии. Экран подписывается и ничего не опрашивает. */
     public val state: StateFlow<AdbTerminalState> = mutableState.asStateFlow()
 
-    /** Идёт ли сессия прямо сейчас. */
+    /** Идёт ли открытие или живая сессия прямо сейчас. */
     public val active: Boolean
-        get() = shell != null
+        get() = synchronized(lifecycleLock) { activeRequestId != null }
 
-    /** Открывает оболочку и запускает её читающий цикл. */
+    /**
+     * Запрашивает открытие оболочки и сразу возвращается.
+     *
+     * Даже исходный `OPEN` отправляется на [readerExecutor], а не из callback
+     * Compose. До события [AdbShellEvent.Opened] состояние остаётся
+     * `ready=false`, поэтому ранний ввод не может молча потеряться.
+     */
     public fun start(connection: AdbConnection) {
-        if (active) return
-
-        val session = connection.interactiveShell(diagnostics)
-        shell = session
-        mutableState.value = AdbTerminalState(active = true)
-        if (!session.open()) {
-            shell = null
-            mutableState.value = AdbTerminalState(ended = OPEN_FAILED)
-            return
+        val requestId = synchronized(lifecycleLock) {
+            if (activeRequestId != null) return
+            nextRequestId += 1
+            activeRequestId = nextRequestId
+            mutableState.value = AdbTerminalState(active = true)
+            nextRequestId
         }
-        executor.execute { pumpUntilClosed(session) }
+        readerExecutor.execute { openAndPump(connection, requestId) }
     }
 
-    /**
-     * Передаёт строку в оболочку вместе с переводом строки.
-     *
-     * Перевод строки добавляется здесь, а не в протокольном слое: там его
-     * дописывание означало бы выполнять команду, которую не просили, а тут
-     * пользователь нажал «Отправить» — это и есть Enter.
-     */
+    /** Передаёт строку вместе с Enter, только когда peer подтвердил `OPEN`. */
     public fun sendInput(text: String) {
-        shell?.sendInput(text + "\n")
+        val session = currentReadyShell() ?: return
+        writerExecutor.execute { session.sendInput(text + "\n") }
     }
 
-    /**
-     * Прерывает текущую команду.
-     *
-     * Байт `0x03` — то же, что `Ctrl+C` в терминале: оболочка остаётся жива,
-     * умирает только то, что она запустила.
-     */
+    /** Прерывает текущую команду, не закрывая оболочку. */
     public fun interrupt() {
-        shell?.sendInput(byteArrayOf(CTRL_C))
-    }
-
-    /** Закрывает оболочку. Цикл увидит это и завершится сам. */
-    public fun stop() {
-        shell?.close()
+        val session = currentReadyShell() ?: return
+        writerExecutor.execute { session.sendInput(byteArrayOf(CTRL_C)) }
     }
 
     /**
-     * Читающий цикл сессии.
+     * Закрывает оболочку; блокирующая USB-запись также уходит с UI thread.
      *
-     * Заканчивается вместе с ней: сессия сама перестаёт быть активной, когда
-     * оболочка вышла или транспорт оборвался.
+     * Reader ownership не освобождается, пока worker закрытия не отправил
+     * `CLSE`, а читающий цикл не вышел. Иначе следующий service call мог бы
+     * начать использовать тот же ADB transport параллельно с ещё не
+     * завершившимся закрытием Terminal.
      */
-    private fun pumpUntilClosed(session: AdbInteractiveShell) {
-        val text = StringBuilder()
-        var ended: String? = null
+    public fun stop() {
+        val closeRequest = synchronized(lifecycleLock) {
+            val requestId = activeRequestId
+            when {
+                requestId == null || mutableState.value.closing -> null
+                readerRequestId != requestId -> {
+                    // Reader task ещё даже не начал выполняться. Его можно отменить
+                    // без единой USB-операции; queued task увидит stale request.
+                    activeRequestId = null
+                    mutableState.value = mutableState.value.copy(
+                        active = false,
+                        ready = false,
+                        closing = false,
+                        ended = CLOSED,
+                    )
+                    null
+                }
 
-        while (session.active) {
-            session.pump().forEach { event -> ended = apply(event, text) ?: ended }
-            trimToLimit(text)
-            mutableState.value = AdbTerminalState(active = true, output = text.toString())
+                else -> prepareClose(requestId)
+            }
+        }
+        closeRequest?.let { (session, requestId) -> scheduleClose(session, requestId) }
+    }
+
+    private fun prepareClose(requestId: Long): Pair<AdbInteractiveShell, Long>? {
+        val wasReady = mutableState.value.ready
+        mutableState.value = mutableState.value.copy(
+            active = true,
+            ready = false,
+            closing = true,
+        )
+
+        // До OKAY remoteId неизвестен, а AdbStreamRouter не может сформировать
+        // корректный CLSE. При остановке во время OPEN продолжаем pump до
+        // OKAY/CLSE и только затем закрываем.
+        return shell.takeIf { wasReady && shellRequestId == requestId }?.let { it to requestId }
+    }
+
+    private fun openAndPump(connection: AdbConnection, requestId: Long) {
+        if (markReaderStarted(requestId)) {
+            val session = connection.interactiveShell(diagnostics)
+            when {
+                !session.open() -> finishSession(session, requestId, OPEN_FAILED)
+                bindShell(session, requestId) -> pumpUntilClosed(session, requestId)
+                else -> session.close()
+            }
+        }
+    }
+
+    private fun markReaderStarted(requestId: Long): Boolean = synchronized(lifecycleLock) {
+        if (activeRequestId == requestId) {
+            readerRequestId = requestId
+            true
+        } else {
+            false
+        }
+    }
+
+    private fun bindShell(session: AdbInteractiveShell, requestId: Long): Boolean =
+        synchronized(lifecycleLock) {
+            if (activeRequestId == requestId) {
+                shell = session
+                shellRequestId = requestId
+                true
+            } else {
+                false
+            }
         }
 
-        shell = null
-        mutableState.value = AdbTerminalState(
-            active = false,
-            output = text.toString(),
-            ended = ended ?: CLOSED,
-        )
+    /** Читающий цикл одной сессии. */
+    private fun pumpUntilClosed(session: AdbInteractiveShell, requestId: Long) {
+        val text = StringBuilder()
+        var progress = PumpProgress()
+
+        while (session.active && isCurrent(requestId)) {
+            progress = consumePumpEvents(session, requestId, text, progress)
+            trimToLimit(text)
+            publishRunningState(requestId, progress.ready, text)
+        }
+
+        finishSession(session, requestId, progress.ended ?: CLOSED, text.toString())
     }
 
-    /**
-     * Прикладывает событие к накопленному выводу.
-     *
-     * Возвращает причину завершения, когда сессия закончилась, и `null`, пока
-     * она продолжается.
-     */
+    private fun consumePumpEvents(
+        session: AdbInteractiveShell,
+        requestId: Long,
+        text: StringBuilder,
+        previous: PumpProgress,
+    ): PumpProgress {
+        var ready = previous.ready
+        var ended = previous.ended
+        for (event in session.pump()) {
+            if (event == AdbShellEvent.Opened) {
+                ready = true
+                if (isClosing(requestId)) scheduleClose(session, requestId)
+            } else {
+                ended = apply(event, text) ?: ended
+            }
+        }
+        return PumpProgress(ready, ended)
+    }
+
+    private fun publishRunningState(requestId: Long, ready: Boolean, text: StringBuilder) {
+        synchronized(lifecycleLock) {
+            if (activeRequestId == requestId) {
+                val closing = mutableState.value.closing
+                mutableState.value = AdbTerminalState(
+                    active = true,
+                    ready = ready && !closing,
+                    closing = closing,
+                    output = text.toString(),
+                )
+            }
+        }
+    }
+
+    /** Прикладывает событие вывода и возвращает причину завершения. */
     private fun apply(event: AdbShellEvent, text: StringBuilder): String? = when (event) {
+        AdbShellEvent.Opened -> null
+
         is AdbShellEvent.Output -> {
             text.append(event.text)
             null
@@ -133,21 +231,69 @@ public class AdbTerminalController(
         }
 
         is AdbShellEvent.Exited -> event.code?.let { code -> "exit $code" } ?: "exit"
-
         is AdbShellEvent.Broken -> event.reason
     }
 
-    /**
-     * Держит вывод в пределах памяти.
-     *
-     * Терминал может выдавать бесконечный поток: `logcat` не остановится сам.
-     * Отбрасывается старое, потому что на экране нужно последнее.
-     */
+    private fun scheduleClose(session: AdbInteractiveShell, requestId: Long) {
+        val schedule = synchronized(lifecycleLock) {
+            if (activeRequestId != requestId || closeScheduledRequestId == requestId) {
+                false
+            } else {
+                closeScheduledRequestId = requestId
+                true
+            }
+        }
+        if (schedule) writerExecutor.execute { session.close() }
+    }
+
+    private fun currentReadyShell(): AdbInteractiveShell? = synchronized(lifecycleLock) {
+        val requestId = activeRequestId ?: return null
+        if (!mutableState.value.ready || shellRequestId != requestId) return null
+        shell
+    }
+
+    private fun isCurrent(requestId: Long): Boolean =
+        synchronized(lifecycleLock) { activeRequestId == requestId }
+
+    private fun isClosing(requestId: Long): Boolean = synchronized(lifecycleLock) {
+        activeRequestId == requestId && mutableState.value.closing
+    }
+
+    private fun finishSession(
+        session: AdbInteractiveShell,
+        requestId: Long,
+        ended: String,
+        output: String = "",
+    ) {
+        synchronized(lifecycleLock) {
+            if (shell === session && shellRequestId == requestId) {
+                shell = null
+                shellRequestId = null
+            }
+            if (activeRequestId != requestId) return
+            activeRequestId = null
+            if (readerRequestId == requestId) readerRequestId = null
+            if (closeScheduledRequestId == requestId) closeScheduledRequestId = null
+            mutableState.value = AdbTerminalState(
+                active = false,
+                ready = false,
+                output = output,
+                ended = ended,
+            )
+        }
+    }
+
+    /** Держит вывод в пределах памяти; `logcat` может быть бесконечным. */
     private fun trimToLimit(text: StringBuilder) {
         if (text.length > MAX_TERMINAL_CHARS) {
             text.delete(0, text.length - MAX_TERMINAL_CHARS)
         }
     }
+
+    private data class PumpProgress(
+        val ready: Boolean = false,
+        val ended: String? = null,
+    )
 
     private companion object {
         const val CTRL_C: Byte = 3

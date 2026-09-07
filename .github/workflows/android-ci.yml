@@ -34,6 +34,9 @@ jobs:
       - name: Localization contract
         run: python3 ./scripts/ci/check_localization.py
 
+      - name: Documentation consistency
+        run: python3 ./scripts/ci/check_docs_consistency.py
+
       - name: Kotlin style, complexity and module boundaries
         run: ./scripts/ci/check_kotlin_style.sh
 

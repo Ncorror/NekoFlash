@@ -65,18 +65,16 @@ public object AdbShellProtocol {
         val stderr = StringBuilder()
         var exitCode: Int? = null
         var offset = 0
+        var invalidFrame = false
 
         while (offset + HEADER_SIZE_BYTES <= bytes.size) {
             val id = bytes[offset].toInt() and 0xFF
             val length = readIntLe(bytes, offset + 1)
-            if (length < 0 || length > maxFrameBytes) {
-                return AdbShellOutput(stdout.toString(), stderr.toString(), exitCode, truncated = true)
-            }
             val payloadStart = offset + HEADER_SIZE_BYTES
-            if (payloadStart + length > bytes.size) {
-                return AdbShellOutput(stdout.toString(), stderr.toString(), exitCode, truncated = true)
+            if (length < 0 || length > maxFrameBytes || payloadStart + length > bytes.size) {
+                invalidFrame = true
+                break
             }
-
             when (id) {
                 ID_STDOUT -> stdout.append(text(bytes, payloadStart, length))
                 ID_STDERR -> stderr.append(text(bytes, payloadStart, length))
@@ -90,7 +88,7 @@ public object AdbShellProtocol {
             stdout = stdout.toString(),
             stderr = stderr.toString(),
             exitCode = exitCode,
-            truncated = offset != bytes.size,
+            truncated = invalidFrame || offset != bytes.size,
         )
     }
 

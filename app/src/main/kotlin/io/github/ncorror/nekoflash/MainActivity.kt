@@ -1,6 +1,7 @@
 package io.github.ncorror.nekoflash
 
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -13,12 +14,18 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.lifecycleScope
 import io.github.ncorror.nekoflash.ui.NekoFlashApp
 import io.github.ncorror.nekoflash.adb.AdbLinkController
 import io.github.ncorror.nekoflash.ui.FileActions
 import io.github.ncorror.nekoflash.ui.TerminalActions
 import io.github.ncorror.nekoflash.ui.theme.NekoFlashTheme
 import io.github.ncorror.nekoflash.usb.api.UsbClaimResult
+import io.github.ncorror.nekoflash.usb.api.UsbSession
+import io.github.ncorror.nekoflash.usb.api.UsbSessionCoordinator
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -49,14 +56,9 @@ class MainActivity : ComponentActivity() {
             val saveLauncher = rememberLauncherForActivityResult(
                 ActivityResultContracts.CreateDocument("application/zip"),
             ) { destination ->
-                if (destination == null) return@rememberLauncherForActivityResult
-                exportStatus = runCatching { application.writeDiagnostics(destination) }
-                    .fold(
-                        onSuccess = { result -> savedTemplate.format(result.sectionCount) },
-                        onFailure = { failure ->
-                            failedTemplate.format(failure.message ?: failure.javaClass.simpleName)
-                        },
-                    )
+                exportDiagnostics(application, destination, savedTemplate, failedTemplate) { message ->
+                    exportStatus = message
+                }
             }
 
             NekoFlashTheme {
@@ -72,22 +74,38 @@ class MainActivity : ComponentActivity() {
                     files = fileState,
                     fileActions = FileActions(adbLink::describeFile, adbLink::readFile),
                     onRescanUsb = { coordinator.scanAttachedDevices() },
-                    onClaim = { session ->
-                        val result = coordinator.claim(session.generation)
-                        if (result is UsbClaimResult.Failed) {
-                            exportStatus = claimFailedTemplate.format(result.reason.name)
-                        }
-                    },
+                    onClaim = claimAction(coordinator, claimFailedTemplate) { exportStatus = it },
                     onRelease = { session -> coordinator.release(session.generation) },
                     onAdbConnect = { session -> adbLink.connect(session.generation) },
                     onAdbDisconnect = { session -> adbLink.disconnect(session.generation) },
                     onRunCommand = adbLink::runCommand,
-                    onExportDiagnostics = {
-                        saveLauncher.launch(application.suggestedDiagnosticsFileName())
-                    },
+                    onExportDiagnostics = { saveLauncher.launch(application.suggestedDiagnosticsFileName()) },
                 )
             }
         }
+    }
+}
+
+private fun MainActivity.exportDiagnostics(
+    application: NekoFlashApplication,
+    destination: Uri?,
+    savedTemplate: String,
+    failedTemplate: String,
+    onStatus: (String) -> Unit,
+) {
+    if (destination == null) return
+    lifecycleScope.launch {
+        val outcome = withContext(Dispatchers.IO) {
+            runCatching { application.writeDiagnostics(destination) }
+        }
+        onStatus(
+            outcome.fold(
+                onSuccess = { result -> savedTemplate.format(result.sectionCount) },
+                onFailure = { failure ->
+                    failedTemplate.format(failure.message ?: failure.javaClass.simpleName)
+                },
+            ),
+        )
     }
 }
 
@@ -98,3 +116,15 @@ private fun terminalActions(link: AdbLinkController) = TerminalActions(
     onInterrupt = link::interruptShell,
     onStop = link::stopShell,
 )
+
+/** Преобразует технический результат claim в короткое UI-сообщение. */
+private fun claimAction(
+    coordinator: UsbSessionCoordinator,
+    failedTemplate: String,
+    onFailure: (String) -> Unit,
+): (UsbSession) -> Unit = { session ->
+    val result = coordinator.claim(session.generation)
+    if (result is UsbClaimResult.Failed) {
+        onFailure(failedTemplate.format(result.reason.name))
+    }
+}

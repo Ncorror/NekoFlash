@@ -83,6 +83,22 @@ public class AdbHandshake(
 ) {
     private var attempted = false
 
+    private sealed interface AuthStart {
+        data class Ready(val publicKeySent: Boolean) : AuthStart
+        data class Failed(val outcome: AdbHandshakeOutcome) : AuthStart
+    }
+
+    private sealed interface AuthRead {
+        data class Packet(val packet: AdbPacket, val elapsedMillis: Long) : AuthRead
+        data class Failed(val outcome: AdbHandshakeOutcome) : AuthRead
+    }
+
+    private sealed interface AuthAction {
+        data object Continue : AuthAction
+        data object PublicKeySent : AuthAction
+        data class Finished(val outcome: AdbHandshakeOutcome) : AuthAction
+    }
+
     /**
      * Проводит рукопожатие.
      *
@@ -105,22 +121,27 @@ public class AdbHandshake(
             arg1 = localMaxPayload,
             payload = HOST_BANNER,
         )
-        if (sent !is AdbWriteOutcome.Sent) return sendFailure(sent, "CNXN")
-        emit("cnxn_sent", mapOf("version" to LOCAL_VERSION.toHex(), "maxPayload" to localMaxPayload.toString()))
-
-        val first = when (val outcome = reader.read(RESPONSE_TIMEOUT_MS)) {
-            is AdbReadOutcome.Received -> outcome.packet
-            else -> return readFailure(outcome, "CNXN response")
-        }
-
-        return when (first.command) {
-            AdbCommand.CNXN -> connected(first)
-            AdbCommand.AUTH -> authorize(first)
-            else -> failed(
-                AdbHandshakeFailure.UNEXPECTED_COMMAND,
-                "command=0x${first.command.toString(16)}",
+        return if (sent !is AdbWriteOutcome.Sent) {
+            sendFailure(sent, "CNXN")
+        } else {
+            emit(
+                "cnxn_sent",
+                mapOf("version" to LOCAL_VERSION.toHex(), "maxPayload" to localMaxPayload.toString()),
             )
+            when (val outcome = reader.read(RESPONSE_TIMEOUT_MS)) {
+                is AdbReadOutcome.Received -> handleInitialResponse(outcome.packet)
+                else -> readFailure(outcome, "CNXN response")
+            }
         }
+    }
+
+    private fun handleInitialResponse(packet: AdbPacket): AdbHandshakeOutcome = when (packet.command) {
+        AdbCommand.CNXN -> connected(packet)
+        AdbCommand.AUTH -> authorize(packet)
+        else -> failed(
+            AdbHandshakeFailure.UNEXPECTED_COMMAND,
+            "command=0x${packet.command.toString(16)}",
+        )
     }
 
     private fun authorize(first: AdbPacket): AdbHandshakeOutcome {
@@ -129,85 +150,115 @@ public class AdbHandshake(
         }
         emit("auth_required")
         emitHostKeyProvenance()
+        return when (val start = beginAuthorization(first.payload)) {
+            is AuthStart.Failed -> start.outcome
+            is AuthStart.Ready -> awaitAuthorization(start.publicKeySent)
+        }
+    }
 
-        var publicKeySent = false
-        val signature = runCatching { keyStore.signToken(first.payload) }
-        if (signature.isSuccess) {
+    private fun beginAuthorization(token: ByteArray): AuthStart {
+        val signature = runCatching { keyStore.signToken(token) }
+        return if (signature.isSuccess) {
             val sent = writer.write(AdbCommand.AUTH, AUTH_SIGNATURE, 0, signature.getOrThrow())
-            if (sent !is AdbWriteOutcome.Sent) return sendFailure(sent, "AUTH SIGNATURE")
-            emit("auth_signature_sent")
+            if (sent is AdbWriteOutcome.Sent) {
+                emit("auth_signature_sent")
+                AuthStart.Ready(publicKeySent = false)
+            } else {
+                AuthStart.Failed(sendFailure(sent, "AUTH SIGNATURE"))
+            }
         } else {
             emit("auth_signature_failed", mapOf("cause" to signature.causeName()))
-            when (val result = sendPublicKey()) {
-                null -> publicKeySent = true
-                else -> return result
+            val publicKeyFailure = sendPublicKey()
+            if (publicKeyFailure == null) {
+                AuthStart.Ready(publicKeySent = true)
+            } else {
+                AuthStart.Failed(publicKeyFailure)
             }
         }
+    }
 
-        var attempt = 0
-        repeat(AUTH_RESPONSE_LIMIT) {
+    private fun awaitAuthorization(initialPublicKeySent: Boolean): AdbHandshakeOutcome {
+        var publicKeySent = initialPublicKeySent
+        var attempt = 1
+        var outcome: AdbHandshakeOutcome? = null
+        while (attempt <= AUTH_RESPONSE_LIMIT && outcome == null) {
+            when (val read = readAuthResponse(publicKeySent)) {
+                is AuthRead.Failed -> outcome = read.outcome
+                is AuthRead.Packet -> {
+                    emitAuthResponse(attempt, read)
+                    when (val action = handleAuthResponse(read.packet, publicKeySent)) {
+                        AuthAction.Continue -> Unit
+                        AuthAction.PublicKeySent -> publicKeySent = true
+                        is AuthAction.Finished -> outcome = action.outcome
+                    }
+                }
+            }
             attempt += 1
-            val timeout = if (publicKeySent) AUTH_CONFIRMATION_TIMEOUT_MS else AUTH_SIGNATURE_TIMEOUT_MS
-            val startedAt = elapsedNanos()
-            val packet = when (val outcome = reader.read(timeout)) {
-                is AdbReadOutcome.Received -> outcome.packet
-                AdbReadOutcome.Idle -> return failed(
+        }
+        return outcome ?: failed(
+            AdbHandshakeFailure.AUTHORIZATION_NOT_CONFIRMED,
+            "device kept asking after $AUTH_RESPONSE_LIMIT responses",
+        )
+    }
+
+    private fun readAuthResponse(publicKeySent: Boolean): AuthRead {
+        val timeout = if (publicKeySent) AUTH_CONFIRMATION_TIMEOUT_MS else AUTH_SIGNATURE_TIMEOUT_MS
+        val startedAt = elapsedNanos()
+        val read = reader.read(timeout)
+        val elapsedMillis = (elapsedNanos() - startedAt) / NANOS_PER_MILLI
+        return when (read) {
+            is AdbReadOutcome.Received -> AuthRead.Packet(read.packet, elapsedMillis)
+            AdbReadOutcome.Idle -> AuthRead.Failed(
+                failed(
                     if (publicKeySent) {
                         AdbHandshakeFailure.AUTHORIZATION_NOT_CONFIRMED
                     } else {
                         AdbHandshakeFailure.NO_RESPONSE
                     },
-                    // Сколько ждали на самом деле, а не сколько собирались.
-                    // Платформа возвращает управление и раньше срока: отказ в
-                    // диалоге 2026-09-06 пришёл через 27 секунд, а журнал
-                    // сообщал про 60 (`07` §6.29). Разница между «ждал минуту»
-                    // и «ждал полминуты» — это разница между «человек не
-                    // подошёл» и «человек нажал отмену».
-                    "waited ${(elapsedNanos() - startedAt) / NANOS_PER_MILLI}ms of ${timeout}ms",
-                )
-
-                else -> return readFailure(outcome, "AUTH response")
-            }
-
-            // Каждый ответ в этом цикле записывается. Без этого «ожидание»
-            // выглядит одинаково и когда устройство молчит, и когда оно раз за
-            // разом присылает токен: разбор 2026-09-07 упёрся именно в это.
-            emit(
-                "auth_response",
-                mapOf(
-                    "attempt" to attempt.toString(),
-                    "command" to "0x${packet.command.toString(16)}",
-                    "type" to packet.arg0.toString(),
-                    "payload" to packet.payload.size.toString(),
-                    "afterMs" to ((elapsedNanos() - startedAt) / NANOS_PER_MILLI).toString(),
+                    "waited ${elapsedMillis}ms of ${timeout}ms",
                 ),
             )
 
-            when (packet.command) {
-                AdbCommand.CNXN -> return connected(packet)
-                AdbCommand.AUTH -> {
-                    if (packet.arg0 != AUTH_TOKEN) {
-                        return failed(AdbHandshakeFailure.UNSUPPORTED_AUTH_TYPE, "type=${packet.arg0}")
-                    }
-                    if (!publicKeySent) {
-                        when (val result = sendPublicKey()) {
-                            null -> publicKeySent = true
-                            else -> return result
-                        }
-                    }
-                }
+            else -> AuthRead.Failed(readFailure(read, "AUTH response"))
+        }
+    }
 
-                else -> return failed(
+    private fun emitAuthResponse(attempt: Int, read: AuthRead.Packet) {
+        // Каждый ответ записывается: молчание устройства и повторный AUTH token
+        // должны различаться в hardware evidence.
+        emit(
+            "auth_response",
+            mapOf(
+                "attempt" to attempt.toString(),
+                "command" to "0x${read.packet.command.toString(16)}",
+                "type" to read.packet.arg0.toString(),
+                "payload" to read.packet.payload.size.toString(),
+                "afterMs" to read.elapsedMillis.toString(),
+            ),
+        )
+    }
+
+    private fun handleAuthResponse(packet: AdbPacket, publicKeySent: Boolean): AuthAction =
+        when (packet.command) {
+            AdbCommand.CNXN -> AuthAction.Finished(connected(packet))
+            AdbCommand.AUTH -> handleAuthToken(packet, publicKeySent)
+            else -> AuthAction.Finished(
+                failed(
                     AdbHandshakeFailure.UNEXPECTED_COMMAND,
                     "command=0x${packet.command.toString(16)}",
-                )
-            }
+                ),
+            )
         }
 
-        return failed(
-            AdbHandshakeFailure.AUTHORIZATION_NOT_CONFIRMED,
-            "device kept asking after $AUTH_RESPONSE_LIMIT responses",
-        )
+    private fun handleAuthToken(packet: AdbPacket, publicKeySent: Boolean): AuthAction {
+        return when {
+            packet.arg0 != AUTH_TOKEN -> AuthAction.Finished(
+                failed(AdbHandshakeFailure.UNSUPPORTED_AUTH_TYPE, "type=${packet.arg0}"),
+            )
+
+            publicKeySent -> AuthAction.Continue
+            else -> sendPublicKey()?.let(AuthAction::Finished) ?: AuthAction.PublicKeySent
+        }
     }
 
     /**
@@ -218,21 +269,29 @@ public class AdbHandshake(
      */
     private fun sendPublicKey(): AdbHandshakeOutcome? {
         val payload = runCatching { keyStore.authPayload() }
-        if (payload.isFailure) {
-            return failed(AdbHandshakeFailure.HOST_KEY_UNAVAILABLE, payload.causeName())
-        }
-        val sent = writer.write(AdbCommand.AUTH, AUTH_RSAPUBLICKEY, 0, payload.getOrThrow())
-        if (sent !is AdbWriteOutcome.Sent) return sendFailure(sent, "AUTH RSAPUBLICKEY")
-        emit(
-            "auth_public_key_sent",
-            mapOf(
-                "path" to keyStore.publicKeyPath(),
-                // Длина payload: по ней видно, что на устройство ушла строка
-                // ожидаемого вида, а не пустой или обрезанный ключ.
-                "payload" to payload.getOrThrow().size.toString(),
-            ),
+        return payload.fold(
+            onSuccess = { bytes ->
+                val sent = writer.write(AdbCommand.AUTH, AUTH_RSAPUBLICKEY, 0, bytes)
+                if (sent is AdbWriteOutcome.Sent) {
+                    emit(
+                        "auth_public_key_sent",
+                        mapOf(
+                            "path" to keyStore.publicKeyPath(),
+                            "payload" to bytes.size.toString(),
+                        ),
+                    )
+                    null
+                } else {
+                    sendFailure(sent, "AUTH RSAPUBLICKEY")
+                }
+            },
+            onFailure = { error ->
+                failed(
+                    AdbHandshakeFailure.HOST_KEY_UNAVAILABLE,
+                    error.message ?: error.javaClass.simpleName,
+                )
+            },
         )
-        return null
     }
 
     /**

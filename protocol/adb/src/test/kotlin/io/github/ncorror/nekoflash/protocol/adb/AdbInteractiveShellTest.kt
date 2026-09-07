@@ -31,6 +31,15 @@ class AdbInteractiveShellTest {
     }
 
     @Test
+    fun okayPublishesOpenedEvent() {
+        val device = Device(okay())
+        val shell = device.shell(useShellV2 = true)
+        shell.open()
+
+        assertEquals(listOf(AdbShellEvent.Opened), shell.pump())
+    }
+
+    @Test
     fun outputArrivesAsSeparateStreams() {
         val device = Device(
             okay(),
@@ -60,6 +69,52 @@ class AdbInteractiveShellTest {
         assertTrue(shell.pump().isEmpty())
 
         assertEquals(listOf(AdbShellEvent.Output("halves")), shell.pump())
+    }
+
+    /** UTF-8 symbol may be split between two complete shell,v2 frames. */
+    @Test
+    fun utf8SplitBetweenShellV2FramesIsDecodedIncrementally() {
+        val bytes = "кот".toByteArray(Charsets.UTF_8)
+        val first = bytes.copyOfRange(0, 1)
+        val second = bytes.copyOfRange(1, bytes.size)
+        val device = Device(
+            okay(),
+            write(AdbShellProtocol.encode(AdbShellProtocol.ID_STDOUT, first)),
+            write(AdbShellProtocol.encode(AdbShellProtocol.ID_STDOUT, second)),
+        )
+        val shell = device.opened()
+
+        assertTrue(shell.pump().isEmpty())
+        assertEquals(listOf(AdbShellEvent.Output("кот")), shell.pump())
+    }
+
+    @Test
+    fun shellV2StreamingDecoderStillStripsNulCharacters() {
+        val device = Device(
+            okay(),
+            write(
+                AdbShellProtocol.encode(
+                    AdbShellProtocol.ID_STDOUT,
+                    "a\u0000б".toByteArray(Charsets.UTF_8),
+                ),
+            ),
+        )
+        val shell = device.opened()
+
+        assertEquals(listOf(AdbShellEvent.Output("aб")), shell.pump())
+    }
+
+    /** Legacy shell has the same byte-stream rule even without shell,v2 frames. */
+    @Test
+    fun utf8SplitBetweenLegacyWritesIsDecodedIncrementally() {
+        val bytes = "ёж".toByteArray(Charsets.UTF_8)
+        val first = bytes.copyOfRange(0, 1)
+        val second = bytes.copyOfRange(1, bytes.size)
+        val device = Device(okay(), write(first), write(second))
+        val shell = device.opened(useShellV2 = false)
+
+        assertTrue(shell.pump().isEmpty())
+        assertEquals(listOf(AdbShellEvent.Output("ёж")), shell.pump())
     }
 
     @Test

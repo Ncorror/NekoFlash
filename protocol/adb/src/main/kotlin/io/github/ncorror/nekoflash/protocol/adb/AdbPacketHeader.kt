@@ -65,31 +65,29 @@ public data class AdbPacketHeader(
 
             val command = readIntLe(source, OFFSET_COMMAND).toLong() and 0xFFFF_FFFFL
             val magic = readIntLe(source, OFFSET_MAGIC)
-            if (magic != command.inv().toInt()) {
-                return AdbHeaderDecoding.Rejected(
+            val payloadLength = readIntLe(source, OFFSET_PAYLOAD_LENGTH)
+            return when {
+                magic != command.inv().toInt() -> AdbHeaderDecoding.Rejected(
                     AdbHeaderRejection.MAGIC_MISMATCH,
                     "command=0x${command.toString(16)} magic=0x${magic.toUInt().toString(16)}",
                 )
-            }
 
-            val payloadLength = readIntLe(source, OFFSET_PAYLOAD_LENGTH)
-            if (payloadLength !in 0..maxPayloadBytes) {
-                return AdbHeaderDecoding.Rejected(
+                payloadLength !in 0..maxPayloadBytes -> AdbHeaderDecoding.Rejected(
                     AdbHeaderRejection.PAYLOAD_LENGTH_OUT_OF_RANGE,
                     "length=$payloadLength advertisedMaxPayload=$maxPayloadBytes",
                 )
-            }
 
-            return AdbHeaderDecoding.Decoded(
-                AdbPacketHeader(
-                    command = command,
-                    arg0 = readIntLe(source, OFFSET_ARG0),
-                    arg1 = readIntLe(source, OFFSET_ARG1),
-                    payloadLength = payloadLength,
-                    checksum = readIntLe(source, OFFSET_CHECKSUM),
-                    magic = magic,
-                ),
-            )
+                else -> AdbHeaderDecoding.Decoded(
+                    AdbPacketHeader(
+                        command = command,
+                        arg0 = readIntLe(source, OFFSET_ARG0),
+                        arg1 = readIntLe(source, OFFSET_ARG1),
+                        payloadLength = payloadLength,
+                        checksum = readIntLe(source, OFFSET_CHECKSUM),
+                        magic = magic,
+                    ),
+                )
+            }
         }
 
         /** Записывает заголовок пакета в [target] начиная с нулевого смещения. */

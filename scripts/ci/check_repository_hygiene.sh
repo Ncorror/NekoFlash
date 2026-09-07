@@ -32,9 +32,21 @@ mapfile -t production_sources < <(
 )
 
 if (( ${#production_sources[@]} > 0 )); then
-  if git grep -nE '\b(FIXME|HACK)\b|TODO\(|NotImplementedError|UnsupportedOperationException\("Not implemented' -- "${production_sources[@]}"; then
-    fail 'production stub or unresolved marker found'
-  fi
+  set +e
+  stub_scan="$(git grep -nE '(^|[^[:alnum:]_])(FIXME|HACK)([^[:alnum:]_]|$)|TODO[(]|NotImplementedError|UnsupportedOperationException[(]"Not implemented' -- "${production_sources[@]}" 2>&1)"
+  stub_status=$?
+  set -e
+  case "$stub_status" in
+    0)
+      printf '%s\n' "$stub_scan" >&2
+      fail 'production stub or unresolved marker found'
+      ;;
+    1) ;;
+    *)
+      printf '%s\n' "$stub_scan" >&2
+      fail "git grep failed while scanning production stubs (status $stub_status)"
+      ;;
+  esac
 fi
 
 mapfile -t text_files < <(
@@ -43,9 +55,21 @@ mapfile -t text_files < <(
 )
 
 if (( ${#text_files[@]} > 0 )); then
-  if git grep -nI -E '[[:blank:]]+$' -- "${text_files[@]}"; then
-    fail 'trailing whitespace found in tracked text files'
-  fi
+  set +e
+  whitespace_scan="$(git grep -nI -E '[[:blank:]]+$' -- "${text_files[@]}" 2>&1)"
+  whitespace_status=$?
+  set -e
+  case "$whitespace_status" in
+    0)
+      printf '%s\n' "$whitespace_scan" >&2
+      fail 'trailing whitespace found in tracked text files'
+      ;;
+    1) ;;
+    *)
+      printf '%s\n' "$whitespace_scan" >&2
+      fail "git grep failed while scanning trailing whitespace (status $whitespace_status)"
+      ;;
+  esac
 fi
 
 printf 'repository hygiene: PASS\n'

@@ -79,10 +79,11 @@ public class AdbPacketWriter(
         AdbPacketHeader.encode(headerBuffer, command, arg0, arg1, payload, checksum)
 
         val header = sendFully(headerBuffer, headerBuffer.size, 0, timeoutMillis)
-        if (header !is AdbWriteOutcome.Sent) return header
-        if (payload.isEmpty()) return AdbWriteOutcome.Sent
-
-        return sendFully(payload, payload.size, headerBuffer.size, timeoutMillis)
+        return when {
+            header !is AdbWriteOutcome.Sent -> header
+            payload.isEmpty() -> AdbWriteOutcome.Sent
+            else -> sendFully(payload, payload.size, headerBuffer.size, timeoutMillis)
+        }
     }
 
     /**
@@ -96,26 +97,29 @@ public class AdbPacketWriter(
         timeoutMillis: Int,
     ): AdbWriteOutcome {
         var sent = 0
-        while (sent < length) {
+        var outcome: AdbWriteOutcome? = null
+        while (sent < length && outcome == null) {
             val chunk = minOf(USB_BULK_CHUNK_BYTES, length - sent)
-            val result = handle.send(
-                source = source,
-                offset = sent,
-                length = chunk,
-                timeoutMillis = timeoutMillis,
-            )
-            when (result) {
+            when (
+                val result = handle.send(
+                    source = source,
+                    offset = sent,
+                    length = chunk,
+                    timeoutMillis = timeoutMillis,
+                )
+            ) {
                 is UsbTransferResult.Completed -> {
                     if (result.bytes == 0) {
-                        return AdbWriteOutcome.Interrupted(
+                        outcome = AdbWriteOutcome.Interrupted(
                             alreadySent + sent,
                             "transfer moved no bytes with $chunk requested",
                         )
+                    } else {
+                        sent += result.bytes
                     }
-                    sent += result.bytes
                 }
 
-                is UsbTransferResult.Failed -> return when (result.reason) {
+                is UsbTransferResult.Failed -> outcome = when (result.reason) {
                     UsbTransferFailure.NOT_HELD -> AdbWriteOutcome.Closed
                     UsbTransferFailure.NOT_COMPLETED -> AdbWriteOutcome.Interrupted(
                         alreadySent + sent,
@@ -124,7 +128,7 @@ public class AdbPacketWriter(
                 }
             }
         }
-        return AdbWriteOutcome.Sent
+        return outcome ?: AdbWriteOutcome.Sent
     }
 
     public companion object {

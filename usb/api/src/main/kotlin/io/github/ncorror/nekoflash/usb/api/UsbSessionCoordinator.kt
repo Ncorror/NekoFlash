@@ -73,20 +73,27 @@ public class UsbSessionCoordinator(
      */
     public fun claim(generation: SessionGeneration): UsbClaimResult {
         val session = registry.session(generation)
-        if (session == null || session.closed) {
-            emit("claim_rejected_session_unavailable", session)
-            return UsbClaimResult.Failed(UsbClaimFailure.DEVICE_GONE)
-        }
-        if (session.state != UsbSessionState.READY && session.state != UsbSessionState.CLAIMED) {
-            emit(
-                message = "claim_rejected_not_ready",
-                session = session,
-                fields = mapOf("required" to UsbSessionState.READY.name),
-            )
-            return UsbClaimResult.Failed(UsbClaimFailure.OPEN_REFUSED)
-        }
+        return when {
+            session == null || session.closed -> {
+                emit("claim_rejected_session_unavailable", session)
+                UsbClaimResult.Failed(UsbClaimFailure.DEVICE_GONE)
+            }
 
-        return when (val result = host.claim(session.candidate)) {
+            session.state != UsbSessionState.READY && session.state != UsbSessionState.CLAIMED -> {
+                emit(
+                    message = "claim_rejected_not_ready",
+                    session = session,
+                    fields = mapOf("required" to UsbSessionState.READY.name),
+                )
+                UsbClaimResult.Failed(UsbClaimFailure.OPEN_REFUSED)
+            }
+
+            else -> claimReadySession(generation, session)
+        }
+    }
+
+    private fun claimReadySession(generation: SessionGeneration, session: UsbSession): UsbClaimResult =
+        when (val result = host.claim(session.candidate)) {
             is UsbClaimResult.Claimed -> {
                 handles.put(generation.value, result.handle)?.close()
                 emit("interface_claimed", registry.markClaimed(generation).or(session))
@@ -102,7 +109,6 @@ public class UsbSessionCoordinator(
                 result
             }
         }
-    }
 
     /**
      * Освобождает удерживаемый интерфейс, не закрывая сессию.

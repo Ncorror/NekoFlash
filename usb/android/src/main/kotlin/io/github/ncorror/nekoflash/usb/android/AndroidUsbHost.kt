@@ -151,24 +151,52 @@ public class AndroidUsbHost(
      */
     override fun claim(candidate: UsbInterfaceCandidate): UsbClaimResult {
         val device = findDevice(candidate.device)
-            ?: return UsbClaimResult.Failed(UsbClaimFailure.DEVICE_GONE)
+        return if (device == null) {
+            UsbClaimResult.Failed(UsbClaimFailure.DEVICE_GONE)
+        } else {
+            claimDevice(candidate, device)
+        }
+    }
+
+    private fun claimDevice(candidate: UsbInterfaceCandidate, device: UsbDevice): UsbClaimResult {
         val usbInterface = device.getInterfaceOrNull(candidate.interfaceIndex)
-            ?: return UsbClaimResult.Failed(UsbClaimFailure.DEVICE_GONE)
+        return if (usbInterface == null) {
+            UsbClaimResult.Failed(UsbClaimFailure.DEVICE_GONE)
+        } else {
+            claimInterface(candidate, device, usbInterface)
+        }
+    }
+
+    private fun claimInterface(
+        candidate: UsbInterfaceCandidate,
+        device: UsbDevice,
+        usbInterface: UsbInterface,
+    ): UsbClaimResult {
         val endpointIn = usbInterface.findEndpoint(candidate.endpointIn.address)
         val endpointOut = usbInterface.findEndpoint(candidate.endpointOut.address)
-        if (endpointIn == null || endpointOut == null) {
-            return UsbClaimResult.Failed(UsbClaimFailure.ENDPOINTS_MISSING)
-        }
-        val connection = usbManager.openDevice(device)
-            ?: return UsbClaimResult.Failed(UsbClaimFailure.OPEN_REFUSED)
+        return if (endpointIn == null || endpointOut == null) {
+            UsbClaimResult.Failed(UsbClaimFailure.ENDPOINTS_MISSING)
+        } else {
+            val connection = usbManager.openDevice(device)
+            when {
+                connection == null -> UsbClaimResult.Failed(UsbClaimFailure.OPEN_REFUSED)
 
-        if (!connection.claimInterface(usbInterface, true)) {
-            runCatching { connection.close() }
-            return UsbClaimResult.Failed(UsbClaimFailure.INTERFACE_REFUSED)
+                !connection.claimInterface(usbInterface, true) -> {
+                    runCatching { connection.close() }
+                    UsbClaimResult.Failed(UsbClaimFailure.INTERFACE_REFUSED)
+                }
+
+                else -> UsbClaimResult.Claimed(
+                    AndroidUsbTransportHandle(
+                        connection,
+                        usbInterface,
+                        candidate,
+                        endpointIn,
+                        endpointOut,
+                    ),
+                )
+            }
         }
-        return UsbClaimResult.Claimed(
-            AndroidUsbTransportHandle(connection, usbInterface, candidate, endpointIn, endpointOut),
-        )
     }
 
     private fun UsbDevice.getInterfaceOrNull(index: Int): UsbInterface? =
@@ -245,11 +273,16 @@ public class AndroidUsbHost(
             timeoutMillis: Int,
         ): UsbTransferResult {
             UsbTransferArguments.validate(buffer.size, offset, length, timeoutMillis)
-            if (released) return UsbTransferResult.Failed(UsbTransferFailure.NOT_HELD)
-            val transferred = connection.bulkTransfer(endpoint, buffer, offset, length, timeoutMillis)
-            if (transferred >= 0) return UsbTransferResult.Completed(transferred)
-            if (endpoint === endpointOut) clearEndpointHalt(endpoint)
-            return UsbTransferResult.Failed(UsbTransferFailure.NOT_COMPLETED)
+            return if (released) {
+                UsbTransferResult.Failed(UsbTransferFailure.NOT_HELD)
+            } else {
+                val transferred = connection.bulkTransfer(endpoint, buffer, offset, length, timeoutMillis)
+                val result = bulkTransferResult(transferred)
+                if (result !is UsbTransferResult.Completed && endpoint === endpointOut) {
+                    clearEndpointHalt(endpoint)
+                }
+                result
+            }
         }
 
         /**

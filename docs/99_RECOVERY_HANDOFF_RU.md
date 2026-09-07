@@ -41,11 +41,11 @@ Phase 0, Phase 1, Phase 2 и Phase 3 — COMPLETE. Legacy/A2 frozen.
 
 Phase 2 закрыта аппаратным прогоном: discovery, permission с выдачей и отказом, идентичность target с уточнением серийным номером, `SessionGeneration`, detach и re-enumeration, захват и освобождение интерфейса, выгрузка evidence. Критерий PASS и полная таблица проверок — `07_TESTING_CI_HARDWARE_EVIDENCE_RU.md` §6.10.
 
-Модулей семь: `:app`, `:core:model`, `:core:diagnostics`, `:core:operation`, `:usb:api`, `:usb:android`, `:protocol:adb`. Тестов 324.
+Модулей семь: `:app`, `:core:model`, `:core:diagnostics`, `:core:operation`, `:usb:api`, `:usb:android`, `:protocol:adb`. Тестов 368 (`@Test` в текущем дереве).
 
-Phase 3 закрыта аппаратными прогонами: рукопожатие с авторизацией и с отказом, автоподключение, все три режима ADB, `shell,v2` с кодом возврата, откат на legacy shell, интерактивная оболочка и терминал. Гейты — `07_TESTING_CI_HARDWARE_EVIDENCE_RU.md` §6.13–§6.29.
+Phase 3 закрыта аппаратными прогонами: рукопожатие с авторизацией и с отказом, автоподключение, все три режима ADB, `shell,v2` с кодом возврата, откат на legacy shell, интерактивная оболочка и терминал. Гейты — `07_TESTING_CI_HARDWARE_EVIDENCE_RU.md` §6.13–§6.28.
 
-Текущая работа — **Phase 4: ADB professional services**. Sync core, push/pull, install, reboot, raw services.
+Текущая работа — **Phase 4: ADB professional services**. Read-only Sync (`STAT`/`RECV`) уже в production-пути; `SEND`, install, reboot, raw services и настоящий concurrent service dispatcher остаются открыты.
 
 Порядок фаз читать в `09_IMPLEMENTATION_ROADMAP_RU.md`, а не по памяти: Fastboot — Phase 5, Recovery и Sideload — Phase 7.
 

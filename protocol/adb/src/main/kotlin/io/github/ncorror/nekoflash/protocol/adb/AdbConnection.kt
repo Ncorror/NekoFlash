@@ -97,31 +97,46 @@ public class AdbConnection(
         maxOutputBytes: Int = AdbServiceCall.DEFAULT_MAX_OUTPUT_BYTES,
         timeoutMillis: Int = AdbServiceCall.DEFAULT_TIMEOUT_MS,
     ): AdbShellOutcome {
-        if (supportsShellV2) {
-            val outcome = services.run(
-                service = "shell,v2,raw:$command",
-                maxOutputBytes = maxOutputBytes,
-                timeoutMillis = timeoutMillis,
-                payloadOnOpen = AdbShellProtocol.closeStdinFrame(),
-            )
-            when (outcome) {
-                is AdbServiceOutcome.Completed ->
-                    return AdbShellOutcome.Finished(AdbShellProtocol.decode(outcome.output))
-
-                is AdbServiceOutcome.Failed ->
-                    if (outcome.reason != AdbServiceFailure.REJECTED) {
-                        return AdbShellOutcome.Failed(outcome.reason, outcome.detail)
-                    }
-            }
+        val shellV2 = if (supportsShellV2) {
+            shellV2(command, maxOutputBytes, timeoutMillis)
+        } else {
+            null
         }
+        return shellV2 ?: legacyShell(command, maxOutputBytes, timeoutMillis)
+    }
 
-        return when (val legacy = services.run("shell:$command", maxOutputBytes, timeoutMillis)) {
-            is AdbServiceOutcome.Completed -> AdbShellOutcome.Finished(
-                AdbShellOutput(stdout = legacy.text(), stderr = "", exitCode = null),
-            )
+    private fun shellV2(
+        command: String,
+        maxOutputBytes: Int,
+        timeoutMillis: Int,
+    ): AdbShellOutcome? = when (
+        val outcome = services.run(
+            service = "shell,v2,raw:$command",
+            maxOutputBytes = maxOutputBytes,
+            timeoutMillis = timeoutMillis,
+            payloadOnOpen = AdbShellProtocol.closeStdinFrame(),
+        )
+    ) {
+        is AdbServiceOutcome.Completed ->
+            AdbShellOutcome.Finished(AdbShellProtocol.decode(outcome.output))
 
-            is AdbServiceOutcome.Failed -> AdbShellOutcome.Failed(legacy.reason, legacy.detail)
+        is AdbServiceOutcome.Failed -> if (outcome.reason == AdbServiceFailure.REJECTED) {
+            null
+        } else {
+            AdbShellOutcome.Failed(outcome.reason, outcome.detail)
         }
+    }
+
+    private fun legacyShell(
+        command: String,
+        maxOutputBytes: Int,
+        timeoutMillis: Int,
+    ): AdbShellOutcome = when (val legacy = services.run("shell:$command", maxOutputBytes, timeoutMillis)) {
+        is AdbServiceOutcome.Completed -> AdbShellOutcome.Finished(
+            AdbShellOutput(stdout = legacy.text(), stderr = "", exitCode = null),
+        )
+
+        is AdbServiceOutcome.Failed -> AdbShellOutcome.Failed(legacy.reason, legacy.detail)
     }
 
     /**

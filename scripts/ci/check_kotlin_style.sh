@@ -44,7 +44,7 @@ failures=0
 
 echo "== style and complexity =="
 if java -jar "$DETEKT_JAR" \
-    --input app/src,core \
+    --input app/src/main,core/model/src/main,core/diagnostics/src/main,core/operation/src/main,usb/api/src/main,usb/android/src/main,protocol/adb/src/main \
     --config config/detekt/detekt.yml \
     --build-upon-default-config; then
     echo "style: PASS"

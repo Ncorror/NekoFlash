@@ -80,8 +80,8 @@ public class AdbKeyStore(private val directory: File) {
     @Synchronized
     public fun keyPair(): KeyPair {
         cached?.let { return it }
-        if (!directory.exists() && !directory.mkdirs()) {
-            throw IllegalStateException("Could not create the ADB key folder: ${directory.absolutePath}")
+        check(directory.exists() || directory.mkdirs()) {
+            "Could not create the ADB key folder: ${directory.absolutePath}"
         }
 
         val keyPair = if (privateKeyFile.exists()) {

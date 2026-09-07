@@ -80,9 +80,9 @@ Legacy и A2 считаются **FROZEN / REFERENCE ONLY**. Новые product 
 
 **Phase 2 завершена: COMPLETE / PASS.** USB + Target/Session vertical slice построен и подтверждён на реальном устройстве: descriptor discovery, permission lifecycle с выдачей и отказом, `TargetId` с уточнением серийным номером, `SessionGeneration`, application-scoped ownership, detach/re-enumeration, захват и освобождение интерфейса, выгрузка evidence приложением. Полная таблица проверок и критерий PASS — `07_TESTING_CI_HARDWARE_EVIDENCE_RU.md` §6.10.
 
-**Phase 3 завершена: COMPLETE.** Настоящий ADB foundation построен и подтверждён на устройстве: ввод-вывод на захваченном интерфейсе, рамка пакета с доказанным на `vayu` inbound framing invariant, `CNXN`/`AUTH` с авторизацией и с отказом, автоподключение, маршрутизатор логических потоков, `openService`, `shell,v2` с разделением `stdout`/`stderr` и кодом возврата, откат на legacy shell, интерактивная оболочка с `Ctrl+C` и терминал на экране. Полная таблица пунктов — чеклист `09_IMPLEMENTATION_ROADMAP_RU.md`, аппаратные гейты — `07_TESTING_CI_HARDWARE_EVIDENCE_RU.md` §6.13–§6.29.
+**Phase 3 завершена: COMPLETE.** Настоящий ADB foundation построен и подтверждён на устройстве: ввод-вывод на захваченном интерфейсе, рамка пакета с доказанным на `vayu` inbound framing invariant, `CNXN`/`AUTH` с авторизацией и с отказом, автоподключение, маршрутизатор логических потоков, `openService`, `shell,v2` с разделением `stdout`/`stderr` и кодом возврата, откат на legacy shell, интерактивная оболочка с `Ctrl+C` и терминал на экране. Полная таблица пунктов — чеклист `09_IMPLEMENTATION_ROADMAP_RU.md`, аппаратные гейты — `07_TESTING_CI_HARDWARE_EVIDENCE_RU.md` §6.13–§6.28.
 
-Текущая работа: **Phase 4 — ADB professional services**. Sync core, push/pull, install, reboot, raw services, передача файлов в UI.
+Текущая работа: **Phase 4 — ADB professional services**. Read-only Sync (`STAT`/`RECV`) уже в production-пути; `SEND`, install, reboot, raw services и полноценная передача файлов остаются открыты.
 
 **Порядок фаз менять нельзя молча.** Fastboot — это Phase 5, а не Phase 4; Recovery и Sideload — Phase 7. Прежде чем называть следующую работу, открывай список фаз в `09_IMPLEMENTATION_ROADMAP_RU.md` и читай нужную, а не восстанавливай по памяти: 2026-09-06 такая догадка увела работу на фазу вперёд.
 

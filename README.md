@@ -11,7 +11,7 @@ Recovery and vendor workflows.
 - Phase 1: complete; clean application/bootstrap foundation verified by CI.
 - Phase 2: complete; USB + Target/Session ownership verified on hardware.
 - Phase 3: complete; ADB transport, protocol engines and the terminal verified on hardware.
-- Phase 4: next; ADB professional services — sync, push/pull, install.
+- Phase 4: **current / in progress**; ADB professional services. Read-only Sync (`STAT`/`RECV`) is already wired into the production UI; `SEND`, install and the remaining service surface are still open.
 - Legacy and A2 are reference/evidence only.
 
 ## Product rule

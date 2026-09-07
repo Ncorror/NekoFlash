@@ -1,7 +1,7 @@
 # NekoFlash — canonical documentation for the clean new project
 
-Дата фиксации: **2026-08-27**
-Статус: **каноническая стартовая база нового clean repository**.
+Дата актуализации: **2026-09-07**
+Статус: **каноническая документация активного clean repository**.
 
 Это не новый бренд и не отдельный продукт «NEXT». Мы продолжаем делать **NekoFlash**, но начинаем его новую кодовую базу с чистой архитектуры.
 
@@ -55,8 +55,10 @@ Legacy и A2 заморожены как **reference/evidence**. Ни один �
 
 - Phase 0: **COMPLETE / PASS**.
 - Legacy/A2: **FROZEN / REFERENCE ONLY**.
-- Phase 1: **COMPLETE / PASS** — clean bootstrap, verified tracked wrapper, AGP `9.3.2`, bilingual resource foundation, launcher/adaptive/monochrome icon, explicit no-backup/D2D policy, executable hygiene checks, 7 unit tests, Lint `0 errors`, debug APK assembly.
-- Current work: **Phase 2 — USB + Target/Session vertical slice**.
+- Phase 1: **COMPLETE / PASS** — clean bootstrap, verified tracked wrapper, AGP `9.3.2`, bilingual resource foundation, launcher/adaptive/monochrome icon, explicit no-backup/D2D policy, executable hygiene checks, Lint `0 errors`, debug APK assembly.
+- Phase 2: **COMPLETE / PASS** — USB + Target/Session vertical slice закрыт аппаратным гейтом.
+- Phase 3: **COMPLETE** — ADB foundation, `shell,v2`, legacy fallback и interactive shell подтверждены аппаратными прогонами.
+- Current work: **Phase 4 — ADB professional services**. Read-only Sync (`STAT`/`RECV`) уже подключён к production UI; `SEND`, install и остальная поверхность фазы ещё не закрыты.
 - Termux: Git/worktree/edit/commit/push.
 - GitHub Actions: authoritative build/test/lint/CI environment.
 - UI languages: **English (default) + Русский (first-class)**.

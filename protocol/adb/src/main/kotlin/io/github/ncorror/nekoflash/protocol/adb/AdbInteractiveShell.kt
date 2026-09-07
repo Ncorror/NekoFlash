@@ -7,6 +7,9 @@ import java.time.Instant
 
 /** Что произошло за один шаг интерактивной сессии. */
 public sealed interface AdbShellEvent {
+    /** Устройство подтвердило OPEN, ввод теперь можно отправлять. */
+    public data object Opened : AdbShellEvent
+
     /** Обычный вывод. */
     public data class Output(val text: String) : AdbShellEvent
 
@@ -56,6 +59,9 @@ public class AdbInteractiveShell(
     private val clock: () -> Instant = { Clock.systemUTC().instant() },
 ) {
     private val frames = AdbShellFrameBuffer()
+    private val stdoutText = IncrementalUtf8Decoder()
+    private val stderrText = IncrementalUtf8Decoder()
+    private val legacyText = IncrementalUtf8Decoder()
 
     /** Защищает маршрутизатор, писателя и состояние сессии. */
     private val lock = Any()
@@ -166,64 +172,122 @@ public class AdbInteractiveShell(
         step.outbound.forEach(::send)
 
         val events = mutableListOf<AdbShellEvent>()
+        var terminal: List<AdbShellEvent>? = null
         for (event in step.events) {
-            when (event) {
-                is AdbStreamEvent.Opened -> if (event.localId == localId) {
-                    opened = true
-                    emit("shell_opened", mapOf("remote" to event.remoteId.toString()))
-                }
-
-                is AdbStreamEvent.Data -> if (event.localId == localId) {
-                    if (useShellV2) {
-                        frames.append(event.payload)
-                    } else {
-                        // Без shell,v2 рамок нет вовсе: всё, что пришло, —
-                        // вывод, и отделить stderr не от чего.
-                        events += AdbShellEvent.Output(event.payload.toString(Charsets.UTF_8))
-                    }
-                }
-
-                is AdbStreamEvent.Closed -> if (event.localId == localId) {
-                    events += drainFrames()
-                    return events + finish(AdbShellEvent.Exited(null))
-                }
-
-                is AdbStreamEvent.Stale -> Unit
-                is AdbStreamEvent.Unexpected -> Unit
-            }
+            if (terminal == null) terminal = applyStreamEvent(event, events)
         }
-        return events + drainFrames()
+        return terminal ?: (events + drainFrames())
+    }
+
+    private fun applyStreamEvent(
+        event: AdbStreamEvent,
+        events: MutableList<AdbShellEvent>,
+    ): List<AdbShellEvent>? = when (event) {
+        is AdbStreamEvent.Opened -> {
+            applyOpenedEvent(event, events)
+            null
+        }
+
+        is AdbStreamEvent.Data -> {
+            applyDataEvent(event, events)
+            null
+        }
+
+        is AdbStreamEvent.Closed -> applyClosedEvent(event, events)
+        is AdbStreamEvent.Stale -> null
+        is AdbStreamEvent.Unexpected -> null
+    }
+
+    private fun applyOpenedEvent(
+        event: AdbStreamEvent.Opened,
+        events: MutableList<AdbShellEvent>,
+    ) {
+        if (event.localId != localId) return
+        opened = true
+        emit("shell_opened", mapOf("remote" to event.remoteId.toString()))
+        events += AdbShellEvent.Opened
+    }
+
+    private fun applyDataEvent(
+        event: AdbStreamEvent.Data,
+        events: MutableList<AdbShellEvent>,
+    ) {
+        if (event.localId != localId) return
+        if (useShellV2) {
+            frames.append(event.payload)
+        } else {
+            appendLegacyText(event.payload, events)
+        }
+    }
+
+    private fun appendLegacyText(
+        payload: ByteArray,
+        events: MutableList<AdbShellEvent>,
+    ) {
+        // Без shell,v2 рамок нет вовсе: всё, что пришло, — вывод,
+        // и отделить stderr не от чего.
+        legacyText.decode(payload)
+            .takeIf(String::isNotEmpty)
+            ?.let { text -> events += AdbShellEvent.Output(text) }
+    }
+
+    private fun applyClosedEvent(
+        event: AdbStreamEvent.Closed,
+        events: MutableList<AdbShellEvent>,
+    ): List<AdbShellEvent>? {
+        if (event.localId != localId) return null
+        events += drainFrames()
+        events += flushTextStreams()
+        return events + finish(AdbShellEvent.Exited(null))
     }
 
     private fun drainFrames(): List<AdbShellEvent> {
         if (!useShellV2) return emptyList()
         val events = mutableListOf<AdbShellEvent>()
-        while (true) {
+        var done = false
+        while (!done) {
             when (val poll = frames.poll()) {
-                AdbShellFramePoll.Incomplete -> return events
+                AdbShellFramePoll.Incomplete -> done = true
 
-                is AdbShellFramePoll.Corrupt ->
-                    return events + finish(AdbShellEvent.Broken("shell frame: ${poll.detail}"))
-
-                is AdbShellFramePoll.Ready -> when (poll.frame.id) {
-                    AdbShellProtocol.ID_STDOUT ->
-                        events += AdbShellEvent.Output(text(poll.frame.payload))
-
-                    AdbShellProtocol.ID_STDERR ->
-                        events += AdbShellEvent.ErrorOutput(text(poll.frame.payload))
-
-                    AdbShellProtocol.ID_EXIT -> {
-                        val code = poll.frame.payload.firstOrNull()?.toInt()?.and(0xFF)
-                        return events + finish(AdbShellEvent.Exited(code))
-                    }
-
-                    // Незнакомое поле пропускается вместе с payload: протокол
-                    // расширяемый, и терять из-за него уже полученный вывод
-                    // незачем.
-                    else -> Unit
+                is AdbShellFramePoll.Corrupt -> {
+                    events += finish(AdbShellEvent.Broken("shell frame: ${poll.detail}"))
+                    done = true
                 }
+
+                is AdbShellFramePoll.Ready -> done = appendFrame(poll.frame, events)
             }
         }
+        return events
+    }
+
+    private fun appendFrame(
+        frame: AdbShellFrame,
+        events: MutableList<AdbShellEvent>,
+    ): Boolean = when (frame.id) {
+        AdbShellProtocol.ID_STDOUT -> {
+            shellV2Text(stdoutText.decode(frame.payload))
+                .takeIf(String::isNotEmpty)
+                ?.let { text -> events += AdbShellEvent.Output(text) }
+            false
+        }
+
+        AdbShellProtocol.ID_STDERR -> {
+            shellV2Text(stderrText.decode(frame.payload))
+                .takeIf(String::isNotEmpty)
+                ?.let { text -> events += AdbShellEvent.ErrorOutput(text) }
+            false
+        }
+
+        AdbShellProtocol.ID_EXIT -> {
+            val code = frame.payload.firstOrNull()?.toInt()?.and(0xFF)
+            events += flushTextStreams()
+            events += finish(AdbShellEvent.Exited(code))
+            true
+        }
+
+        // Незнакомое поле пропускается вместе с payload: протокол расширяемый,
+        // и терять из-за него уже полученный вывод незачем.
+        else -> false
     }
 
     /** Вызывается уже под замком: [close] берёт его повторно, что разрешено. */
@@ -236,8 +300,30 @@ public class AdbInteractiveShell(
     private fun send(packet: AdbOutboundPacket): Boolean =
         writer.write(packet.command, packet.arg0, packet.arg1, packet.payload) == AdbWriteOutcome.Sent
 
-    private fun text(payload: ByteArray): String =
-        payload.toString(Charsets.UTF_8).replace("\u0000", "")
+    private fun flushTextStreams(): List<AdbShellEvent> {
+        if (!useShellV2) {
+            return legacyText.finish()
+                .takeIf(String::isNotEmpty)
+                ?.let { listOf(AdbShellEvent.Output(it)) }
+                ?: emptyList()
+        }
+
+        val events = mutableListOf<AdbShellEvent>()
+        shellV2Text(stdoutText.finish())
+            .takeIf(String::isNotEmpty)
+            ?.let { events += AdbShellEvent.Output(it) }
+        shellV2Text(stderrText.finish())
+            .takeIf(String::isNotEmpty)
+            ?.let { events += AdbShellEvent.ErrorOutput(it) }
+        return events
+    }
+
+    /**
+     * `shell,v2` historically strips NUL bytes before showing text. Keep that
+     * hardware-proven behaviour while decoding UTF-8 incrementally. Legacy
+     * `shell:` deliberately remains byte-for-text compatible with its old path.
+     */
+    private fun shellV2Text(text: String): String = text.replace("\u0000", "")
 
     private fun emit(message: String, fields: Map<String, String>) {
         diagnostics.emit(

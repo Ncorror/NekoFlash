@@ -115,54 +115,62 @@ public class AdbPacketReader(
      * целиком: читающий цикл работает короткими отрезками, чтобы остановка
      * была наблюдаемой.
      */
-    public fun read(timeoutMillis: Int = DEFAULT_RECEIVE_TIMEOUT_MS): AdbReadOutcome {
-        val header = when (val outcome = readHeader(timeoutMillis)) {
-            is HeaderOutcome.Ready -> outcome.header
-            is HeaderOutcome.Other -> return outcome.result
+    public fun read(timeoutMillis: Int = DEFAULT_RECEIVE_TIMEOUT_MS): AdbReadOutcome =
+        when (val outcome = readHeader(timeoutMillis)) {
+            is HeaderOutcome.Ready -> readPacket(outcome.header, timeoutMillis)
+            is HeaderOutcome.Other -> outcome.result
         }
 
+    private fun readPacket(header: AdbPacketHeader, timeoutMillis: Int): AdbReadOutcome {
         val payload = if (header.payloadLength == 0) {
-            EMPTY_PAYLOAD
+            PayloadOutcome.Ready(EMPTY_PAYLOAD)
         } else {
-            when (val outcome = readPayload(header.payloadLength, timeoutMillis)) {
-                is PayloadOutcome.Ready -> outcome.payload
-                is PayloadOutcome.Other -> return outcome.result
-            }
+            readPayload(header.payloadLength, timeoutMillis)
         }
+        return when (payload) {
+            is PayloadOutcome.Other -> payload.result
+            is PayloadOutcome.Ready -> decodePacket(header, payload.payload)
+        }
+    }
 
-        if (!AdbChecksum.matches(header.checksum, payload, localVersion, peerVersion)) {
-            return AdbReadOutcome.Failed(
+    private fun decodePacket(header: AdbPacketHeader, payload: ByteArray): AdbReadOutcome =
+        if (AdbChecksum.matches(header.checksum, payload, localVersion, peerVersion)) {
+            AdbReadOutcome.Received(
+                AdbPacket(
+                    command = header.command,
+                    arg0 = header.arg0,
+                    arg1 = header.arg1,
+                    payload = payload,
+                ),
+            )
+        } else {
+            AdbReadOutcome.Failed(
                 AdbReadFailure.CHECKSUM_MISMATCH,
                 "command=0x${header.command.toString(16)} bytes=${payload.size} declared=${header.checksum}",
             )
         }
 
-        return AdbReadOutcome.Received(
-            AdbPacket(
-                command = header.command,
-                arg0 = header.arg0,
-                arg1 = header.arg1,
-                payload = payload,
-            ),
-        )
-    }
-
     private fun readHeader(timeoutMillis: Int): HeaderOutcome {
         var received = 0
-        while (received < AdbPacketHeader.SIZE_BYTES) {
-            val result = handle.receive(
-                destination = headerBuffer,
-                offset = received,
-                length = AdbPacketHeader.SIZE_BYTES - received,
-                timeoutMillis = timeoutMillis,
-            )
-            when (result) {
+        var terminal: HeaderOutcome? = null
+        while (received < AdbPacketHeader.SIZE_BYTES && terminal == null) {
+            when (
+                val result = handle.receive(
+                    destination = headerBuffer,
+                    offset = received,
+                    length = AdbPacketHeader.SIZE_BYTES - received,
+                    timeoutMillis = timeoutMillis,
+                )
+            ) {
                 is UsbTransferResult.Completed -> {
-                    if (result.bytes == 0) return HeaderOutcome.Other(idleOrPartialHeader(received))
-                    received += result.bytes
+                    if (result.bytes == 0) {
+                        terminal = HeaderOutcome.Other(idleOrPartialHeader(received))
+                    } else {
+                        received += result.bytes
+                    }
                 }
 
-                is UsbTransferResult.Failed -> return HeaderOutcome.Other(
+                is UsbTransferResult.Failed -> terminal = HeaderOutcome.Other(
                     when (result.reason) {
                         UsbTransferFailure.NOT_HELD -> AdbReadOutcome.Closed
                         UsbTransferFailure.NOT_COMPLETED -> idleOrPartialHeader(received)
@@ -171,7 +179,11 @@ public class AdbPacketReader(
             }
         }
 
-        return when (val decoding = AdbPacketHeader.decode(headerBuffer, maxPayloadBytes)) {
+        return terminal ?: decodeHeader()
+    }
+
+    private fun decodeHeader(): HeaderOutcome =
+        when (val decoding = AdbPacketHeader.decode(headerBuffer, maxPayloadBytes)) {
             is AdbHeaderDecoding.Decoded -> HeaderOutcome.Ready(decoding.header)
             is AdbHeaderDecoding.Rejected -> HeaderOutcome.Other(
                 AdbReadOutcome.Failed(
@@ -180,7 +192,6 @@ public class AdbPacketReader(
                 ),
             )
         }
-    }
 
     /**
      * Ожидание без единого принятого байта — это простой; обрыв после части

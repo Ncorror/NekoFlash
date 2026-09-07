@@ -60,14 +60,19 @@ public class AdbShellFrameBuffer(private val maxFrameBytes: Int = MAX_FRAME_BYTE
             ((pending.elementAt(3).toInt() and 0xFF) shl 16) or
             ((pending.elementAt(4).toInt() and 0xFF) shl 24)
 
-        if (length < 0 || length > maxFrameBytes) {
-            return AdbShellFramePoll.Corrupt("id=$id length=$length")
-        }
-        if (pending.size < AdbShellProtocol.HEADER_SIZE_BYTES + length) return AdbShellFramePoll.Incomplete
+        return when {
+            length < 0 || length > maxFrameBytes ->
+                AdbShellFramePoll.Corrupt("id=$id length=$length")
 
-        repeat(AdbShellProtocol.HEADER_SIZE_BYTES) { pending.removeFirst() }
-        val payload = ByteArray(length) { pending.removeFirst() }
-        return AdbShellFramePoll.Ready(AdbShellFrame(id, payload))
+            pending.size < AdbShellProtocol.HEADER_SIZE_BYTES + length ->
+                AdbShellFramePoll.Incomplete
+
+            else -> {
+                repeat(AdbShellProtocol.HEADER_SIZE_BYTES) { pending.removeFirst() }
+                val payload = ByteArray(length) { pending.removeFirst() }
+                AdbShellFramePoll.Ready(AdbShellFrame(id, payload))
+            }
+        }
     }
 
     private companion object {

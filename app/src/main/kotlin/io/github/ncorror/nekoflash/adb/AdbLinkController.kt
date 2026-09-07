@@ -6,7 +6,6 @@ import io.github.ncorror.nekoflash.protocol.adb.AdbConnection
 import io.github.ncorror.nekoflash.protocol.adb.AdbHandshakeFailure
 import io.github.ncorror.nekoflash.protocol.adb.AdbHandshakeOutcome
 import io.github.ncorror.nekoflash.protocol.adb.AdbKeyStore
-import io.github.ncorror.nekoflash.protocol.adb.AdbPeerMode
 import io.github.ncorror.nekoflash.protocol.adb.AdbShellOutcome
 import io.github.ncorror.nekoflash.usb.api.UsbAutoConnectPolicy
 import io.github.ncorror.nekoflash.usb.api.UsbClaimResult
@@ -20,65 +19,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-/** Что происходит с ADB-соединением прямо сейчас. */
-public sealed interface AdbLinkState {
-    /** Соединения нет и не запрашивалось. */
-    public data object Idle : AdbLinkState
-
-    /** Идёт рукопожатие. */
-    public data class Connecting(val generation: SessionGeneration) : AdbLinkState
-
-    /**
-     * Устройство спрашивает у пользователя, доверять ли этому хосту.
-     *
-     * Отдельное состояние, потому что оно требует действия человека, а не
-     * ожидания: без него экран показывал бы «идёт подключение» всё время, пока
-     * на устройстве висит неотвеченный диалог.
-     */
-    public data class WaitingForAuthorization(val generation: SessionGeneration) : AdbLinkState
-
-    /** Соединение установлено. */
-    public data class Connected(
-        val generation: SessionGeneration,
-        val peerMode: AdbPeerMode,
-        val banner: String,
-        val features: Set<String>,
-    ) : AdbLinkState
-
-    /** Соединение не состоялось. */
-    public data class Failed(
-        val generation: SessionGeneration,
-        val reason: AdbHandshakeFailure,
-        val detail: String,
-    ) : AdbLinkState
-}
-
-/** Что происходит с последней командой. */
-public sealed interface AdbCommandState {
-    /** Команд ещё не было. */
-    public data object None : AdbCommandState
-
-    /** Команда выполняется. */
-    public data class Running(val command: String) : AdbCommandState
-
-    /**
-     * Команда закончилась.
-     *
-     * [exitCode] отсутствует, когда устройство не поддерживает `shell,v2`: там
-     * кода возврата нет вовсе, и подставлять ноль означало бы сообщить об
-     * успехе, о котором ничего не известно.
-     */
-    public data class Finished(
-        val command: String,
-        val output: String,
-        val errorOutput: String,
-        val exitCode: Int?,
-    ) : AdbCommandState
-
-    /** Команда не выполнилась. */
-    public data class Failed(val command: String, val reason: String) : AdbCommandState
-}
-
 /**
  * Владелец ADB-соединения на уровне приложения.
  *
@@ -86,10 +26,12 @@ public sealed interface AdbCommandState {
  * рукопожатие живут вместе намеренно: удерживать исключительный ресурс без
  * протокольного обмена незачем, а обмен без удержания невозможен.
  *
- * Работа идёт на [executor] с **единственным** потоком. Это не деталь
- * исполнения, а требование контракта: физический читатель входящего потока
- * должен быть один. Одновременно запущенные рукопожатия разрушили бы кадр
- * ещё до того, как появился бы маршрутизатор потоков.
+ * Рукопожатия и одноразовые service calls идут на [executor] с
+ * **единственным reader-потоком**. Это не деталь исполнения, а требование
+ * контракта: физический читатель входящего потока должен быть один.
+ * Интерактивные записи имеют отдельный последовательный writer executor, но
+ * никогда не читают транспорт. Одновременно запущенные рукопожатия разрушили
+ * бы кадр ещё до того, как появился бы маршрутизатор потоков.
  *
  * Подключение происходит само, как только устройство готово: приложение
  * существует ради работы с устройством, и требовать нажатия ради того, что
@@ -109,6 +51,7 @@ public class AdbLinkController(
     private val keyStore: AdbKeyStore,
     private val apiLevel: Int,
     private val executor: Executor,
+    private val terminalWriterExecutor: Executor,
     private val diagnostics: DiagnosticSink = DiagnosticSink { },
 ) {
     private val mutableState = MutableStateFlow<AdbLinkState>(AdbLinkState.Idle)
@@ -121,7 +64,7 @@ public class AdbLinkController(
      * Отдельный класс: этот следит за жизнью транспорта, тот — за жизнью одной
      * сессии оболочки, и заканчиваются они по разным причинам.
      */
-    private val shellSessions = AdbTerminalController(executor, diagnostics)
+    private val shellSessions = AdbTerminalController(executor, terminalWriterExecutor, diagnostics)
 
     /**
      * Владелец читающих файловых операций.
@@ -204,9 +147,10 @@ public class AdbLinkController(
     }
 
     /**
-     * Занят ли единственный поток обмена.
+     * Занят ли текущий production reader.
      *
-     * Живая оболочка и идущая команда занимают его одинаково.
+     * Живая оболочка, файловая операция и одноразовая команда пока используют
+     * один physical reader и потому не могут безопасно читать параллельно.
      */
     private fun busy(): Boolean =
         shellSessions.active ||
@@ -216,8 +160,9 @@ public class AdbLinkController(
     /**
      * Выполняет команду в неинтерактивной оболочке устройства.
      *
-     * Уходит на тот же единственный поток, что и рукопожатие: читатель один, и
-     * две команды одновременно разобрали бы пакеты друг друга. Очередь
+     * Уходит на тот же единственный reader executor, что и рукопожатие:
+     * читатель один, и две команды одновременно разобрали бы пакеты друг
+     * друга. Очередь
      * получается сама собой — исполнитель последовательный.
      *
      * Команда выполняется как есть. Приложение не проверяет, что она делает:
@@ -227,7 +172,7 @@ public class AdbLinkController(
     public fun runCommand(command: String) {
         val trimmed = command.trim()
         val live = connection
-        // Пустая команда, отсутствующее соединение и занятый поток обмена —
+        // Пустая команда, отсутствующее соединение и занятый reader —
         // три разные причины ничего не делать, и ни одна из них не ошибка.
         if (trimmed.isEmpty() || live == null || busy()) return
 

@@ -87,36 +87,55 @@ public class AdbServiceCall(
 
         val (localId, open) = router.openRequest(service)
         emit("service_open", mapOf("service" to service, "stream" to localId.toString()))
-        send(open)?.let { failure -> return abandon(localId, failure) }
+        val initialFailure = send(open)
+        return if (initialFailure != null) {
+            abandon(localId, initialFailure)
+        } else {
+            runUntilDone(localId, service, maxOutputBytes, timeoutMillis, payloadOnOpen)
+        }
+    }
 
+    private fun runUntilDone(
+        localId: Int,
+        service: String,
+        maxOutputBytes: Int,
+        timeoutMillis: Int,
+        payloadOnOpen: ByteArray?,
+    ): AdbServiceOutcome {
         val deadline = elapsedNanos() + timeoutMillis * NANOS_PER_MILLI
         val output = ByteArrayBuilder(maxOutputBytes)
+        var outcome: AdbServiceOutcome? = null
+        while (outcome == null) {
+            outcome = nextOutcome(localId, service, deadline, output, payloadOnOpen)
+        }
+        return outcome
+    }
 
-        while (true) {
-            val remaining = remainingMillis(deadline)
-            if (remaining <= 0) {
-                return abandon(localId, failure(AdbServiceFailure.TIMED_OUT, "service=$service"))
-            }
-
+    private fun nextOutcome(
+        localId: Int,
+        service: String,
+        deadline: Long,
+        output: ByteArrayBuilder,
+        payloadOnOpen: ByteArray?,
+    ): AdbServiceOutcome? {
+        val remaining = remainingMillis(deadline)
+        return if (remaining <= 0) {
+            abandon(localId, failure(AdbServiceFailure.TIMED_OUT, "service=$service"))
+        } else {
             when (val read = reader.read(remaining.coerceAtMost(PACKET_TIMEOUT_MS))) {
-                is AdbReadOutcome.Received -> {
-                    val step = router.onPacket(read.packet)
-                    step.outbound.forEach { packet ->
-                        send(packet)?.let { failure -> return abandon(localId, failure) }
-                    }
-                    resolve(localId, step, output, service, payloadOnOpen)?.let { outcome -> return outcome }
-                }
+                is AdbReadOutcome.Received ->
+                    receivedOutcome(localId, service, read.packet, output, payloadOnOpen)
 
                 // Тишина — обычное состояние ожидания: сервис думает. Решает
                 // дедлайн, а не одна неудачная попытка приёма.
-                AdbReadOutcome.Idle -> Unit
+                AdbReadOutcome.Idle -> null
 
-                AdbReadOutcome.Closed -> return abandon(
+                AdbReadOutcome.Closed -> abandon(
                     localId,
                     failure(AdbServiceFailure.TRANSPORT_CLOSED, "service=$service"),
                 )
 
-                is AdbReadOutcome.Failed -> return abandon(
+                is AdbReadOutcome.Failed -> abandon(
                     localId,
                     failure(
                         AdbServiceFailure.FRAMING_LOST,
@@ -125,6 +144,30 @@ public class AdbServiceCall(
                 )
             }
         }
+    }
+
+    private fun receivedOutcome(
+        localId: Int,
+        service: String,
+        packet: AdbPacket,
+        output: ByteArrayBuilder,
+        payloadOnOpen: ByteArray?,
+    ): AdbServiceOutcome? {
+        val step = router.onPacket(packet)
+        val sendFailure = sendOutbound(step)
+        return if (sendFailure != null) {
+            abandon(localId, sendFailure)
+        } else {
+            resolve(localId, step, output, service, payloadOnOpen)
+        }
+    }
+
+    private fun sendOutbound(step: AdbRouterStep): AdbServiceOutcome.Failed? {
+        var failure: AdbServiceOutcome.Failed? = null
+        for (packet in step.outbound) {
+            if (failure == null) failure = send(packet)
+        }
+        return failure
     }
 
     /**
@@ -139,44 +182,67 @@ public class AdbServiceCall(
         service: String,
         payloadOnOpen: ByteArray?,
     ): AdbServiceOutcome? {
+        var outcome: AdbServiceOutcome? = null
         for (event in step.events) {
-            when (event) {
-                is AdbStreamEvent.Opened ->
-                    if (event.localId == localId) {
-                        emit("service_opened", mapOf("service" to service, "remote" to event.remoteId.toString()))
-                        // Отправляется только после OKAY: до него потока ещё нет,
-                        // и адресовать пакет некуда.
-                        if (payloadOnOpen != null) {
-                            val write = router.writeRequest(localId, payloadOnOpen)
-                            if (write != null) {
-                                send(write)?.let { failure -> return abandon(localId, failure) }
-                            }
-                        }
-                    }
-
-                is AdbStreamEvent.Data ->
-                    if (event.localId == localId && !output.append(event.payload)) {
-                        return abandon(
-                            localId,
-                            failure(
-                                AdbServiceFailure.OUTPUT_TOO_LARGE,
-                                "service=$service cap=${output.capacity}",
-                            ),
-                        )
-                    }
-
-                is AdbStreamEvent.Closed ->
-                    if (event.localId == localId) {
-                        return finish(event.reason, output, service)
-                    }
-
-                // Чужие и неожиданные пакеты маршрутизатор уже отработал: ответ,
-                // если он нужен, лежит в step.outbound и уже отправлен.
-                is AdbStreamEvent.Stale -> Unit
-                is AdbStreamEvent.Unexpected -> Unit
+            if (outcome == null) {
+                outcome = resolveEvent(localId, event, output, service, payloadOnOpen)
             }
         }
-        return null
+        return outcome
+    }
+
+    private fun resolveEvent(
+        localId: Int,
+        event: AdbStreamEvent,
+        output: ByteArrayBuilder,
+        service: String,
+        payloadOnOpen: ByteArray?,
+    ): AdbServiceOutcome? = when (event) {
+        is AdbStreamEvent.Opened -> resolveOpened(localId, event, service, payloadOnOpen)
+        is AdbStreamEvent.Data -> resolveData(localId, event, output, service)
+        is AdbStreamEvent.Closed -> if (event.localId == localId) {
+            finish(event.reason, output, service)
+        } else {
+            null
+        }
+
+        // Чужие и неожиданные пакеты маршрутизатор уже отработал: ответ,
+        // если он нужен, лежит в step.outbound и уже отправлен.
+        is AdbStreamEvent.Stale -> null
+        is AdbStreamEvent.Unexpected -> null
+    }
+
+    private fun resolveOpened(
+        localId: Int,
+        event: AdbStreamEvent.Opened,
+        service: String,
+        payloadOnOpen: ByteArray?,
+    ): AdbServiceOutcome? = if (event.localId != localId) {
+        null
+    } else {
+        emit(
+            "service_opened",
+            mapOf("service" to service, "remote" to event.remoteId.toString()),
+        )
+        val write = payloadOnOpen?.let { payload -> router.writeRequest(localId, payload) }
+        write?.let { packet -> send(packet)?.let { failure -> abandon(localId, failure) } }
+    }
+
+    private fun resolveData(
+        localId: Int,
+        event: AdbStreamEvent.Data,
+        output: ByteArrayBuilder,
+        service: String,
+    ): AdbServiceOutcome? = if (event.localId == localId && !output.append(event.payload)) {
+        abandon(
+            localId,
+            failure(
+                AdbServiceFailure.OUTPUT_TOO_LARGE,
+                "service=$service cap=${output.capacity}",
+            ),
+        )
+    } else {
+        null
     }
 
     private fun finish(
@@ -203,7 +269,9 @@ public class AdbServiceCall(
      * устройства и держит там сервис.
      */
     private fun abandon(localId: Int, failure: AdbServiceOutcome.Failed): AdbServiceOutcome {
-        router.closeRequest(localId)?.let { packet -> writer.write(packet.command, packet.arg0, packet.arg1, packet.payload) }
+        router.closeRequest(localId)?.let { packet ->
+            writer.write(packet.command, packet.arg0, packet.arg1, packet.payload)
+        }
         return failure
     }
 

@@ -75,13 +75,25 @@ public class NekoFlashApplication : Application() {
     private val adbKeys by lazy { AdbKeyStore(File(filesDir, ADB_KEY_FOLDER)) }
 
     /**
-     * Единственный поток протокольного обмена.
+     * Единственный поток чтения ADB.
      *
-     * Ровно один: контракт требует единственного физического читателя
-     * входящего потока, и пул с несколькими потоками эту гарантию бы отменил.
+     * Ровно один физический reader — протокольный инвариант. Запись этим же
+     * потоком не обязана выполняться: интерактивный ввод должен уходить, пока
+     * reader ждёт входящий пакет.
      */
-    private val adbThread by lazy {
-        Executors.newSingleThreadExecutor { runnable -> Thread(runnable, "nekoflash-adb") }
+    private val adbReaderThread by lazy {
+        Executors.newSingleThreadExecutor { runnable -> Thread(runnable, "nekoflash-adb-reader") }
+    }
+
+    /**
+     * Последовательный поток записи интерактивной ADB-сессии.
+     *
+     * Он не читает транспорт и не нарушает single-reader invariant. Нужен,
+     * чтобы блокирующий Android `bulkTransfer` никогда не выполнялся из Compose
+     * callback на главном потоке.
+     */
+    private val adbWriterThread by lazy {
+        Executors.newSingleThreadExecutor { runnable -> Thread(runnable, "nekoflash-adb-writer") }
     }
 
     /** Состояние ADB-соединения. Экран подписывается на него. */
@@ -90,7 +102,8 @@ public class NekoFlashApplication : Application() {
             coordinator = usbSessions,
             keyStore = adbKeys,
             apiLevel = Build.VERSION.SDK_INT,
-            executor = adbThread,
+            executor = adbReaderThread,
+            terminalWriterExecutor = adbWriterThread,
             diagnostics = events,
         )
     }

@@ -44,6 +44,16 @@ public sealed interface AdbSyncOutcome<out T> {
     ) : AdbSyncOutcome<Nothing>
 }
 
+private fun readIntLe(source: ByteArray, offset: Int): Int =
+    (source[offset].toInt() and 0xFF) or
+        ((source[offset + 1].toInt() and 0xFF) shl 8) or
+        ((source[offset + 2].toInt() and 0xFF) shl 16) or
+        ((source[offset + 3].toInt() and 0xFF) shl 24)
+
+private fun AdbPacketWriter.writeIgnoringResult(packet: AdbOutboundPacket) {
+    write(packet.command, packet.arg0, packet.arg1, packet.payload)
+}
+
 /**
  * Сессия сервиса `sync:`.
  *
@@ -80,14 +90,14 @@ public class AdbSyncSession(
         val (id, packet) = router.openRequest(SERVICE)
         localId = id
         emit("sync_open", mapOf("stream" to id.toString()))
-        send(packet)?.let { failure -> return failure }
-
+        var failure = send(packet)
         val deadline = deadlineFrom(timeoutMillis)
-        while (!opened) {
-            pump(deadline)?.let { failure -> return failure }
+        while (!opened && failure == null) {
+            failure = pump(deadline)
         }
-        emit("sync_opened", mapOf("stream" to id.toString()))
-        return AdbSyncOutcome.Done(Unit)
+        return failure ?: AdbSyncOutcome.Done(Unit).also {
+            emit("sync_opened", mapOf("stream" to id.toString()))
+        }
     }
 
     /**
@@ -100,24 +110,25 @@ public class AdbSyncSession(
     public fun stat(path: String, timeoutMillis: Int = DEFAULT_TIMEOUT_MS): AdbSyncOutcome<AdbSyncStat> {
         if (!opened) return failure(AdbSyncFailure.NOT_OPEN, "stat $path")
         val deadline = deadlineFrom(timeoutMillis)
-        request(AdbSyncProtocol.ID_STAT, path)?.let { failure -> return failure }
+        return request(AdbSyncProtocol.ID_STAT, path) ?: readStatResponse(path, deadline)
+    }
 
-        val header = when (val read = readHeader(deadline)) {
-            is AdbSyncOutcome.Done -> read.value
-            is AdbSyncOutcome.Failed -> return read
-        }
-        return when (header.id) {
-            AdbSyncProtocol.ID_STAT -> {
-                val body = when (val read = readExactly(STAT_BODY_BYTES, deadline)) {
-                    is AdbSyncOutcome.Done -> read.value
-                    is AdbSyncOutcome.Failed -> return read
-                }
-                AdbSyncOutcome.Done(decodeStat(header, body))
+    private fun readStatResponse(
+        path: String,
+        deadline: Long,
+    ): AdbSyncOutcome<AdbSyncStat> = when (val read = readHeader(deadline)) {
+        is AdbSyncOutcome.Failed -> read
+        is AdbSyncOutcome.Done -> when (read.value.id) {
+            AdbSyncProtocol.ID_STAT -> when (val body = readExactly(STAT_BODY_BYTES, deadline)) {
+                is AdbSyncOutcome.Failed -> body
+                is AdbSyncOutcome.Done -> AdbSyncOutcome.Done(decodeStat(read.value, body.value))
             }
 
-            AdbSyncProtocol.ID_FAIL -> refusal(header, deadline, "stat $path")
-
-            else -> failure(AdbSyncFailure.UNEXPECTED_RESPONSE, "stat $path got ${header.id}")
+            AdbSyncProtocol.ID_FAIL -> refusal(read.value, deadline, "stat $path")
+            else -> failure(
+                AdbSyncFailure.UNEXPECTED_RESPONSE,
+                "stat $path got ${read.value.id}",
+            )
         }
     }
 
@@ -133,51 +144,68 @@ public class AdbSyncSession(
         timeoutMillis: Int = TRANSFER_TIMEOUT_MS,
         sink: (ByteArray) -> Unit,
     ): AdbSyncOutcome<Long> {
-        if (!opened) return failure(AdbSyncFailure.NOT_OPEN, "recv $path")
-        val deadline = deadlineFrom(timeoutMillis)
-        request(AdbSyncProtocol.ID_RECV, path)?.let { failure -> return failure }
+        return if (!opened) {
+            failure(AdbSyncFailure.NOT_OPEN, "recv $path")
+        } else {
+            val deadline = deadlineFrom(timeoutMillis)
+            request(AdbSyncProtocol.ID_RECV, path) ?: receiveLoop(path, deadline, sink)
+        }
+    }
 
-        var received = 0L
-        while (true) {
-            val header = when (val read = readHeader(deadline)) {
-                is AdbSyncOutcome.Done -> read.value
-                is AdbSyncOutcome.Failed -> return read
-            }
-            when (header.id) {
-                AdbSyncProtocol.ID_DATA -> {
-                    // Длину называет устройство. Блок больше предела протокола
-                    // означает, что мы читаем не то, что думаем.
-                    if (header.value < 0 || header.value > AdbSyncProtocol.DATA_CHUNK_BYTES) {
-                        return failure(AdbSyncFailure.INVALID_LENGTH, "recv $path chunk=${header.value}")
-                    }
-                    val chunk = when (val read = readExactly(header.value, deadline)) {
-                        is AdbSyncOutcome.Done -> read.value
-                        is AdbSyncOutcome.Failed -> return read
-                    }
-                    sink(chunk)
-                    received += chunk.size
-                }
-
-                AdbSyncProtocol.ID_DONE -> {
-                    emit("sync_received", mapOf("path" to path, "bytes" to received.toString()))
-                    return AdbSyncOutcome.Done(received)
-                }
-
-                AdbSyncProtocol.ID_FAIL -> return refusal(header, deadline, "recv $path")
-
-                else -> return failure(
-                    AdbSyncFailure.UNEXPECTED_RESPONSE,
-                    "recv $path got ${header.id}",
-                )
+    private fun receiveLoop(
+        path: String,
+        deadline: Long,
+        sink: (ByteArray) -> Unit,
+    ): AdbSyncOutcome<Long> {
+        var progress = ReceiveProgress()
+        while (progress.outcome == null) {
+            progress = when (val read = readHeader(deadline)) {
+                is AdbSyncOutcome.Failed -> progress.copy(outcome = read)
+                is AdbSyncOutcome.Done -> receiveHeader(path, deadline, sink, read.value, progress.received)
             }
         }
+        return checkNotNull(progress.outcome)
+    }
+
+    private fun receiveHeader(
+        path: String,
+        deadline: Long,
+        sink: (ByteArray) -> Unit,
+        header: AdbSyncHeader,
+        received: Long,
+    ): ReceiveProgress = when (header.id) {
+        AdbSyncProtocol.ID_DATA -> if (header.value < 0 || header.value > AdbSyncProtocol.DATA_CHUNK_BYTES) {
+            ReceiveProgress(
+                received,
+                failure(AdbSyncFailure.INVALID_LENGTH, "recv $path chunk=${header.value}"),
+            )
+        } else {
+            when (val chunk = readExactly(header.value, deadline)) {
+                is AdbSyncOutcome.Failed -> ReceiveProgress(received, chunk)
+                is AdbSyncOutcome.Done -> {
+                    sink(chunk.value)
+                    ReceiveProgress(received + chunk.value.size)
+                }
+            }
+        }
+
+        AdbSyncProtocol.ID_DONE -> {
+            emit("sync_received", mapOf("path" to path, "bytes" to received.toString()))
+            ReceiveProgress(received, AdbSyncOutcome.Done(received))
+        }
+
+        AdbSyncProtocol.ID_FAIL -> ReceiveProgress(received, refusal(header, deadline, "recv $path"))
+        else -> ReceiveProgress(
+            received,
+            failure(AdbSyncFailure.UNEXPECTED_RESPONSE, "recv $path got ${header.id}"),
+        )
     }
 
     /** Закрывает сессию. */
     public fun close() {
         if (localId == 0) return
         opened = false
-        router.closeRequest(localId)?.let(::sendIgnoringResult)
+        router.closeRequest(localId)?.let { packet -> writer.writeIgnoringResult(packet) }
         emit("sync_closed", mapOf("stream" to localId.toString()))
         localId = 0
     }
@@ -231,35 +259,50 @@ public class AdbSyncSession(
      */
     private fun pump(deadline: Long): AdbSyncOutcome.Failed? {
         val remaining = remainingMillis(deadline)
-        if (remaining <= 0) return failure(AdbSyncFailure.TIMED_OUT, "sync")
+        return if (remaining <= 0) {
+            failure(AdbSyncFailure.TIMED_OUT, "sync")
+        } else {
+            when (val outcome = reader.read(remaining.coerceAtMost(READ_SLICE_MS))) {
+                AdbReadOutcome.Idle -> null
+                AdbReadOutcome.Closed -> failure(AdbSyncFailure.TRANSPORT_CLOSED, "sync")
+                is AdbReadOutcome.Failed -> failure(
+                    AdbSyncFailure.FRAMING_LOST,
+                    "${outcome.reason.name} ${outcome.detail}",
+                )
 
-        when (val outcome = reader.read(remaining.coerceAtMost(READ_SLICE_MS))) {
-            AdbReadOutcome.Idle -> return null
-            AdbReadOutcome.Closed -> return failure(AdbSyncFailure.TRANSPORT_CLOSED, "sync")
-            is AdbReadOutcome.Failed -> return failure(
-                AdbSyncFailure.FRAMING_LOST,
-                "${outcome.reason.name} ${outcome.detail}",
-            )
-
-            is AdbReadOutcome.Received -> {
-                val step = router.onPacket(outcome.packet)
-                step.outbound.forEach(::sendIgnoringResult)
-                for (event in step.events) {
-                    when (event) {
-                        is AdbStreamEvent.Opened -> if (event.localId == localId) opened = true
-                        is AdbStreamEvent.Data -> if (event.localId == localId) incoming.append(event.payload)
-                        is AdbStreamEvent.Closed -> if (event.localId == localId) {
-                            opened = false
-                            return failure(AdbSyncFailure.TRANSPORT_CLOSED, "device closed sync")
-                        }
-
-                        is AdbStreamEvent.Stale -> Unit
-                        is AdbStreamEvent.Unexpected -> Unit
-                    }
-                }
+                is AdbReadOutcome.Received -> handlePumpPacket(outcome.packet)
             }
         }
-        return null
+    }
+
+    private fun handlePumpPacket(packet: AdbPacket): AdbSyncOutcome.Failed? {
+        val step = router.onPacket(packet)
+        step.outbound.forEach { packet -> writer.writeIgnoringResult(packet) }
+        var failure: AdbSyncOutcome.Failed? = null
+        for (event in step.events) {
+            failure = failure ?: when (event) {
+                is AdbStreamEvent.Opened -> {
+                    if (event.localId == localId) opened = true
+                    null
+                }
+
+                is AdbStreamEvent.Data -> {
+                    if (event.localId == localId) incoming.append(event.payload)
+                    null
+                }
+
+                is AdbStreamEvent.Closed -> if (event.localId == localId) {
+                    opened = false
+                    failure(AdbSyncFailure.TRANSPORT_CLOSED, "device closed sync")
+                } else {
+                    null
+                }
+
+                is AdbStreamEvent.Stale -> null
+                is AdbStreamEvent.Unexpected -> null
+            }
+        }
+        return failure
     }
 
     /**
@@ -293,11 +336,6 @@ public class AdbSyncSession(
             )
         }
 
-    /** Подтверждения и закрытия отправляются без разбора: их исход ничего не меняет. */
-    private fun sendIgnoringResult(packet: AdbOutboundPacket) {
-        writer.write(packet.command, packet.arg0, packet.arg1, packet.payload)
-    }
-
     private fun deadlineFrom(timeoutMillis: Int): Long {
         require(timeoutMillis > 0) { "Sync timeout must be positive: $timeoutMillis" }
         return elapsedNanos() + timeoutMillis * NANOS_PER_MILLI
@@ -324,11 +362,10 @@ public class AdbSyncSession(
         )
     }
 
-    private fun readIntLe(source: ByteArray, offset: Int): Int =
-        (source[offset].toInt() and 0xFF) or
-            ((source[offset + 1].toInt() and 0xFF) shl 8) or
-            ((source[offset + 2].toInt() and 0xFF) shl 16) or
-            ((source[offset + 3].toInt() and 0xFF) shl 24)
+    private data class ReceiveProgress(
+        val received: Long = 0L,
+        val outcome: AdbSyncOutcome<Long>? = null,
+    )
 
     public companion object {
         /** Имя сервиса. */
