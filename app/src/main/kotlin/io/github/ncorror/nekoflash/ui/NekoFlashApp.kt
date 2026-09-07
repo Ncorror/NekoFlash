@@ -23,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.github.ncorror.nekoflash.R
@@ -480,15 +481,30 @@ private fun FilesSection(files: AdbFileState, actions: FileActions, enabled: Boo
 private fun fileStateText(files: AdbFileState): String = when (files) {
     AdbFileState.None -> ""
     is AdbFileState.Busy -> stringResource(R.string.files_busy, files.path)
-    is AdbFileState.Read -> stringResource(R.string.files_read_done, files.bytes, files.sha256)
+    is AdbFileState.Read ->
+        pluralStringResource(R.plurals.files_read_done, files.bytes.toQuantity(), files.bytes, files.sha256)
+
     is AdbFileState.Failed -> stringResource(R.string.files_failed, files.reason)
     is AdbFileState.Described -> when {
         !files.stat.exists -> stringResource(R.string.files_missing, files.path)
         files.stat.directory -> stringResource(R.string.files_directory, files.path)
-        files.stat.regularFile -> stringResource(R.string.files_file, files.path, files.stat.size)
-        else -> stringResource(R.string.files_object, files.path, files.stat.size)
+        files.stat.regularFile ->
+            pluralStringResource(R.plurals.files_file, files.stat.size.toQuantity(), files.path, files.stat.size)
+
+        else ->
+            pluralStringResource(R.plurals.files_object, files.stat.size.toQuantity(), files.path, files.stat.size)
     }
 }
+
+/**
+ * Число для выбора формы множественного числа.
+ *
+ * Формы выбираются целым числом, а размер файла — длинное. Значения больше
+ * двух гигабайт прижимаются к пределу: во всех поддерживаемых языках такие
+ * числа попадают в ту же форму, что и предел, а само число выводится
+ * отдельным аргументом и остаётся точным.
+ */
+private fun Long.toQuantity(): Int = coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
 
 /** Действия интерактивной оболочки. Собраны вместе, чтобы не плодить параметры. */
 data class TerminalActions(

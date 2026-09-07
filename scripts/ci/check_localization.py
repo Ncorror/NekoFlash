@@ -26,6 +26,28 @@ def resource_keys(path: Path, *, include_non_translatable: bool) -> set[tuple[st
     return keys
 
 
+# Русский различает четыре формы. Объявить только "other" — значит выводить
+# "1 байтов" и "2 байтов": ошибка, которую не видно, пока число не совпадёт.
+RUSSIAN_QUANTITIES = {"one", "few", "many", "other"}
+
+
+def incomplete_russian_plurals() -> dict[str, set[str]]:
+    """Русские plurals, в которых объявлены не все формы."""
+    root = ET.parse(RUSSIAN_STRINGS).getroot()
+    incomplete: dict[str, set[str]] = {}
+    for child in root:
+        if child.tag != "plurals":
+            continue
+        name = child.attrib.get("name")
+        if not name:
+            continue
+        declared = {item.attrib.get("quantity") for item in child}
+        missing = RUSSIAN_QUANTITIES - declared
+        if missing:
+            incomplete[name] = missing
+    return incomplete
+
+
 def format_keys(keys: set[tuple[str, str]]) -> str:
     return "\n".join(f"  {kind}:{name}" for kind, name in sorted(keys))
 
@@ -46,6 +68,13 @@ def main() -> int:
     if extra:
         print("localization: Russian resources contain unknown keys:", file=sys.stderr)
         print(format_keys(extra), file=sys.stderr)
+        return 1
+
+    missing_quantities = incomplete_russian_plurals()
+    if missing_quantities:
+        print("localization: Russian plurals are missing quantity forms:", file=sys.stderr)
+        for name, quantities in sorted(missing_quantities.items()):
+            print(f"  plurals:{name} needs {', '.join(sorted(quantities))}", file=sys.stderr)
         return 1
 
     properties = RESOURCES_PROPERTIES.read_text(encoding="utf-8")

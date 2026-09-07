@@ -90,9 +90,24 @@
     <string name="files_busy">Идёт работа: %1$s…</string>
     <string name="files_missing">%1$s: ничего нет</string>
     <string name="files_directory">%1$s: каталог</string>
-    <string name="files_file">%1$s: файл, %2$d байт</string>
-    <string name="files_object">%1$s: существует, %2$d байт</string>
-    <string name="files_read_done">Прочитано %1$d байт, SHA-256 %2$s</string>
     <string name="files_failed">Не получилось: %1$s</string>
     <string name="files_note">Чтение ничего не сохраняет: оно проверяет передачу. Сверьте отпечаток с sha256sum на устройстве — совпадение доказывает, что байты дошли без искажений. Сохранение в доступное место появится позже.</string>
+    <plurals name="files_file">
+        <item quantity="one">%1$s: файл, %2$d байт</item>
+        <item quantity="few">%1$s: файл, %2$d байта</item>
+        <item quantity="many">%1$s: файл, %2$d байт</item>
+        <item quantity="other">%1$s: файл, %2$d байта</item>
+    </plurals>
+    <plurals name="files_object">
+        <item quantity="one">%1$s: существует, %2$d байт</item>
+        <item quantity="few">%1$s: существует, %2$d байта</item>
+        <item quantity="many">%1$s: существует, %2$d байт</item>
+        <item quantity="other">%1$s: существует, %2$d байта</item>
+    </plurals>
+    <plurals name="files_read_done">
+        <item quantity="one">Прочитан %1$d байт, SHA-256 %2$s</item>
+        <item quantity="few">Прочитано %1$d байта, SHA-256 %2$s</item>
+        <item quantity="many">Прочитано %1$d байт, SHA-256 %2$s</item>
+        <item quantity="other">Прочитано %1$d байта, SHA-256 %2$s</item>
+    </plurals>
 </resources>

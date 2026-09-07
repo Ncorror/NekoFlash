@@ -95,9 +95,18 @@
     <string name="files_busy">Working on %1$s…</string>
     <string name="files_missing">%1$s: nothing there</string>
     <string name="files_directory">%1$s: directory</string>
-    <string name="files_file">%1$s: file, %2$d bytes</string>
-    <string name="files_object">%1$s: exists, %2$d bytes</string>
-    <string name="files_read_done">%1$d bytes read, SHA-256 %2$s</string>
     <string name="files_failed">Failed: %1$s</string>
     <string name="files_note">Reading does not save anything: it checks the transfer. Compare the hash with sha256sum on the device — matching hashes prove the bytes arrived intact. Saving to a place you can reach comes later.</string>
+    <plurals name="files_file">
+        <item quantity="one">%1$s: file, %2$d byte</item>
+        <item quantity="other">%1$s: file, %2$d bytes</item>
+    </plurals>
+    <plurals name="files_object">
+        <item quantity="one">%1$s: exists, %2$d byte</item>
+        <item quantity="other">%1$s: exists, %2$d bytes</item>
+    </plurals>
+    <plurals name="files_read_done">
+        <item quantity="one">%1$d byte read, SHA-256 %2$s</item>
+        <item quantity="other">%1$d bytes read, SHA-256 %2$s</item>
+    </plurals>
 </resources>
