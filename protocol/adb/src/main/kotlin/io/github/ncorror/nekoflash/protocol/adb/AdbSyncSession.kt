@@ -1,6 +1,5 @@
 package io.github.ncorror.nekoflash.protocol.adb
 
-import io.github.ncorror.nekoflash.core.diagnostics.DiagnosticEvent
 import io.github.ncorror.nekoflash.core.diagnostics.DiagnosticSink
 import java.security.MessageDigest
 import java.time.Clock
@@ -31,6 +30,21 @@ public enum class AdbSyncFailure {
 
     /** Отправить запрос не удалось. */
     SEND_FAILED,
+
+    /**
+     * Путь непредставим на проводе.
+     *
+     * Единственный случай — байт `NUL` внутри пути: на стороне устройства он
+     * оборвал бы строку, и запрос означал бы не то, что просил вызывающий. Это
+     * класс A из `03_PROTOCOL_AND_SAFETY_INVARIANTS_RU.md` §2 — техническая
+     * непредставимость, а не запрет на путь.
+     *
+     * Пустой путь сюда **не относится**: он представим, и отвечает на него
+     * устройство своим `FAIL`. Упреждать этот ответ проверкой на хосте значило
+     * бы подменять class B собственной авторизацией — ровно то, что отменено
+     * решением D031.
+     */
+    UNREPRESENTABLE_PATH,
 }
 
 /** Исход обмена по `sync:`. */
@@ -51,10 +65,6 @@ private fun readIntLe(source: ByteArray, offset: Int): Int =
         ((source[offset + 2].toInt() and 0xFF) shl 16) or
         ((source[offset + 3].toInt() and 0xFF) shl 24)
 
-private fun AdbPacketWriter.writeIgnoringResult(packet: AdbOutboundPacket) {
-    write(packet.command, packet.arg0, packet.arg1, packet.payload)
-}
-
 /**
  * Сессия сервиса `sync:`.
  *
@@ -65,41 +75,44 @@ private fun AdbPacketWriter.writeIgnoringResult(packet: AdbOutboundPacket) {
  * Пока сессия открыта, других вызовов по этому соединению быть не должно:
  * физический читатель один. Запрет держит владелец соединения.
  *
- * Здесь только чтение. `SEND` — запись на устройство, первая мутация в проекте
- * — появится отдельно и с отдельным разбором правил `docs/03` §3, а не
- * дописыванием метода в этот класс.
+ * Класс отвечает за операции сервиса и только за них. Как разговаривать по
+ * потоку, знает [AdbSyncExchange]; как писать файл — [AdbSyncUpload]. Граница
+ * проведена там, где её потребовал detekt: с приходом `SEND` в одном классе
+ * оказалось 28 функций при пороге 20, а поднимать порог запрещено
+ * (`15_CLEAN_REBUILD_BLUEPRINT_RU.md` §4.1).
+ *
+ * [send] — единственная мутирующая операция. Она подчиняется правилам
+ * `docs/03` §3 и §7; разбор — в KDoc [AdbSyncSendOutcome].
  */
 public class AdbSyncSession(
-    private val reader: AdbPacketReader,
-    private val writer: AdbPacketWriter,
-    private val router: AdbStreamRouter,
-    private val diagnostics: DiagnosticSink = DiagnosticSink { },
-    private val clock: () -> Instant = { Clock.systemUTC().instant() },
-    private val elapsedNanos: () -> Long = { System.nanoTime() },
+    reader: AdbPacketReader,
+    writer: AdbPacketWriter,
+    router: AdbStreamRouter,
+    diagnostics: DiagnosticSink = DiagnosticSink { },
+    clock: () -> Instant = { Clock.systemUTC().instant() },
+    elapsedNanos: () -> Long = { System.nanoTime() },
 ) {
-    private val incoming = AdbStreamBuffer()
+    private val exchange = AdbSyncExchange(
+        reader = reader,
+        writer = writer,
+        router = router,
+        diagnostics = diagnostics,
+        clock = clock,
+        elapsedNanos = elapsedNanos,
+    )
 
-    private var localId: Int = 0
-    private var opened = false
+    private val upload = AdbSyncUpload(exchange)
 
     /** Открыта ли сессия. */
     public val active: Boolean
-        get() = opened
+        get() = exchange.active
 
     /** Открывает сервис и ждёт подтверждения. */
-    public fun open(timeoutMillis: Int = DEFAULT_TIMEOUT_MS): AdbSyncOutcome<Unit> {
-        val (id, packet) = router.openRequest(SERVICE)
-        localId = id
-        emit("sync_open", mapOf("stream" to id.toString()))
-        var failure = send(packet)
-        val deadline = deadlineFrom(timeoutMillis)
-        while (!opened && failure == null) {
-            failure = pump(deadline)
-        }
-        return failure ?: AdbSyncOutcome.Done(Unit).also {
-            emit("sync_opened", mapOf("stream" to id.toString()))
-        }
-    }
+    public fun open(timeoutMillis: Int = DEFAULT_TIMEOUT_MS): AdbSyncOutcome<Unit> =
+        exchange.open(timeoutMillis)
+
+    /** Закрывает сессию. */
+    public fun close(): Unit = exchange.close()
 
     /**
      * Спрашивает сведения о пути.
@@ -109,28 +122,9 @@ public class AdbSyncSession(
      * не может ответить вовсе.
      */
     public fun stat(path: String, timeoutMillis: Int = DEFAULT_TIMEOUT_MS): AdbSyncOutcome<AdbSyncStat> {
-        if (!opened) return failure(AdbSyncFailure.NOT_OPEN, "stat $path")
-        val deadline = deadlineFrom(timeoutMillis)
-        return request(AdbSyncProtocol.ID_STAT, path) ?: readStatResponse(path, deadline)
-    }
-
-    private fun readStatResponse(
-        path: String,
-        deadline: Long,
-    ): AdbSyncOutcome<AdbSyncStat> = when (val read = readHeader(deadline)) {
-        is AdbSyncOutcome.Failed -> read
-        is AdbSyncOutcome.Done -> when (read.value.id) {
-            AdbSyncProtocol.ID_STAT -> when (val body = readExactly(STAT_BODY_BYTES, deadline)) {
-                is AdbSyncOutcome.Failed -> body
-                is AdbSyncOutcome.Done -> AdbSyncOutcome.Done(decodeStat(read.value, body.value))
-            }
-
-            AdbSyncProtocol.ID_FAIL -> refusal(read.value, deadline, "stat $path")
-            else -> failure(
-                AdbSyncFailure.UNEXPECTED_RESPONSE,
-                "stat $path got ${read.value.id}",
-            )
-        }
+        if (!exchange.active) return exchange.failure(AdbSyncFailure.NOT_OPEN, "stat $path")
+        val deadline = exchange.deadlineFrom(timeoutMillis)
+        return exchange.request(AdbSyncProtocol.ID_STAT, path) ?: readStatResponse(path, deadline)
     }
 
     /**
@@ -145,18 +139,19 @@ public class AdbSyncSession(
         timeoutMillis: Int = TRANSFER_TIMEOUT_MS,
         sink: (ByteArray) -> Unit,
     ): AdbSyncOutcome<Long> {
-        return if (!opened) {
-            failure(AdbSyncFailure.NOT_OPEN, "recv $path")
+        return if (!exchange.active) {
+            exchange.failure(AdbSyncFailure.NOT_OPEN, "recv $path")
         } else {
-            val deadline = deadlineFrom(timeoutMillis)
+            val deadline = exchange.deadlineFrom(timeoutMillis)
             val digest = MessageDigest.getInstance("SHA-256")
-            val outcome = request(AdbSyncProtocol.ID_RECV, path) ?: receiveLoop(path, deadline) { chunk ->
-                digest.update(chunk)
-                sink(chunk)
-            }
+            val outcome = exchange.request(AdbSyncProtocol.ID_RECV, path)
+                ?: receiveLoop(path, deadline) { chunk ->
+                    digest.update(chunk)
+                    sink(chunk)
+                }
             if (outcome is AdbSyncOutcome.Done) {
                 val sha256 = digest.digest().joinToString(separator = "") { byte -> "%02x".format(byte) }
-                emit(
+                exchange.emit(
                     "sync_received",
                     mapOf(
                         "path" to path,
@@ -169,6 +164,53 @@ public class AdbSyncSession(
         }
     }
 
+    /**
+     * Пишет файл на устройство.
+     *
+     * Единственная мутирующая операция сессии. Содержимое берётся у [source]
+     * порциями: он заполняет переданный буфер и возвращает число заполненных
+     * байт, а значение `0` или меньше означает конец. Буфер выделяет сессия,
+     * поэтому блок не может превысить предел протокола — это инвариант формата,
+     * а не ограничение вызывающего.
+     *
+     * Файл не собирается в памяти ни на одном шаге: он может быть больше
+     * доступной памяти (`docs/06` §9).
+     *
+     * Исход отдельно сообщает, что стало с назначением. После пересечения
+     * границы мутации отменить запись безопасно уже нельзя, и результат
+     * [AdbSyncDestination.UNKNOWN] здесь — честный ответ, а не сбой. Полный
+     * разбор — KDoc [AdbSyncSendOutcome].
+     *
+     * @param modifiedAtSeconds время изменения файла в секундах эпохи; уходит
+     *   в `DONE`, как в Legacy `pushFile`.
+     */
+    public fun send(
+        path: String,
+        modifiedAtSeconds: Int,
+        mode: Int = AdbSyncProtocol.DEFAULT_FILE_MODE,
+        timeoutMillis: Int = TRANSFER_TIMEOUT_MS,
+        source: (ByteArray) -> Int,
+    ): AdbSyncSendOutcome = upload.send(path, modifiedAtSeconds, mode, timeoutMillis, source)
+
+    private fun readStatResponse(
+        path: String,
+        deadline: Long,
+    ): AdbSyncOutcome<AdbSyncStat> = when (val read = exchange.readHeader(deadline)) {
+        is AdbSyncOutcome.Failed -> read
+        is AdbSyncOutcome.Done -> when (read.value.id) {
+            AdbSyncProtocol.ID_STAT -> when (val body = exchange.readExactly(STAT_BODY_BYTES, deadline)) {
+                is AdbSyncOutcome.Failed -> body
+                is AdbSyncOutcome.Done -> AdbSyncOutcome.Done(decodeStat(read.value, body.value))
+            }
+
+            AdbSyncProtocol.ID_FAIL -> exchange.refusal(read.value, deadline, "stat $path")
+            else -> exchange.failure(
+                AdbSyncFailure.UNEXPECTED_RESPONSE,
+                "stat $path got ${read.value.id}",
+            )
+        }
+    }
+
     private fun receiveLoop(
         path: String,
         deadline: Long,
@@ -176,7 +218,7 @@ public class AdbSyncSession(
     ): AdbSyncOutcome<Long> {
         var progress = ReceiveProgress()
         while (progress.outcome == null) {
-            progress = when (val read = readHeader(deadline)) {
+            progress = when (val read = exchange.readHeader(deadline)) {
                 is AdbSyncOutcome.Failed -> progress.copy(outcome = read)
                 is AdbSyncOutcome.Done -> receiveHeader(path, deadline, sink, read.value, progress.received)
             }
@@ -194,10 +236,10 @@ public class AdbSyncSession(
         AdbSyncProtocol.ID_DATA -> if (header.value < 0 || header.value > AdbSyncProtocol.DATA_CHUNK_BYTES) {
             ReceiveProgress(
                 received,
-                failure(AdbSyncFailure.INVALID_LENGTH, "recv $path chunk=${header.value}"),
+                exchange.failure(AdbSyncFailure.INVALID_LENGTH, "recv $path chunk=${header.value}"),
             )
         } else {
-            when (val chunk = readExactly(header.value, deadline)) {
+            when (val chunk = exchange.readExactly(header.value, deadline)) {
                 is AdbSyncOutcome.Failed -> ReceiveProgress(received, chunk)
                 is AdbSyncOutcome.Done -> {
                     sink(chunk.value)
@@ -208,115 +250,15 @@ public class AdbSyncSession(
 
         AdbSyncProtocol.ID_DONE -> ReceiveProgress(received, AdbSyncOutcome.Done(received))
 
-        AdbSyncProtocol.ID_FAIL -> ReceiveProgress(received, refusal(header, deadline, "recv $path"))
+        AdbSyncProtocol.ID_FAIL -> ReceiveProgress(
+            received,
+            exchange.refusal(header, deadline, "recv $path"),
+        )
+
         else -> ReceiveProgress(
             received,
-            failure(AdbSyncFailure.UNEXPECTED_RESPONSE, "recv $path got ${header.id}"),
+            exchange.failure(AdbSyncFailure.UNEXPECTED_RESPONSE, "recv $path got ${header.id}"),
         )
-    }
-
-    /** Закрывает сессию. */
-    public fun close() {
-        if (localId == 0) return
-        opened = false
-        router.closeRequest(localId)?.let { packet -> writer.writeIgnoringResult(packet) }
-        emit("sync_closed", mapOf("stream" to localId.toString()))
-        localId = 0
-    }
-
-    private fun request(id: String, path: String): AdbSyncOutcome.Failed? {
-        val payload = AdbSyncProtocol.request(id, path)
-        val packet = router.writeRequest(localId, payload)
-            ?: return failure(AdbSyncFailure.NOT_OPEN, "$id $path")
-        return send(packet)
-    }
-
-    /**
-     * Читает сообщение об отказе.
-     *
-     * Устройство называет длину сообщения само, поэтому она проверяется:
-     * иначе один испорченный ответ заставил бы ждать мегабайт текста.
-     */
-    private fun refusal(
-        header: AdbSyncHeader,
-        deadline: Long,
-        stage: String,
-    ): AdbSyncOutcome.Failed {
-        if (header.value < 0 || header.value > AdbSyncProtocol.MAX_STRING_BYTES) {
-            return failure(AdbSyncFailure.INVALID_LENGTH, "$stage message=${header.value}")
-        }
-        val message = when (val read = readExactly(header.value, deadline)) {
-            is AdbSyncOutcome.Done -> read.value.toString(Charsets.UTF_8)
-            is AdbSyncOutcome.Failed -> return read
-        }
-        return failure(AdbSyncFailure.DEVICE_REFUSED, "$stage: $message")
-    }
-
-    private fun readHeader(deadline: Long): AdbSyncOutcome<AdbSyncHeader> =
-        when (val read = readExactly(AdbSyncProtocol.HEADER_SIZE_BYTES, deadline)) {
-            is AdbSyncOutcome.Done -> AdbSyncOutcome.Done(AdbSyncProtocol.decodeHeader(read.value))
-            is AdbSyncOutcome.Failed -> read
-        }
-
-    /** Добирает из потока ровно столько байт, сколько названо. */
-    private fun readExactly(count: Int, deadline: Long): AdbSyncOutcome<ByteArray> {
-        while (true) {
-            incoming.take(count)?.let { bytes -> return AdbSyncOutcome.Done(bytes) }
-            pump(deadline)?.let { failure -> return failure }
-        }
-    }
-
-    /**
-     * Один приём: принять пакет и разложить его по маршрутизатору.
-     *
-     * Возвращает отказ, когда продолжать нельзя, и `null`, когда можно.
-     */
-    private fun pump(deadline: Long): AdbSyncOutcome.Failed? {
-        val remaining = remainingMillis(deadline)
-        return if (remaining <= 0) {
-            failure(AdbSyncFailure.TIMED_OUT, "sync")
-        } else {
-            when (val outcome = reader.read(remaining.coerceAtMost(READ_SLICE_MS))) {
-                AdbReadOutcome.Idle -> null
-                AdbReadOutcome.Closed -> failure(AdbSyncFailure.TRANSPORT_CLOSED, "sync")
-                is AdbReadOutcome.Failed -> failure(
-                    AdbSyncFailure.FRAMING_LOST,
-                    "${outcome.reason.name} ${outcome.detail}",
-                )
-
-                is AdbReadOutcome.Received -> handlePumpPacket(outcome.packet)
-            }
-        }
-    }
-
-    private fun handlePumpPacket(packet: AdbPacket): AdbSyncOutcome.Failed? {
-        val step = router.onPacket(packet)
-        step.outbound.forEach { packet -> writer.writeIgnoringResult(packet) }
-        var failure: AdbSyncOutcome.Failed? = null
-        for (event in step.events) {
-            failure = failure ?: when (event) {
-                is AdbStreamEvent.Opened -> {
-                    if (event.localId == localId) opened = true
-                    null
-                }
-
-                is AdbStreamEvent.Data -> {
-                    if (event.localId == localId) incoming.append(event.payload)
-                    null
-                }
-
-                is AdbStreamEvent.Closed -> if (event.localId == localId) {
-                    opened = false
-                    failure(AdbSyncFailure.TRANSPORT_CLOSED, "device closed sync")
-                } else {
-                    null
-                }
-
-                is AdbStreamEvent.Stale -> null
-                is AdbStreamEvent.Unexpected -> null
-            }
-        }
-        return failure
     }
 
     /**
@@ -329,7 +271,7 @@ public class AdbSyncSession(
      */
     private fun decodeStat(header: AdbSyncHeader, body: ByteArray): AdbSyncStat {
         val size = readIntLe(body, 0).toLong() and 0xFFFF_FFFFL
-        emit(
+        exchange.emit(
             "sync_stat",
             mapOf("mode" to header.value.toString(), "size" to size.toString()),
         )
@@ -337,42 +279,6 @@ public class AdbSyncSession(
             mode = header.value,
             size = size,
             modifiedAtSeconds = readIntLe(body, 4),
-        )
-    }
-
-    private fun send(packet: AdbOutboundPacket): AdbSyncOutcome.Failed? =
-        when (val outcome = writer.write(packet.command, packet.arg0, packet.arg1, packet.payload)) {
-            AdbWriteOutcome.Sent -> null
-            AdbWriteOutcome.Closed -> failure(AdbSyncFailure.TRANSPORT_CLOSED, "send")
-            is AdbWriteOutcome.Interrupted -> failure(
-                AdbSyncFailure.SEND_FAILED,
-                "${outcome.detail} (sent=${outcome.sentBytes})",
-            )
-        }
-
-    private fun deadlineFrom(timeoutMillis: Int): Long {
-        require(timeoutMillis > 0) { "Sync timeout must be positive: $timeoutMillis" }
-        return elapsedNanos() + timeoutMillis * NANOS_PER_MILLI
-    }
-
-    private fun remainingMillis(deadlineNanos: Long): Int =
-        ((deadlineNanos - elapsedNanos()) / NANOS_PER_MILLI)
-            .coerceAtMost(Int.MAX_VALUE.toLong())
-            .toInt()
-
-    private fun failure(reason: AdbSyncFailure, detail: String): AdbSyncOutcome.Failed {
-        emit("sync_failed", mapOf("reason" to reason.name, "detail" to detail))
-        return AdbSyncOutcome.Failed(reason, detail)
-    }
-
-    private fun emit(message: String, fields: Map<String, String>) {
-        diagnostics.emit(
-            DiagnosticEvent(
-                timestamp = clock(),
-                category = AdbHandshake.DIAGNOSTIC_CATEGORY,
-                message = message,
-                fields = fields,
-            ),
         )
     }
 
@@ -397,8 +303,5 @@ public class AdbSyncSession(
          * восемь байт, а не двенадцать.
          */
         private const val STAT_BODY_BYTES = 8
-
-        private const val READ_SLICE_MS = 2_000
-        private const val NANOS_PER_MILLI = 1_000_000L
     }
 }

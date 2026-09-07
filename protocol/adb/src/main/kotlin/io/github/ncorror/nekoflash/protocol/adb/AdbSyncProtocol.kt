@@ -71,6 +71,15 @@ public object AdbSyncProtocol {
     /** Тип «обычный файл». */
     public const val MODE_REGULAR_FILE: Int = 0x8000
 
+    /**
+     * Режим создаваемого файла по умолчанию — `0644`.
+     *
+     * Значение из Legacy (`pushFile(..., mode: Int = 0x1A4)`). Это умолчание
+     * вызывающего, а не ограничение: любой режим передаётся как есть, и решает
+     * его судьбу устройство.
+     */
+    public const val DEFAULT_FILE_MODE: Int = 0x1A4
+
     /** Собирает заголовок без полезной части. */
     public fun header(id: String, value: Int): ByteArray {
         require(id.length == ID_LENGTH) { "Sync id must be $ID_LENGTH characters: $id" }
@@ -91,6 +100,37 @@ public object AdbSyncProtocol {
     /** Собирает запрос с путём. Путь идёт в UTF-8: имена файлов бывают любые. */
     public fun request(id: String, path: String): ByteArray =
         message(id, path.toByteArray(Charsets.UTF_8))
+
+    /**
+     * Собирает спецификацию назначения для `SEND`: путь и режим через запятую.
+     *
+     * Формат перенесён из Legacy `pushFile`: `"$path,$mode"`, режим — десятичное
+     * число. `adbd` отделяет режим по **последней** запятой, поэтому запятая
+     * внутри самого пути допустима и не экранируется.
+     */
+    public fun sendSpec(path: String, mode: Int): ByteArray =
+        "$path,$mode".toByteArray(Charsets.UTF_8)
+
+    /**
+     * Собирает блок `DATA` из первых [length] байт буфера.
+     *
+     * Буфер переиспользуется вызывающим, поэтому берётся часть, а не весь
+     * массив: копировать хвост прошлого блока значило бы отправить мусор.
+     *
+     * @throws IllegalArgumentException если длина выходит за предел протокола.
+     */
+    public fun dataFrame(buffer: ByteArray, length: Int): ByteArray {
+        require(length in 0..DATA_CHUNK_BYTES) {
+            "Sync data chunk must fit $DATA_CHUNK_BYTES bytes, got $length"
+        }
+        require(length <= buffer.size) {
+            "Sync data chunk of $length bytes exceeds the buffer of ${buffer.size}"
+        }
+        val frame = ByteArray(HEADER_SIZE_BYTES + length)
+        header(ID_DATA, length).copyInto(frame)
+        buffer.copyInto(frame, HEADER_SIZE_BYTES, 0, length)
+        return frame
+    }
 
     /** Разбирает заголовок из первых [HEADER_SIZE_BYTES] байт. */
     public fun decodeHeader(source: ByteArray): AdbSyncHeader {
