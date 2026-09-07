@@ -24,6 +24,7 @@ public class AdbConnection(
     keyStore: AdbKeyStore,
     apiLevel: Int,
     diagnostics: DiagnosticSink = DiagnosticSink { },
+    onPublicKeySent: () -> Unit = { },
 ) {
     /** Что объявляется peer'у и чем проверяется входящий кадр. */
     public val advertisedMaxPayload: Int = AdbInboundFraming.advertisedMaxPayload(apiLevel)
@@ -52,6 +53,7 @@ public class AdbConnection(
         keyStore = keyStore,
         localMaxPayload = advertisedMaxPayload,
         diagnostics = diagnostics,
+        onPublicKeySent = onPublicKeySent,
     )
 
     /**

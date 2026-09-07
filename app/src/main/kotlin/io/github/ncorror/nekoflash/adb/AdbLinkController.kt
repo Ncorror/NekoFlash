@@ -264,12 +264,13 @@ public class AdbLinkController(
             keyStore = keyStore,
             apiLevel = apiLevel,
             diagnostics = diagnostics,
+            onPublicKeySent = {
+                val current = mutableState.value
+                if (current is AdbLinkState.Connecting && current.generation == generation) {
+                    mutableState.value = AdbLinkState.WaitingForAuthorization(generation)
+                }
+            },
         )
-        // Пока идёт рукопожатие, отдельного сигнала «устройство спрашивает
-        // пользователя» из него не приходит: рукопожатие синхронное. Ожидание
-        // подтверждения видно по тому, что оно длится, поэтому состояние
-        // меняется до вызова, а не после.
-        mutableState.value = AdbLinkState.WaitingForAuthorization(generation)
 
         val outcome = runCatching { connection.connect() }
         mutableState.value = when (val result = outcome.getOrNull()) {

@@ -78,6 +78,7 @@ public class AdbHandshake(
     private val keyStore: AdbKeyStore,
     private val localMaxPayload: Int,
     private val diagnostics: DiagnosticSink = DiagnosticSink { },
+    private val onPublicKeySent: () -> Unit = { },
     private val clock: () -> Instant = { Clock.systemUTC().instant() },
     private val elapsedNanos: () -> Long = { System.nanoTime() },
 ) {
@@ -128,19 +129,42 @@ public class AdbHandshake(
                 "cnxn_sent",
                 mapOf("version" to LOCAL_VERSION.toHex(), "maxPayload" to localMaxPayload.toString()),
             )
-            when (val outcome = reader.read(RESPONSE_TIMEOUT_MS)) {
-                is AdbReadOutcome.Received -> handleInitialResponse(outcome.packet)
-                else -> readFailure(outcome, "CNXN response")
-            }
+            readInitialResponse()
         }
     }
 
-    private fun handleInitialResponse(packet: AdbPacket): AdbHandshakeOutcome = when (packet.command) {
-        AdbCommand.CNXN -> connected(packet)
-        AdbCommand.AUTH -> authorize(packet)
-        else -> failed(
+    private fun readInitialResponse(): AdbHandshakeOutcome {
+        var staleCloseCount = 0
+        var result: AdbHandshakeOutcome? = null
+        while (result == null && staleCloseCount <= STALE_CLOSE_LIMIT) {
+            result = when (val outcome = reader.read(RESPONSE_TIMEOUT_MS)) {
+                is AdbReadOutcome.Received -> when (outcome.packet.command) {
+                    AdbCommand.CNXN -> connected(outcome.packet)
+                    AdbCommand.AUTH -> authorize(outcome.packet)
+                    AdbCommand.CLSE -> {
+                        staleCloseCount += 1
+                        emit(
+                            "handshake_stale_close",
+                            mapOf(
+                                "remote" to outcome.packet.arg0.toString(),
+                                "local" to outcome.packet.arg1.toString(),
+                            ),
+                        )
+                        null
+                    }
+
+                    else -> failed(
+                        AdbHandshakeFailure.UNEXPECTED_COMMAND,
+                        "command=0x${outcome.packet.command.toString(16)}",
+                    )
+                }
+
+                else -> readFailure(outcome, "CNXN response")
+            }
+        }
+        return result ?: failed(
             AdbHandshakeFailure.UNEXPECTED_COMMAND,
-            "command=0x${packet.command.toString(16)}",
+            "more than $STALE_CLOSE_LIMIT stale CLSE packets before CNXN/AUTH",
         )
     }
 
@@ -280,6 +304,7 @@ public class AdbHandshake(
                             "payload" to bytes.size.toString(),
                         ),
                     )
+                    onPublicKeySent()
                     null
                 } else {
                     sendFailure(sent, "AUTH RSAPUBLICKEY")
@@ -400,6 +425,9 @@ public class AdbHandshake(
 
         /** Сколько ответов подряд разбирается, прежде чем ожидание признаётся напрасным. */
         public const val AUTH_RESPONSE_LIMIT: Int = 12
+
+        /** Поздние закрытия старых logical streams перед ответом на новый CNXN. */
+        private const val STALE_CLOSE_LIMIT: Int = 8
 
         private const val NANOS_PER_MILLI = 1_000_000L
 

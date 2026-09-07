@@ -118,6 +118,28 @@ class AdbSyncSessionTest {
     }
 
     @Test
+    fun receivedEventContainsSha256() {
+        val sink = InMemoryDiagnosticSink()
+        val payload = "hello world".toByteArray()
+        val device = Device(
+            okay(),
+            data(AdbSyncProtocol.message(AdbSyncProtocol.ID_DATA, payload)),
+            data(AdbSyncProtocol.header(AdbSyncProtocol.ID_DONE, 0)),
+        )
+        val session = device.session(sink)
+        session.open()
+
+        session.receive("/sdcard/a.txt") { }
+
+        val received = sink.snapshot().single { it.message == "sync_received" }
+        assertEquals("11", received.fields["bytes"])
+        assertEquals(
+            "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9",
+            received.fields["sha256"],
+        )
+    }
+
+    @Test
     fun emptyFileIsReceivedAsZeroBytes() {
         val device = Device(okay(), data(AdbSyncProtocol.header(AdbSyncProtocol.ID_DONE, 0)))
         var calls = 0

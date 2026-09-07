@@ -158,16 +158,16 @@ shifts самого формата. Остальные style/complexity rules н
 
 | Пункт | Статус | Где |
 |---|---|---|
-| Sync core | **частично** | `AdbSyncProtocol` и `AdbStreamBuffer` плюс `AdbSyncSession` со `STAT` и `RECV`. Обе операции только читают. `SEND` — первая мутация в проекте — сделана не будет дописыванием метода: она требует отдельного разбора правил `docs/03` §3. Вызывается из production-кода: на экране подключённого устройства есть проверка пути и чтение файла. Критерий прогона — `07` §6.29 |
-| pull / `RECV` | **частично / ждёт железа** | `RECV` перенесён, покрыт тестами и подключён к экрану: блоки отдаются по мере поступления и нигде не накапливаются, потому что файл может быть больше памяти. Длина блока проверяется — её называет устройство. Сейчас считается размер и SHA-256; сохранение в пользовательский destination требует artifact sink из Phase 8. Аппаратный критерий — `07` §6.29, повторный прогон заблокирован текущей AUTH-проблемой §6.30 |
+| Sync core | **частично / read-only доказан** | `AdbSyncProtocol` и `AdbStreamBuffer` плюс `AdbSyncSession` со `STAT` и `RECV`. Production-путь подтверждён на железе малым и 2 MiB файлом (`07` §6.29, §6.32). `SEND` — первая мутация в проекте — требует отдельного разбора правил `docs/03` §3 и остаётся не начатым |
+| pull / `RECV` | **частично / transport доказан** | `RECV` покрыт тестами и production hardware evidence: 10 байт и 2 MiB получены полностью, SHA-256 большого файла совпал с `sha256sum` (`07` §6.29, §6.32). Блоки стримятся и не накапливаются. Сохранение в пользовательский destination ещё требует artifact sink из Phase 8; именно поэтому весь пользовательский pull пока не COMPLETE |
 | push / `SEND` | **не начато** | Это первая mutation в Sync-пути. До реализации обязателен разбор mutation/cancellation/result semantics из `docs/03` §3; статус `RECV` к `SEND` не наследуется |
 | concurrent service dispatcher | **не начато** | `AdbStreamRouter` умеет маршрутизировать несколько logical streams, но production ownership пока даёт один активный reader consumer. Нужен один постоянный physical reader/dispatcher, который раздаёт пакеты нескольким logical sessions; только после этого Terminal, file transfer и raw services можно честно разрешить параллельно. Это архитектурный долг, а не искусственный product gate |
 | install/install-multiple | **нет** | — |
 | reboot | **нет** | — |
 | raw services | **нет** | `AdbServiceCall` уже вызывает произвольный сервис; здесь нужен доступ к этому из UI |
 | forward/reverse | **нет** | по документу — «если current protocol layer готов» |
-| file/transfer UI | **нет** | — |
-| large-file and process-death tests | **нет** | — |
+| file/transfer UI | **частично** | Read-only UI уже умеет `STAT` и `RECV`+SHA-256. Выбор destination, сохранение artifact, progress/cancel для полноценного transfer UI остаются открыты |
+| large-file and process-death tests | **частично** | `RECV` 2 MiB подтверждён на железе с совпавшим SHA-256 (`07` §6.29/§6.32); process-death и large mutation/upload paths ещё не проверены |
 
 ## Phase 5 — Fastboot generic engine
 

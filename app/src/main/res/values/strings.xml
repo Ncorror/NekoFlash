@@ -56,7 +56,7 @@
     <string name="adb_state_label">ADB link</string>
     <string name="adb_state_idle">Not connected</string>
     <string name="adb_state_connecting">Handshake in progress</string>
-    <string name="adb_state_waiting">Waiting for you to allow debugging on the device</string>
+    <string name="adb_state_waiting">Public key sent; waiting for device authorization. Android may show an RSA confirmation dialog.</string>
     <string name="adb_state_connected">Connected: %1$s</string>
     <string name="adb_state_failed">Handshake failed: %1$s (%2$s)</string>
     <string name="adb_features_label">Peer features</string>

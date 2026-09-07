@@ -113,6 +113,52 @@ class AdbHandshakeTest {
         assertEquals(AdbHandshake.AUTH_SIGNATURE, device.sent[1].arg0)
     }
 
+    /** Поздний CLSE старого потока не является ответом на новый CNXN. */
+    @Test
+    fun staleCloseBeforeAuthIsSkipped() = withKeyStore { keyStore ->
+        val sink = InMemoryDiagnosticSink()
+        val device = ScriptedDevice(
+            packet(AdbCommand.CLSE, arg0 = 6, arg1 = 1),
+            authToken(),
+            cnxn(DEVICE_BANNER),
+        )
+
+        val outcome = device.handshake(keyStore, diagnostics = sink).connect()
+
+        assertTrue(outcome is AdbHandshakeOutcome.Connected)
+        val stale = sink.snapshot().single { it.message == "handshake_stale_close" }
+        assertEquals("6", stale.fields["remote"])
+        assertEquals("1", stale.fields["local"])
+    }
+
+    /** Бюджет поздних CLSE конечен: девятый пакет уже не маскируется как stale. */
+    @Test
+    fun staleCloseBudgetIsBounded() = withKeyStore { keyStore ->
+        val sink = InMemoryDiagnosticSink()
+        val closes = Array(9) { packet(AdbCommand.CLSE, arg0 = it + 1, arg1 = 1) }
+        val outcome = ScriptedDevice(*closes).handshake(keyStore, diagnostics = sink).connect()
+
+        assertTrue(outcome is AdbHandshakeOutcome.Failed)
+        outcome as AdbHandshakeOutcome.Failed
+        assertEquals(AdbHandshakeFailure.UNEXPECTED_COMMAND, outcome.reason)
+        assertEquals(9, sink.snapshot().count { it.message == "handshake_stale_close" })
+    }
+
+    /** UI получает сигнал только после реально отправленного публичного ключа. */
+    @Test
+    fun publicKeyObserverRunsOnlyWhenPublicKeyWasSent() = withKeyStore { keyStore ->
+        var observed = 0
+        ScriptedDevice(authToken(), cnxn(DEVICE_BANNER))
+            .handshake(keyStore, onPublicKeySent = { observed += 1 })
+            .connect()
+        assertEquals(0, observed)
+
+        ScriptedDevice(authToken(), authToken(), cnxn(DEVICE_BANNER))
+            .handshake(keyStore, onPublicKeySent = { observed += 1 })
+            .connect()
+        assertEquals(1, observed)
+    }
+
     /** Устройство не узнало ключ и просит снова: тогда уходит публичный ключ. */
     @Test
     fun repeatedTokenMakesTheHostSendItsPublicKey() = withKeyStore { keyStore ->
@@ -379,12 +425,14 @@ class AdbHandshakeTest {
             localMaxPayload: Int = MAX_PAYLOAD,
             diagnostics: InMemoryDiagnosticSink? = null,
             elapsed: (() -> Long)? = null,
+            onPublicKeySent: () -> Unit = { },
         ) = AdbHandshake(
             reader = sharedReader,
             writer = sharedWriter,
             keyStore = keyStore,
             localMaxPayload = localMaxPayload,
             diagnostics = diagnostics ?: InMemoryDiagnosticSink(),
+            onPublicKeySent = onPublicKeySent,
             elapsedNanos = elapsed ?: { 0L },
         )
     }

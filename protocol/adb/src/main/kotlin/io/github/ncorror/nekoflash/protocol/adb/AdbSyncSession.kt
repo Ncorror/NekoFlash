@@ -2,6 +2,7 @@ package io.github.ncorror.nekoflash.protocol.adb
 
 import io.github.ncorror.nekoflash.core.diagnostics.DiagnosticEvent
 import io.github.ncorror.nekoflash.core.diagnostics.DiagnosticSink
+import java.security.MessageDigest
 import java.time.Clock
 import java.time.Instant
 
@@ -148,7 +149,23 @@ public class AdbSyncSession(
             failure(AdbSyncFailure.NOT_OPEN, "recv $path")
         } else {
             val deadline = deadlineFrom(timeoutMillis)
-            request(AdbSyncProtocol.ID_RECV, path) ?: receiveLoop(path, deadline, sink)
+            val digest = MessageDigest.getInstance("SHA-256")
+            val outcome = request(AdbSyncProtocol.ID_RECV, path) ?: receiveLoop(path, deadline) { chunk ->
+                digest.update(chunk)
+                sink(chunk)
+            }
+            if (outcome is AdbSyncOutcome.Done) {
+                val sha256 = digest.digest().joinToString(separator = "") { byte -> "%02x".format(byte) }
+                emit(
+                    "sync_received",
+                    mapOf(
+                        "path" to path,
+                        "bytes" to outcome.value.toString(),
+                        "sha256" to sha256,
+                    ),
+                )
+            }
+            outcome
         }
     }
 
@@ -189,10 +206,7 @@ public class AdbSyncSession(
             }
         }
 
-        AdbSyncProtocol.ID_DONE -> {
-            emit("sync_received", mapOf("path" to path, "bytes" to received.toString()))
-            ReceiveProgress(received, AdbSyncOutcome.Done(received))
-        }
+        AdbSyncProtocol.ID_DONE -> ReceiveProgress(received, AdbSyncOutcome.Done(received))
 
         AdbSyncProtocol.ID_FAIL -> ReceiveProgress(received, refusal(header, deadline, "recv $path"))
         else -> ReceiveProgress(
