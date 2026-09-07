@@ -144,7 +144,9 @@ public class AdbHandshake(
             }
         }
 
+        var attempt = 0
         repeat(AUTH_RESPONSE_LIMIT) {
+            attempt += 1
             val timeout = if (publicKeySent) AUTH_CONFIRMATION_TIMEOUT_MS else AUTH_SIGNATURE_TIMEOUT_MS
             val startedAt = elapsedNanos()
             val packet = when (val outcome = reader.read(timeout)) {
@@ -166,6 +168,20 @@ public class AdbHandshake(
 
                 else -> return readFailure(outcome, "AUTH response")
             }
+
+            // Каждый ответ в этом цикле записывается. Без этого «ожидание»
+            // выглядит одинаково и когда устройство молчит, и когда оно раз за
+            // разом присылает токен: разбор 2026-09-07 упёрся именно в это.
+            emit(
+                "auth_response",
+                mapOf(
+                    "attempt" to attempt.toString(),
+                    "command" to "0x${packet.command.toString(16)}",
+                    "type" to packet.arg0.toString(),
+                    "payload" to packet.payload.size.toString(),
+                    "afterMs" to ((elapsedNanos() - startedAt) / NANOS_PER_MILLI).toString(),
+                ),
+            )
 
             when (packet.command) {
                 AdbCommand.CNXN -> return connected(packet)
@@ -207,7 +223,15 @@ public class AdbHandshake(
         }
         val sent = writer.write(AdbCommand.AUTH, AUTH_RSAPUBLICKEY, 0, payload.getOrThrow())
         if (sent !is AdbWriteOutcome.Sent) return sendFailure(sent, "AUTH RSAPUBLICKEY")
-        emit("auth_public_key_sent", mapOf("path" to keyStore.publicKeyPath()))
+        emit(
+            "auth_public_key_sent",
+            mapOf(
+                "path" to keyStore.publicKeyPath(),
+                // Длина payload: по ней видно, что на устройство ушла строка
+                // ожидаемого вида, а не пустой или обрезанный ключ.
+                "payload" to payload.getOrThrow().size.toString(),
+            ),
+        )
         return null
     }
 

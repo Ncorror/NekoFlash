@@ -270,7 +270,9 @@ class AdbHandshakeTest {
                 "auth_required",
                 "host_key",
                 "auth_signature_sent",
+                "auth_response",
                 "auth_public_key_sent",
+                "auth_response",
                 "connected",
             ),
             messages,
@@ -307,6 +309,35 @@ class AdbHandshakeTest {
 
         val connected = sink.snapshot().single { it.message == "connected" }
         assertEquals("cmd,shell_v2", connected.fields["features"])
+    }
+
+    /**
+     * Без записи ответов «ожидание» выглядит одинаково и когда устройство
+     * молчит, и когда оно раз за разом присылает токен.
+     */
+    @Test
+    fun everyAuthResponseIsRecorded() = withKeyStore { keyStore ->
+        val sink = InMemoryDiagnosticSink()
+        val device = ScriptedDevice(authToken(), authToken(), authToken(), cnxn(DEVICE_BANNER))
+
+        device.handshake(keyStore, diagnostics = sink).connect()
+
+        val responses = sink.snapshot().filter { it.message == "auth_response" }
+        assertEquals(3, responses.size)
+        assertEquals(listOf("1", "2", "3"), responses.map { it.fields["attempt"] })
+        assertEquals("1", responses.first().fields["type"])
+        assertEquals("20", responses.first().fields["payload"])
+    }
+
+    @Test
+    fun publicKeyEventNamesItsPayloadSize() = withKeyStore { keyStore ->
+        val sink = InMemoryDiagnosticSink()
+        val device = ScriptedDevice(authToken(), authToken(), cnxn(DEVICE_BANNER))
+
+        device.handshake(keyStore, diagnostics = sink).connect()
+
+        val sent = sink.snapshot().single { it.message == "auth_public_key_sent" }
+        assertEquals(keyStore.authPayload().size.toString(), sent.fields["payload"])
     }
 
     @Test
