@@ -57,12 +57,6 @@ public class AdbConnection(
     )
 
     /**
-     * Проводит рукопожатие.
-     *
-     * Блокирует вызывающий поток до ответа устройства или до истечения
-     * таймаутов рукопожатия: при ожидании подтверждения диалога это до минуты.
-     */
-    /**
      * Возможности, объявленные устройством в `CNXN`.
      *
      * До рукопожатия пусто. Хост о своих возможностях не объявляет вовсе, и
@@ -73,6 +67,12 @@ public class AdbConnection(
     public var peerFeatures: Set<String> = emptySet()
         private set
 
+    /**
+     * Проводит рукопожатие.
+     *
+     * Блокирует вызывающий поток до ответа устройства или до истечения
+     * таймаутов рукопожатия: при ожидании подтверждения диалога это до минуты.
+     */
     public fun connect(): AdbHandshakeOutcome = handshake.connect().also { outcome ->
         if (outcome is AdbHandshakeOutcome.Connected) {
             peerFeatures = outcome.banner.features
