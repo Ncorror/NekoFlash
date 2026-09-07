@@ -156,6 +156,21 @@ public class AdbConnection(
             diagnostics = diagnostics,
         )
 
+    /**
+     * Открывает сессию сервиса `sync:`.
+     *
+     * Как и интерактивная оболочка, занимает единственного читателя на всё
+     * время работы. Владелец соединения обязан не допускать одновременных
+     * вызовов.
+     */
+    public fun syncSession(diagnostics: DiagnosticSink = DiagnosticSink { }): AdbSyncSession =
+        AdbSyncSession(
+            reader = reader,
+            writer = writer,
+            router = router,
+            diagnostics = diagnostics,
+        )
+
     private companion object {
         const val SHELL_V2_FEATURE = "shell_v2"
     }

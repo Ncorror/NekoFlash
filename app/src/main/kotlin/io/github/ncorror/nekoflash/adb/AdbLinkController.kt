@@ -124,6 +124,14 @@ public class AdbLinkController(
     private val shellSessions = AdbTerminalController(executor, diagnostics)
 
     /**
+     * Владелец читающих файловых операций.
+     *
+     * Отдельный класс по той же причине, что и оболочка: у операции своё время
+     * жизни, и мешать его с жизнью транспорта не нужно.
+     */
+    private val fileOperations = AdbSyncController(executor, diagnostics)
+
+    /**
      * Живое соединение.
      *
      * Хранится, потому что после рукопожатия оно продолжает быть нужным: через
@@ -150,6 +158,23 @@ public class AdbLinkController(
 
     /** Состояние интерактивной оболочки. */
     public val terminal: StateFlow<AdbTerminalState> = shellSessions.state
+
+    /** Состояние последней файловой операции. */
+    public val files: StateFlow<AdbFileState> = fileOperations.state
+
+    /** Спрашивает сведения о пути на устройстве. */
+    public fun describeFile(path: String) {
+        val live = connection ?: return
+        if (busy()) return
+        fileOperations.describe(live, path)
+    }
+
+    /** Читает файл целиком, считая размер и отпечаток. */
+    public fun readFile(path: String) {
+        val live = connection ?: return
+        if (busy()) return
+        fileOperations.read(live, path)
+    }
 
     /**
      * Открывает интерактивную оболочку по этому соединению.
@@ -184,7 +209,9 @@ public class AdbLinkController(
      * Живая оболочка и идущая команда занимают его одинаково.
      */
     private fun busy(): Boolean =
-        shellSessions.active || mutableCommand.value is AdbCommandState.Running
+        shellSessions.active ||
+            fileOperations.active ||
+            mutableCommand.value is AdbCommandState.Running
 
     /**
      * Выполняет команду в неинтерактивной оболочке устройства.

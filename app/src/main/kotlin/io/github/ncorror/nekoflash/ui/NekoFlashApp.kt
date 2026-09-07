@@ -27,6 +27,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.github.ncorror.nekoflash.R
 import io.github.ncorror.nekoflash.adb.AdbCommandState
+import io.github.ncorror.nekoflash.adb.AdbFileState
 import io.github.ncorror.nekoflash.adb.AdbTerminalState
 import io.github.ncorror.nekoflash.adb.AdbLinkState
 import io.github.ncorror.nekoflash.core.model.SessionGeneration
@@ -48,6 +49,7 @@ fun NekoFlashApp(
     adbLink: AdbLinkState = AdbLinkState.Idle,
     adbCommand: AdbCommandState = AdbCommandState.None,
     terminal: AdbTerminalState = AdbTerminalState(),
+    files: AdbFileState = AdbFileState.None,
     onRescanUsb: () -> Unit = {},
     onClaim: (UsbSession) -> Unit = {},
     onRelease: (UsbSession) -> Unit = {},
@@ -55,6 +57,7 @@ fun NekoFlashApp(
     onAdbDisconnect: (UsbSession) -> Unit = {},
     onRunCommand: (String) -> Unit = {},
     terminalActions: TerminalActions = TerminalActions(),
+    fileActions: FileActions = FileActions(),
     onExportDiagnostics: () -> Unit = {},
 ) {
     // Рабочая область одинакова в обеих раскладках и отличается только тем,
@@ -70,6 +73,8 @@ fun NekoFlashApp(
             adbCommand = adbCommand,
             terminal = terminal,
             terminalActions = terminalActions,
+            files = files,
+            fileActions = fileActions,
             onRescanUsb = onRescanUsb,
             onClaim = onClaim,
             onRelease = onRelease,
@@ -143,6 +148,14 @@ private fun Workspace(
     adbCommand: AdbCommandState,
     terminal: AdbTerminalState,
     terminalActions: TerminalActions,
+    files: AdbFileState,
+    fileActions: FileActions,
+    files: AdbFileState,
+    fileActions: FileActions,
+    files: AdbFileState,
+    fileActions: FileActions,
+    files: AdbFileState,
+    fileActions: FileActions,
     onRescanUsb: () -> Unit,
     onClaim: (UsbSession) -> Unit,
     onRelease: (UsbSession) -> Unit,
@@ -170,6 +183,8 @@ private fun Workspace(
             adbCommand = adbCommand,
             terminal = terminal,
             terminalActions = terminalActions,
+            files = files,
+            fileActions = fileActions,
             onClaim = onClaim,
             onRelease = onRelease,
             onAdbConnect = onAdbConnect,
@@ -194,6 +209,14 @@ private fun SessionList(
     adbCommand: AdbCommandState,
     terminal: AdbTerminalState,
     terminalActions: TerminalActions,
+    files: AdbFileState,
+    fileActions: FileActions,
+    files: AdbFileState,
+    fileActions: FileActions,
+    files: AdbFileState,
+    fileActions: FileActions,
+    files: AdbFileState,
+    fileActions: FileActions,
     onClaim: (UsbSession) -> Unit,
     onRelease: (UsbSession) -> Unit,
     onAdbConnect: (UsbSession) -> Unit,
@@ -221,6 +244,8 @@ private fun SessionList(
             adbCommand = adbCommand,
             terminal = terminal,
             terminalActions = terminalActions,
+            files = files,
+            fileActions = fileActions,
             onClaim = { onClaim(session) },
             onRelease = { onRelease(session) },
             onAdbConnect = { onAdbConnect(session) },
@@ -286,6 +311,14 @@ private fun SessionCard(
     adbCommand: AdbCommandState,
     terminal: AdbTerminalState,
     terminalActions: TerminalActions,
+    files: AdbFileState,
+    fileActions: FileActions,
+    files: AdbFileState,
+    fileActions: FileActions,
+    files: AdbFileState,
+    fileActions: FileActions,
+    files: AdbFileState,
+    fileActions: FileActions,
     onClaim: () -> Unit,
     onRelease: () -> Unit,
     onAdbConnect: () -> Unit,
@@ -337,6 +370,8 @@ private fun SessionCard(
                         adbCommand = adbCommand,
                         terminal = terminal,
                         terminalActions = terminalActions,
+                        files = files,
+                        fileActions = fileActions,
                         onAdbConnect = onAdbConnect,
                         onAdbDisconnect = onAdbDisconnect,
                         onRunCommand = onRunCommand,
@@ -373,6 +408,14 @@ private fun AdbLinkSection(
     adbCommand: AdbCommandState,
     terminal: AdbTerminalState,
     terminalActions: TerminalActions,
+    files: AdbFileState,
+    fileActions: FileActions,
+    files: AdbFileState,
+    fileActions: FileActions,
+    files: AdbFileState,
+    fileActions: FileActions,
+    files: AdbFileState,
+    fileActions: FileActions,
     onAdbConnect: () -> Unit,
     onAdbDisconnect: () -> Unit,
     onRunCommand: (String) -> Unit,
@@ -415,6 +458,59 @@ private fun AdbLinkSection(
             onRunCommand = onRunCommand,
         )
         TerminalSection(terminal = terminal, actions = terminalActions)
+        FilesSection(files = files, actions = fileActions, enabled = !terminal.active)
+    }
+}
+
+/** Действия с файлами устройства. */
+data class FileActions(
+    val onDescribe: (String) -> Unit = {},
+    val onRead: (String) -> Unit = {},
+)
+
+/**
+ * Читающие операции с файлами.
+ *
+ * Пока открыта оболочка, они недоступны: читатель один. Кнопки гасятся, а не
+ * ставятся в очередь — иначе нажатие выглядело бы как бездействие.
+ */
+@Composable
+private fun FilesSection(files: AdbFileState, actions: FileActions, enabled: Boolean) {
+    val path = remember { mutableStateOf("") }
+    val idle = enabled && files !is AdbFileState.Busy
+
+    LabelledValue(label = stringResource(R.string.files_label), value = fileStateText(files))
+    OutlinedTextField(
+        value = path.value,
+        onValueChange = { text -> path.value = text },
+        label = { Text(stringResource(R.string.files_path_hint)) },
+        singleLine = true,
+        enabled = idle,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    Button(onClick = { actions.onDescribe(path.value) }, enabled = idle && path.value.isNotBlank()) {
+        Text(stringResource(R.string.files_describe))
+    }
+    Button(onClick = { actions.onRead(path.value) }, enabled = idle && path.value.isNotBlank()) {
+        Text(stringResource(R.string.files_read))
+    }
+    Text(
+        text = stringResource(R.string.files_note),
+        style = MaterialTheme.typography.bodySmall,
+    )
+}
+
+@Composable
+private fun fileStateText(files: AdbFileState): String = when (files) {
+    AdbFileState.None -> ""
+    is AdbFileState.Busy -> stringResource(R.string.files_busy, files.path)
+    is AdbFileState.Read -> stringResource(R.string.files_read_done, files.bytes, files.sha256)
+    is AdbFileState.Failed -> stringResource(R.string.files_failed, files.reason)
+    is AdbFileState.Described -> when {
+        !files.stat.exists -> stringResource(R.string.files_missing, files.path)
+        files.stat.directory -> stringResource(R.string.files_directory, files.path)
+        files.stat.regularFile -> stringResource(R.string.files_file, files.path, files.stat.size)
+        else -> stringResource(R.string.files_object, files.path, files.stat.size)
     }
 }
 

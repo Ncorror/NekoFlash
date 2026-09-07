@@ -88,4 +88,16 @@
     <string name="terminal_waiting">The shell is open and waiting for input.</string>
     <string name="terminal_ended">Session ended: %1$s</string>
     <string name="terminal_note">The shell stays open until you close it, so single commands are unavailable meanwhile: there is exactly one reader. Escape sequences are shown as they arrive; they are not interpreted yet.</string>
+    <string name="files_label">Device files</string>
+    <string name="files_path_hint">Path on the device, for example /sdcard/Download/file.zip</string>
+    <string name="files_describe">Check</string>
+    <string name="files_read">Read and hash</string>
+    <string name="files_busy">Working on %1$s…</string>
+    <string name="files_missing">%1$s: nothing there</string>
+    <string name="files_directory">%1$s: directory</string>
+    <string name="files_file">%1$s: file, %2$d bytes</string>
+    <string name="files_object">%1$s: exists, %2$d bytes</string>
+    <string name="files_read_done">%1$d bytes read, SHA-256 %2$s</string>
+    <string name="files_failed">Failed: %1$s</string>
+    <string name="files_note">Reading does not save anything: it checks the transfer. Compare the hash with sha256sum on the device — matching hashes prove the bytes arrived intact. Saving to a place you can reach comes later.</string>
 </resources>
