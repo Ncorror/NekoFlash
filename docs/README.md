@@ -34,6 +34,7 @@ Architecture Decision Records — в `adr/`:
 - `0001_PROJECT_IDENTITY_AND_BUILD_BASELINE_RU.md` — identity, Android/toolchain baseline, начальные модули, авторитет CI.
 - `0002_LOCKED_BOOTLOADER_IS_ADVISORY_RU.md` — отмена product-level hard guard: подтверждённый `LOCKED` даёт предупреждение и typed confirmation, а не запрет.
 - `0003_PHASE2_TECHNICAL_BASELINE_RU.md` — `api()` вместо `implementation()`, конкурентная модель, DI, статический анализ.
+- `0004_CONCURRENT_ADB_DISPATCHER_RU.md` — **PROPOSED**: постоянный читающий цикл на стороне соединения и почтовые ящики логических потоков вместо единственного потребителя. Принимается только после аппаратного прогона.
 
 `brand-reference/` содержит реальные Legacy-ресурсы Welcome и иконки как **визуальный reference**, а не готовый контракт пиксель-в-пиксель.
 
