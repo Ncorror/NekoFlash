@@ -72,7 +72,11 @@ class MainActivity : ComponentActivity() {
                     terminal = terminalState,
                     terminalActions = terminalActions(adbLink),
                     files = fileState,
-                    fileActions = FileActions(adbLink::describeFile, adbLink::readFile),
+                    fileActions = FileActions(
+                        onDescribe = adbLink::describeFile,
+                        onRead = adbLink::readFile,
+                        onWrite = adbLink::writeFile,
+                    ),
                     onRescanUsb = { coordinator.scanAttachedDevices() },
                     onClaim = claimAction(coordinator, claimFailedTemplate) { exportStatus = it },
                     onRelease = { session -> coordinator.release(session.generation) },

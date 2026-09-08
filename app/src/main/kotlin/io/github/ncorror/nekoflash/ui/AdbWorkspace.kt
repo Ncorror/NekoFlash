@@ -18,6 +18,7 @@ import io.github.ncorror.nekoflash.adb.AdbLinkState
 import io.github.ncorror.nekoflash.adb.AdbTerminalState
 import io.github.ncorror.nekoflash.core.model.SessionGeneration
 import io.github.ncorror.nekoflash.protocol.adb.AdbPeerMode
+import io.github.ncorror.nekoflash.protocol.adb.AdbSyncDestination
 import io.github.ncorror.nekoflash.usb.api.UsbSession
 
 /**
@@ -86,7 +87,19 @@ internal fun AdbLinkSection(
 data class FileActions(
     val onDescribe: (String) -> Unit = {},
     val onRead: (String) -> Unit = {},
+    /** Записать файл заданного размера в байтах. */
+    val onWrite: (String, Long) -> Unit = { _, _ -> },
 )
+
+/**
+ * Размеры файлов, которые приложение умеет записать само.
+ *
+ * Оба нужны аппаратному гейту `07` §6.34: малый проходит одним блоком,
+ * большой — двумястами пятьюдесятью шестью, и его же хватает, чтобы успеть
+ * выдернуть кабель посреди передачи.
+ */
+private const val SMALL_WRITE_BYTES = 4L * 1024L
+private const val LARGE_WRITE_BYTES = 16L * 1024L * 1024L
 
 /**
  * Читающие операции с файлами.
@@ -114,8 +127,24 @@ private fun FilesSection(files: AdbFileState, actions: FileActions, enabled: Boo
     Button(onClick = { actions.onRead(path.value) }, enabled = idle && path.value.isNotBlank()) {
         Text(stringResource(R.string.files_read))
     }
+    Button(
+        onClick = { actions.onWrite(path.value, SMALL_WRITE_BYTES) },
+        enabled = idle && path.value.isNotBlank(),
+    ) {
+        Text(stringResource(R.string.files_write_small))
+    }
+    Button(
+        onClick = { actions.onWrite(path.value, LARGE_WRITE_BYTES) },
+        enabled = idle && path.value.isNotBlank(),
+    ) {
+        Text(stringResource(R.string.files_write_large))
+    }
     Text(
         text = stringResource(R.string.files_note),
+        style = MaterialTheme.typography.bodySmall,
+    )
+    Text(
+        text = stringResource(R.string.files_write_note),
         style = MaterialTheme.typography.bodySmall,
     )
 }
@@ -127,16 +156,40 @@ private fun fileStateText(files: AdbFileState): String = when (files) {
     is AdbFileState.Read ->
         pluralStringResource(R.plurals.files_read_done, files.bytes.toQuantity(), files.bytes, files.sha256)
 
-    is AdbFileState.Failed -> stringResource(R.string.files_failed, files.reason)
-    is AdbFileState.Described -> when {
-        !files.stat.exists -> stringResource(R.string.files_missing, files.path)
-        files.stat.directory -> stringResource(R.string.files_directory, files.path)
-        files.stat.regularFile ->
-            pluralStringResource(R.plurals.files_file, files.stat.size.toQuantity(), files.path, files.stat.size)
+    is AdbFileState.Written ->
+        pluralStringResource(R.plurals.files_write_done, files.bytes.toQuantity(), files.bytes, files.sha256)
 
-        else ->
-            pluralStringResource(R.plurals.files_object, files.stat.size.toQuantity(), files.path, files.stat.size)
-    }
+    is AdbFileState.WriteFailed -> writeFailedText(files)
+    is AdbFileState.Failed -> stringResource(R.string.files_failed, files.reason)
+    is AdbFileState.Described -> describedText(files)
+}
+
+/**
+ * Текст неудачной записи.
+ *
+ * Формулировка выбирается по состоянию назначения, а не по причине отказа:
+ * оператору важнее всего, что теперь с файлом на устройстве.
+ */
+@Composable
+private fun writeFailedText(files: AdbFileState.WriteFailed): String = stringResource(
+    when (files.destination) {
+        AdbSyncDestination.UNTOUCHED -> R.string.files_write_failed_untouched
+        AdbSyncDestination.COMMITTED -> R.string.files_write_failed_committed
+        AdbSyncDestination.UNKNOWN -> R.string.files_write_failed_unknown
+    },
+    files.reason,
+    files.path,
+)
+
+@Composable
+private fun describedText(files: AdbFileState.Described): String = when {
+    !files.stat.exists -> stringResource(R.string.files_missing, files.path)
+    files.stat.directory -> stringResource(R.string.files_directory, files.path)
+    files.stat.regularFile ->
+        pluralStringResource(R.plurals.files_file, files.stat.size.toQuantity(), files.path, files.stat.size)
+
+    else ->
+        pluralStringResource(R.plurals.files_object, files.stat.size.toQuantity(), files.path, files.stat.size)
 }
 
 /**

@@ -12,9 +12,9 @@ Recovery and vendor workflows.
 - Phase 2: complete; USB + Target/Session ownership verified on hardware.
 - Phase 3: complete; ADB transport, protocol engines and the terminal verified on hardware.
 - Phase 4: **current / in progress**; ADB professional services. Read-only Sync (`STAT`/`RECV`) is
-  wired into the production UI and proven on hardware. Sync `SEND` exists at the protocol layer with
-  its mutation-boundary rules, but has no production caller and no hardware run yet; install, reboot,
-  raw services and the concurrent service dispatcher are still open.
+  wired into the production UI and proven on hardware. Sync `SEND` exists with its mutation-boundary
+  rules and is reachable from the screen, but has no hardware run yet; install, reboot, raw services
+  and the concurrent service dispatcher are still open.
 - Legacy and A2 are reference/evidence only.
 
 ## Product rule

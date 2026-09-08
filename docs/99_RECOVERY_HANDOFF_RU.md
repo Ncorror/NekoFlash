@@ -41,11 +41,11 @@ Phase 0, Phase 1, Phase 2 и Phase 3 — COMPLETE. Legacy/A2 frozen.
 
 Phase 2 закрыта аппаратным прогоном: discovery, permission с выдачей и отказом, идентичность target с уточнением серийным номером, `SessionGeneration`, detach и re-enumeration, захват и освобождение интерфейса, выгрузка evidence. Критерий PASS и полная таблица проверок — `07_TESTING_CI_HARDWARE_EVIDENCE_RU.md` §6.10.
 
-Модулей семь: `:app`, `:core:model`, `:core:diagnostics`, `:core:operation`, `:usb:api`, `:usb:android`, `:protocol:adb`. Тестов 389 (`@Test` в текущем дереве).
+Модулей семь: `:app`, `:core:model`, `:core:diagnostics`, `:core:operation`, `:usb:api`, `:usb:android`, `:protocol:adb`. Тестов 395 (`@Test` в текущем дереве).
 
 Phase 3 закрыта аппаратными прогонами: рукопожатие с авторизацией и с отказом, автоподключение, все три режима ADB, `shell,v2` с кодом возврата, откат на legacy shell, интерактивная оболочка и терминал. Гейты — `07_TESTING_CI_HARDWARE_EVIDENCE_RU.md` §6.13–§6.28.
 
-Текущая работа — **Phase 4: ADB professional services**. AUTH blocker закрыт аппаратно; read-only Sync (`STAT`/`RECV`) доказан на малом и 2 MiB файле с совпавшим SHA-256 (`07` §6.29–§6.32). `SEND` написан на протокольном уровне вместе с разбором границы мутации по `docs/03` §3 и покрыт тестами, но на железе не проверялся и вызывающего в production не имеет — гейт `07` §6.34. Полноценное сохранение pull-artifact, install, reboot, raw services и настоящий concurrent service dispatcher остаются открыты.
+Текущая работа — **Phase 4: ADB professional services**. AUTH blocker закрыт аппаратно; read-only Sync (`STAT`/`RECV`) доказан на малом и 2 MiB файле с совпавшим SHA-256 (`07` §6.29–§6.32). `SEND` написан вместе с разбором границы мутации по `docs/03` §3, покрыт тестами и подключён к экрану двумя кнопками записи, но на железе не проверялся — гейт `07` §6.34 выполним и ждёт прогона. Полноценное сохранение pull-artifact, install, reboot, raw services и настоящий concurrent service dispatcher остаются открыты.
 
 Порядок фаз читать в `09_IMPLEMENTATION_ROADMAP_RU.md`, а не по памяти: Fastboot — Phase 5, Recovery и Sideload — Phase 7.
 

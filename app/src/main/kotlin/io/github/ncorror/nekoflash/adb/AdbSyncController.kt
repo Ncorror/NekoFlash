@@ -2,8 +2,10 @@ package io.github.ncorror.nekoflash.adb
 
 import io.github.ncorror.nekoflash.core.diagnostics.DiagnosticSink
 import io.github.ncorror.nekoflash.protocol.adb.AdbConnection
+import io.github.ncorror.nekoflash.protocol.adb.AdbSyncDestination
 import io.github.ncorror.nekoflash.protocol.adb.AdbSyncFailure
 import io.github.ncorror.nekoflash.protocol.adb.AdbSyncOutcome
+import io.github.ncorror.nekoflash.protocol.adb.AdbSyncSendOutcome
 import io.github.ncorror.nekoflash.protocol.adb.AdbSyncSession
 import io.github.ncorror.nekoflash.protocol.adb.AdbSyncStat
 import java.security.MessageDigest
@@ -32,18 +34,76 @@ public sealed interface AdbFileState {
      */
     public data class Read(val path: String, val bytes: Long, val sha256: String) : AdbFileState
 
+    /**
+     * Файл записан, и устройство это подтвердило.
+     *
+     * [sha256] посчитан по тому, что хост отдал в USB. Сверка с `sha256sum` на
+     * устройстве доказывает запись побайтно.
+     */
+    public data class Written(val path: String, val bytes: Long, val sha256: String) : AdbFileState
+
+    /**
+     * Запись не удалась.
+     *
+     * [destination] — отдельное поле, а не часть [reason], и это существенно:
+     * причина говорит, что пошло не так, а состояние назначения — что из этого
+     * следует для файла на устройстве. Из отказа не следует, что файл цел
+     * (`03_PROTOCOL_AND_SAFETY_INVARIANTS_RU.md` §7).
+     */
+    public data class WriteFailed(
+        val path: String,
+        val reason: String,
+        val destination: AdbSyncDestination,
+    ) : AdbFileState
+
     /** Не получилось. */
     public data class Failed(val path: String, val reason: String) : AdbFileState
 }
 
 /**
- * Читающие операции с файлами устройства.
+ * Содержимое, которое приложение порождает само.
+ *
+ * Существует потому, что записать на устройство нечего: выбор пользовательского
+ * файла требует artifact source из Phase 8. Для аппаратного гейта `07` §6.34
+ * этого достаточно — он проверяет протокольный путь, а не пользовательский
+ * сценарий push.
+ *
+ * Содержимое детерминировано, поэтому прогон воспроизводим, и нигде не
+ * собирается целиком: генератор заполняет чужой буфер порциями.
+ *
+ * Период узора — простое число, а не степень двойки, намеренно: узор с периодом
+ * 256 совпал бы с границей блока в 64 КиБ, и перепутанные местами блоки дали бы
+ * тот же отпечаток. С простым периодом такая ошибка видна.
+ */
+internal class GeneratedPayload(private val totalBytes: Long) {
+    private var produced = 0L
+
+    /** Заполняет буфер очередной порцией. Возвращает `0`, когда содержимое кончилось. */
+    fun fill(buffer: ByteArray): Int {
+        val remaining = totalBytes - produced
+        if (remaining <= 0L) return 0
+        val count = minOf(remaining, buffer.size.toLong()).toInt()
+        for (index in 0 until count) {
+            buffer[index] = ((produced + index) % PATTERN_PERIOD).toByte()
+        }
+        produced += count
+        return count
+    }
+
+    private companion object {
+        const val PATTERN_PERIOD = 251L
+    }
+}
+
+/**
+ * Операции с файлами устройства.
  *
  * Отделён от владельца соединения и от владельца оболочки: у всех троих разное
  * время жизни. Здесь операция живёт от запроса до ответа и не переживает его.
  *
- * Только чтение. Запись на устройство — первая мутация в проекте — появится
- * отдельно и не дописыванием метода сюда.
+ * Здесь и чтение, и запись. Разные правила у них не в устройстве класса, а в
+ * исходе: [write] отдельно сообщает, что известно про файл назначения, потому
+ * что из неудачи не следует, что он цел.
  *
  * Каждая операция открывает свою сессию `sync:` и закрывает её за собой.
  * Держать сессию между запросами можно, но незачем: открытие стоит один пакет,
@@ -67,10 +127,10 @@ public class AdbSyncController(
 
     /** Спрашивает сведения о пути. */
     public fun describe(connection: AdbConnection, path: String) {
-        start(connection, path) { session ->
-            when (val outcome = session.stat(path)) {
-                is AdbSyncOutcome.Done -> AdbFileState.Described(path, outcome.value)
-                is AdbSyncOutcome.Failed -> failed(path, outcome)
+        start(connection, path) { session, target ->
+            when (val outcome = session.stat(target)) {
+                is AdbSyncOutcome.Done -> AdbFileState.Described(target, outcome.value)
+                is AdbSyncOutcome.Failed -> failed(target, outcome)
             }
         }
     }
@@ -84,24 +144,63 @@ public class AdbSyncController(
      * не достанет.
      */
     public fun read(connection: AdbConnection, path: String) {
-        start(connection, path) { session ->
+        start(connection, path) { session, target ->
             val digest = MessageDigest.getInstance("SHA-256")
-            when (val outcome = session.receive(path) { chunk -> digest.update(chunk) }) {
+            when (val outcome = session.receive(target) { chunk -> digest.update(chunk) }) {
                 is AdbSyncOutcome.Done -> AdbFileState.Read(
-                    path = path,
+                    path = target,
                     bytes = outcome.value,
                     sha256 = digest.digest().joinToString(separator = "") { byte -> "%02x".format(byte) },
                 )
 
-                is AdbSyncOutcome.Failed -> failed(path, outcome)
+                is AdbSyncOutcome.Failed -> failed(target, outcome)
             }
         }
     }
 
+    /**
+     * Пишет на устройство файл из содержимого, порождённого приложением.
+     *
+     * Существующий файл перезаписывается без предупреждения на стороне хоста, и
+     * это не упущение: перезапись — обычная профессиональная операция, `adb
+     * push` тоже ни о чём не спрашивает. Предупредить о существующем файле
+     * можно и сейчас — кнопкой «проверить», — а запрет на хосте был бы ровно
+     * тем ограничением, которое запрещает устав.
+     *
+     * Исход отдельно несёт состояние назначения: при неудаче о файле на
+     * устройстве известно ровно то, что доказано, и не больше.
+     */
+    public fun write(connection: AdbConnection, path: String, sizeBytes: Long) {
+        start(connection, path) { session, target ->
+            val payload = GeneratedPayload(sizeBytes)
+            val outcome = session.send(
+                path = target,
+                modifiedAtSeconds = (System.currentTimeMillis() / MILLIS_PER_SECOND).toInt(),
+            ) { buffer -> payload.fill(buffer) }
+            when (outcome) {
+                is AdbSyncSendOutcome.Committed -> AdbFileState.Written(
+                    path = target,
+                    bytes = outcome.bytesSent,
+                    sha256 = outcome.sha256,
+                )
+
+                is AdbSyncSendOutcome.Failed -> AdbFileState.WriteFailed(
+                    path = target,
+                    reason = "${outcome.reason.name}: ${outcome.detail}",
+                    destination = outcome.destination,
+                )
+            }
+        }
+    }
+
+    /**
+     * @param work получает уже очищенный путь: показывать одно, а отправлять
+     * устройству другое нельзя.
+     */
     private fun start(
         connection: AdbConnection,
         path: String,
-        work: (AdbSyncSession) -> AdbFileState,
+        work: (AdbSyncSession, String) -> AdbFileState,
     ) {
         val trimmed = path.trim()
         if (trimmed.isEmpty() || running) return
@@ -111,7 +210,7 @@ public class AdbSyncController(
         executor.execute {
             val session = connection.syncSession(diagnostics)
             mutableState.value = when (val opened = session.open()) {
-                is AdbSyncOutcome.Done -> runCatching { work(session) }.getOrElse { error ->
+                is AdbSyncOutcome.Done -> runCatching { work(session, trimmed) }.getOrElse { error ->
                     AdbFileState.Failed(trimmed, error.message ?: error.javaClass.simpleName)
                 }
 
@@ -127,4 +226,8 @@ public class AdbSyncController(
 
     private fun failed(path: String, reason: AdbSyncFailure): AdbFileState.Failed =
         AdbFileState.Failed(path, reason.name)
+
+    private companion object {
+        const val MILLIS_PER_SECOND = 1_000L
+    }
 }

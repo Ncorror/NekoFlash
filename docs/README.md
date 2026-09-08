@@ -59,7 +59,7 @@ Legacy и A2 заморожены как **reference/evidence**. Ни один �
 - Phase 1: **COMPLETE / PASS** — clean bootstrap, verified tracked wrapper, AGP `9.3.2`, bilingual resource foundation, launcher/adaptive/monochrome icon, explicit no-backup/D2D policy, executable hygiene checks, Lint `0 errors`, debug APK assembly.
 - Phase 2: **COMPLETE / PASS** — USB + Target/Session vertical slice закрыт аппаратным гейтом.
 - Phase 3: **COMPLETE** — ADB foundation, `shell,v2`, legacy fallback и interactive shell подтверждены аппаратными прогонами.
-- Current work: **Phase 4 — ADB professional services**. Read-only Sync (`STAT`/`RECV`) подключён к production UI и доказан на железе. `SEND` написан на протокольном уровне вместе с разбором границы мутации, но вызывающего в production и аппаратного прогона ещё не имеет; install, reboot, raw services и concurrent service dispatcher не закрыты.
+- Current work: **Phase 4 — ADB professional services**. Read-only Sync (`STAT`/`RECV`) подключён к production UI и доказан на железе. `SEND` написан вместе с разбором границы мутации и подключён к экрану, но аппаратного прогона ещё не имеет — гейт `07` §6.34; install, reboot, raw services и concurrent service dispatcher не закрыты.
 - Termux: Git/worktree/edit/commit/push.
 - GitHub Actions: authoritative build/test/lint/CI environment.
 - UI languages: **English (default) + Русский (first-class)**.

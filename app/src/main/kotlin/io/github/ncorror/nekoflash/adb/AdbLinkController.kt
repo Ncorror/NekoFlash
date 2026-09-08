@@ -19,6 +19,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
+/** Удерживается ли интерфейс этой сессии прямо сейчас. */
+private fun isHeld(session: UsbSession): Boolean =
+    !session.closed && session.state == UsbSessionState.CLAIMED
+
+/** Существует ли сессия ещё. */
+private fun isPresent(session: UsbSession): Boolean = !session.closed
+
 /**
  * Владелец ADB-соединения на уровне приложения.
  *
@@ -117,6 +124,20 @@ public class AdbLinkController(
         val live = connection ?: return
         if (busy()) return
         fileOperations.read(live, path)
+    }
+
+    /**
+     * Пишет на устройство файл заданного размера из содержимого, порождённого
+     * приложением.
+     *
+     * Размер задаёт вызывающий, а не пользователь: выбор своего файла — работа
+     * artifact source из Phase 8. Два предложенных размера покрывают
+     * аппаратный гейт `07` §6.34, где нужны и малый файл, и файл больше 2 MiB.
+     */
+    public fun writeFile(path: String, sizeBytes: Long) {
+        val live = connection ?: return
+        if (busy()) return
+        fileOperations.write(live, path, sizeBytes)
     }
 
     /**
@@ -346,11 +367,6 @@ public class AdbLinkController(
             forgetConnection()
         }
     }
-
-    private fun isHeld(session: UsbSession): Boolean =
-        !session.closed && session.state == UsbSessionState.CLAIMED
-
-    private fun isPresent(session: UsbSession): Boolean = !session.closed
 
     /**
      * Подключается к устройству, которое только что стало готовым.

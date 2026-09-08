@@ -93,6 +93,12 @@
     <string name="files_missing">%1$s: ничего нет</string>
     <string name="files_directory">%1$s: каталог</string>
     <string name="files_failed">Не получилось: %1$s</string>
+    <string name="files_write_small">Записать 4 КиБ</string>
+    <string name="files_write_large">Записать 16 МиБ</string>
+    <string name="files_write_note">Запись создаёт файл по этому пути и перезаписывает то, что там было. Содержимое порождает само приложение: выбор своего файла появится позже. При неудаче приложение говорит, что известно про файл, и «неизвестно» означает именно это — проверьте его на устройстве.</string>
+    <string name="files_write_failed_untouched">Запись не удалась: %1$s. Ничего не записано: запрос не покинул хост, поэтому %2$s не тронут.</string>
+    <string name="files_write_failed_unknown">Запись не удалась: %1$s. Состояние %2$s неизвестно: запрос уже ушёл с хоста, и на устройстве может лежать неполный файл. Проверьте его перед повтором.</string>
+    <string name="files_write_failed_committed">Запись сообщила об ошибке после подтверждения устройством: %1$s (%2$s). Такого сочетания быть не должно — сообщите о нём.</string>
     <string name="files_note">Чтение ничего не сохраняет: оно проверяет передачу. Сверьте отпечаток с sha256sum на устройстве — совпадение доказывает, что байты дошли без искажений. Сохранение в доступное место появится позже.</string>
     <plurals name="files_file">
         <item quantity="one">%1$s: файл, %2$d байт</item>
@@ -111,5 +117,11 @@
         <item quantity="few">Прочитано %1$d байта, SHA-256 %2$s</item>
         <item quantity="many">Прочитано %1$d байт, SHA-256 %2$s</item>
         <item quantity="other">Прочитано %1$d байта, SHA-256 %2$s</item>
+    </plurals>
+    <plurals name="files_write_done">
+        <item quantity="one">Записан %1$d байт, SHA-256 %2$s</item>
+        <item quantity="few">Записано %1$d байта, SHA-256 %2$s</item>
+        <item quantity="many">Записано %1$d байт, SHA-256 %2$s</item>
+        <item quantity="other">Записано %1$d байта, SHA-256 %2$s</item>
     </plurals>
 </resources>
