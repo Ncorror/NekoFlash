@@ -311,7 +311,7 @@ class AdbInteractiveShellTest {
         fun shell(useShellV2: Boolean) = AdbInteractiveShell(
             reader = AdbPacketReader(handle, AdbInboundFraming.MODERN_MAX_PAYLOAD_BYTES),
             writer = AdbPacketWriter(handle),
-            router = AdbStreamRouter(),
+            dispatcher = AdbStreamDispatcher(),
             useShellV2 = useShellV2,
         )
 

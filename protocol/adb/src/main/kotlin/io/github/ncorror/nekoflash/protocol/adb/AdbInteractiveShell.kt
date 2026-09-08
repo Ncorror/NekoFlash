@@ -53,7 +53,7 @@ public sealed interface AdbShellEvent {
 public class AdbInteractiveShell(
     private val reader: AdbPacketReader,
     private val writer: AdbPacketWriter,
-    private val router: AdbStreamRouter,
+    private val dispatcher: AdbStreamDispatcher,
     private val useShellV2: Boolean,
     private val diagnostics: DiagnosticSink = DiagnosticSink { },
     private val clock: () -> Instant = { Clock.systemUTC().instant() },
@@ -63,8 +63,17 @@ public class AdbInteractiveShell(
     private val stderrText = IncrementalUtf8Decoder()
     private val legacyText = IncrementalUtf8Decoder()
 
-    /** Защищает маршрутизатор, писателя и состояние сессии. */
+    /** Защищает диспетчер, писателя и состояние сессии. */
     private val lock = Any()
+
+    /**
+     * Ящик открытого потока.
+     *
+     * Шаг 4 плана `docs/adr/0004_CONCURRENT_ADB_DISPATCHER_RU.md`. Пакеты в
+     * диспетчер по-прежнему подаёт [pump], то есть цикл владельца: постоянный
+     * цикл переезжает в `AdbConnection` шагом 5.
+     */
+    private var mailbox: AdbStreamMailbox? = null
 
     private var localId: Int = 0
 
@@ -87,7 +96,9 @@ public class AdbInteractiveShell(
      */
     public fun open(): Boolean = synchronized(lock) {
         val service = if (useShellV2) SERVICE_PTY else SERVICE_LEGACY
-        val (id, packet) = router.openRequest(service)
+        val (box, packet) = dispatcher.open(service)
+        mailbox = box
+        val id = box.localId
         localId = id
         emit("shell_open", mapOf("service" to service, "stream" to id.toString()))
         if (!send(packet)) {
@@ -110,7 +121,7 @@ public class AdbInteractiveShell(
     public fun sendInput(bytes: ByteArray): Boolean = synchronized(lock) {
         if (!opened || finished) return false
         val payload = if (useShellV2) AdbShellProtocol.encode(AdbShellProtocol.ID_STDIN, bytes) else bytes
-        val packet = router.writeRequest(localId, payload) ?: return false
+        val packet = dispatcher.write(localId, payload) ?: return false
         return send(packet)
     }
 
@@ -122,7 +133,7 @@ public class AdbInteractiveShell(
      */
     public fun closeInput(): Boolean = synchronized(lock) {
         if (!useShellV2 || !opened || finished) return false
-        val packet = router.writeRequest(localId, AdbShellProtocol.closeStdinFrame()) ?: return false
+        val packet = dispatcher.write(localId, AdbShellProtocol.closeStdinFrame()) ?: return false
         return send(packet)
     }
 
@@ -140,22 +151,7 @@ public class AdbInteractiveShell(
         // задержки.
         val outcome = reader.read(timeoutMillis)
         return synchronized(lock) {
-            if (finished) {
-                emptyList()
-            } else {
-                when (outcome) {
-                    // Тишина — обычное состояние оболочки, которая ждёт ввода.
-                    AdbReadOutcome.Idle -> drainFrames()
-
-                    AdbReadOutcome.Closed -> finish(AdbShellEvent.Broken("transport closed"))
-
-                    is AdbReadOutcome.Failed -> finish(
-                        AdbShellEvent.Broken("${outcome.reason.name} ${outcome.detail}"),
-                    )
-
-                    is AdbReadOutcome.Received -> handle(outcome.packet)
-                }
-            }
+            if (finished) emptyList() else receive(outcome)
         }
     }
 
@@ -163,61 +159,71 @@ public class AdbInteractiveShell(
     public fun close(): Unit = synchronized(lock) {
         if (localId == 0 || finished) return
         finished = true
-        router.closeRequest(localId)?.let(::send)
+        dispatcher.close(localId)?.let(::send)
         emit("shell_closed", mapOf("stream" to localId.toString()))
     }
 
-    private fun handle(packet: AdbPacket): List<AdbShellEvent> {
-        val step = router.onPacket(packet)
-        step.outbound.forEach(::send)
+    /**
+     * Отдаёт принятое диспетчеру и разбирает свой ящик.
+     *
+     * Вызывается уже под замком. Беды транспорта не превращаются в событие
+     * прямо здесь: они закрывают ящики, а разбор конца остаётся один — в
+     * [applyEnd].
+     */
+    private fun receive(outcome: AdbReadOutcome): List<AdbShellEvent> {
+        when (outcome) {
+            // Тишина — обычное состояние оболочки, которая ждёт ввода.
+            AdbReadOutcome.Idle -> Unit
 
+            AdbReadOutcome.Closed ->
+                dispatcher.abandonAll(AdbMailboxEnd.TRANSPORT_CLOSED, "transport closed")
+
+            is AdbReadOutcome.Failed -> dispatcher.abandonAll(
+                AdbMailboxEnd.FRAMING_LOST,
+                "${outcome.reason.name} ${outcome.detail}",
+            )
+
+            is AdbReadOutcome.Received -> dispatcher.dispatch(outcome.packet).forEach(::send)
+        }
+        return drainMailbox()
+    }
+
+    private fun drainMailbox(): List<AdbShellEvent> {
+        val box = mailbox ?: return emptyList()
         val events = mutableListOf<AdbShellEvent>()
         var terminal: List<AdbShellEvent>? = null
-        for (event in step.events) {
-            if (terminal == null) terminal = applyStreamEvent(event, events)
+        while (terminal == null) {
+            val item = box.poll(0) ?: break
+            terminal = applyItem(item, events)
         }
         return terminal ?: (events + drainFrames())
     }
 
-    private fun applyStreamEvent(
-        event: AdbStreamEvent,
+    /**
+     * Разбор одного события ящика. `null` — сессия продолжается.
+     *
+     * Подтверждение и данные разбираются здесь же, а не отдельными функциями:
+     * порог detekt на число функций в классе поднимать запрещено
+     * (`15_CLEAN_REBUILD_BLUEPRINT_RU.md` §4.1), а эти два случая коротки и
+     * читаются на месте.
+     */
+    private fun applyItem(
+        item: AdbMailboxItem,
         events: MutableList<AdbShellEvent>,
-    ): List<AdbShellEvent>? = when (event) {
-        is AdbStreamEvent.Opened -> {
-            applyOpenedEvent(event, events)
+    ): List<AdbShellEvent>? = when (item) {
+        is AdbMailboxItem.Opened -> {
+            opened = true
+            emit("shell_opened", mapOf("remote" to item.remoteId.toString()))
+            events += AdbShellEvent.Opened
             null
         }
 
-        is AdbStreamEvent.Data -> {
-            applyDataEvent(event, events)
+        is AdbMailboxItem.Data -> {
+            if (useShellV2) frames.append(item.payload) else appendLegacyText(item.payload, events)
             null
         }
 
-        is AdbStreamEvent.Closed -> applyClosedEvent(event, events)
-        is AdbStreamEvent.Stale -> null
-        is AdbStreamEvent.Unexpected -> null
-    }
-
-    private fun applyOpenedEvent(
-        event: AdbStreamEvent.Opened,
-        events: MutableList<AdbShellEvent>,
-    ) {
-        if (event.localId != localId) return
-        opened = true
-        emit("shell_opened", mapOf("remote" to event.remoteId.toString()))
-        events += AdbShellEvent.Opened
-    }
-
-    private fun applyDataEvent(
-        event: AdbStreamEvent.Data,
-        events: MutableList<AdbShellEvent>,
-    ) {
-        if (event.localId != localId) return
-        if (useShellV2) {
-            frames.append(event.payload)
-        } else {
-            appendLegacyText(event.payload, events)
-        }
+        is AdbMailboxItem.Ended -> applyEnd(item, events)
     }
 
     private fun appendLegacyText(
@@ -231,14 +237,31 @@ public class AdbInteractiveShell(
             ?.let { text -> events += AdbShellEvent.Output(text) }
     }
 
-    private fun applyClosedEvent(
-        event: AdbStreamEvent.Closed,
+    /**
+     * Конец потока.
+     *
+     * Устройство закрыло поток — сначала отдаётся всё принятое, потом конец:
+     * обрыв не должен съедать уже полученный вывод. Обрыв транспорта и потеря
+     * кадра, наоборот, ничего не дособирают — как и раньше: после них
+     * недобранный кусок недостоверен.
+     */
+    private fun applyEnd(
+        item: AdbMailboxItem.Ended,
         events: MutableList<AdbShellEvent>,
-    ): List<AdbShellEvent>? {
-        if (event.localId != localId) return null
-        events += drainFrames()
-        events += flushTextStreams()
-        return events + finish(AdbShellEvent.Exited(null))
+    ): List<AdbShellEvent> = when (item.reason) {
+        AdbMailboxEnd.COMPLETED, AdbMailboxEnd.REJECTED, AdbMailboxEnd.LOCAL -> {
+            events += drainFrames()
+            events += flushTextStreams()
+            events + finish(AdbShellEvent.Exited(null))
+        }
+
+        AdbMailboxEnd.FRAMING_LOST, AdbMailboxEnd.TRANSPORT_CLOSED ->
+            events + finish(AdbShellEvent.Broken(item.detail))
+
+        // Из всех потребителей оболочке переполниться вероятнее всего: `logcat`
+        // льёт вывод, ни у кого не спрашивая. Ветка оживёт на шаге 5.
+        AdbMailboxEnd.OVERFLOWED ->
+            events + finish(AdbShellEvent.Broken("shell mailbox: ${item.detail}"))
     }
 
     private fun drainFrames(): List<AdbShellEvent> {

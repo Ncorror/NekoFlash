@@ -33,18 +33,15 @@ public class AdbConnection(
     private val writer = AdbPacketWriter(handle)
 
     /**
-     * Маршрутизатор один на соединение.
+     * Диспетчер один на соединение, и маршрутизатор внутри него тоже один.
      *
-     * Идентификаторы потоков выдаёт он, и второй экземпляр начал бы выдавать их
-     * заново — устройство получило бы два разных потока под одним номером.
+     * Идентификаторы потоков выдаёт маршрутизатор, и второй экземпляр начал бы
+     * выдавать их заново — устройство получило бы два разных потока под одним
+     * номером. Соединение больше не держит маршрутизатор отдельно: после шага 4
+     * плана `docs/adr/0004_CONCURRENT_ADB_DISPATCHER_RU.md` напрямую к нему не
+     * обращается никто.
      */
-    private val router = AdbStreamRouter()
-
-    /**
-     * Диспетчер строится над **тем же** маршрутизатором, что и остальные
-     * потребители, а не над своим: иначе идентификаторы выдавались бы дважды.
-     */
-    private val dispatcher = AdbStreamDispatcher(router)
+    private val dispatcher = AdbStreamDispatcher()
 
     private val services = AdbServiceCall(
         reader = reader,
@@ -174,7 +171,7 @@ public class AdbConnection(
         AdbInteractiveShell(
             reader = reader,
             writer = writer,
-            router = router,
+            dispatcher = dispatcher,
             useShellV2 = supportsShellV2,
             diagnostics = diagnostics,
         )

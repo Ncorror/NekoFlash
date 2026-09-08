@@ -149,7 +149,7 @@ class AdbConcurrentStreamsTest {
         val shell = AdbInteractiveShell(
             reader = AdbPacketReader(handle, AdbInboundFraming.MODERN_MAX_PAYLOAD_BYTES),
             writer = AdbPacketWriter(handle),
-            router = AdbStreamRouter(),
+            dispatcher = AdbStreamDispatcher(),
             useShellV2 = true,
         )
         shell.open()
