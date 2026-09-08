@@ -54,6 +54,23 @@ mapfile -t text_files < <(
     | grep -E '\.(kt|kts|java|xml|md|yml|yaml|toml|properties|sh|py|txt)$' || true
 )
 
+# Байт NUL в исходнике делает файл двоичным для git, и тогда все текстовые
+# проверки ниже молча его пропускают: они идут с `git grep -I`. Поэтому проверка
+# стоит перед ними. Уже случалось трижды: строка вида "shell:id\u0000" в коде
+# оказывалась настоящим нулевым байтом, компилировалась и проходила все гейты.
+if (( ${#text_files[@]} > 0 )); then
+  binary_text_files=""
+  for text_file in "${text_files[@]}"; do
+    if ! LC_ALL=C tr -d '\000' < "$text_file" | cmp -s - "$text_file"; then
+      binary_text_files+="$text_file"$'\n'
+    fi
+  done
+  if [[ -n "$binary_text_files" ]]; then
+    printf '%s' "$binary_text_files" >&2
+    fail 'NUL byte in a tracked text file (write \u0000 as an escape, not as the byte)'
+  fi
+fi
+
 if (( ${#text_files[@]} > 0 )); then
   set +e
   whitespace_scan="$(git grep -nI -E '[[:blank:]]+$' -- "${text_files[@]}" 2>&1)"
