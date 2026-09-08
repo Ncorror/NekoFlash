@@ -70,20 +70,23 @@ Hard-block допустим только если:
 
 ## 7. Текущая точка
 
-**Phase 0 завершена: PASS.** Read-only hardware gate на `vayu` для ADB inbound framing fix из A2 завершён успешно. Fix принят как доказанный transport/correctness invariant для нового core.
+**Phase 0, 1, 2 и 3 — COMPLETE.** Что именно в каждой и каким прогоном
+закрыто — чеклисты `09_IMPLEMENTATION_ROADMAP_RU.md`, аппаратные гейты —
+`07_TESTING_CI_HARDWARE_EVIDENCE_RU.md` §6.
 
-Legacy и A2 считаются **FROZEN / REFERENCE ONLY**. Новые product features в них не строятся.
+Legacy и A2 считаются **FROZEN / REFERENCE ONLY**. Новые product features в них
+не строятся. В frozen A2 archive нет сохранённого финального diagnostics bundle
+gate Phase 0; статус PASS зафиксирован по подтверждению владельца проекта и
+согласуется с кодом и тестовой моделью A2.
 
-В frozen A2 archive нет сохранённого финального diagnostics bundle этого gate; статус PASS зафиксирован по подтверждению владельца проекта и согласуется с кодом/тестовой моделью A2.
+Текущая работа: **Phase 4 — ADB professional services**.
 
-**Phase 1 завершена: COMPLETE / PASS.** Authoritative GitHub Actions подтвердил clean bootstrap, tracked Gradle Wrapper, AGP `9.3.2`, launcher/adaptive/monochrome icon, explicit no-backup/D2D policy, executable repository/localization hygiene, 7 core unit tests, Android Lint `0 errors` и debug APK assembly.
+**Статус каждого пункта — только в чеклисте `09`.** Он обновляется тем же
+changeset, что и код, и является единственным источником истины о готовности.
+Здесь прозы о сделанном намеренно нет: пересказ статуса в нескольких документах
+уже расходился с действительностью, и первым устаревал именно пересказ.
 
-**Phase 2 завершена: COMPLETE / PASS.** USB + Target/Session vertical slice построен и подтверждён на реальном устройстве: descriptor discovery, permission lifecycle с выдачей и отказом, `TargetId` с уточнением серийным номером, `SessionGeneration`, application-scoped ownership, detach/re-enumeration, захват и освобождение интерфейса, выгрузка evidence приложением. Полная таблица проверок и критерий PASS — `07_TESTING_CI_HARDWARE_EVIDENCE_RU.md` §6.10.
-
-**Phase 3 завершена: COMPLETE.** Настоящий ADB foundation построен и подтверждён на устройстве: ввод-вывод на захваченном интерфейсе, рамка пакета с доказанным на `vayu` inbound framing invariant, `CNXN`/`AUTH` с авторизацией и с отказом, автоподключение, маршрутизатор логических потоков, `openService`, `shell,v2` с разделением `stdout`/`stderr` и кодом возврата, откат на legacy shell, интерактивная оболочка с `Ctrl+C` и терминал на экране. Полная таблица пунктов — чеклист `09_IMPLEMENTATION_ROADMAP_RU.md`, аппаратные гейты — `07_TESTING_CI_HARDWARE_EVIDENCE_RU.md` §6.13–§6.28.
-
-Текущая работа: **Phase 4 — ADB professional services**. Read-only Sync (`STAT`/`RECV`) уже в production-пути; `SEND`, install, reboot, raw services и полноценная передача файлов остаются открыты.
-
-**Порядок фаз менять нельзя молча.** Fastboot — это Phase 5, а не Phase 4; Recovery и Sideload — Phase 7. Прежде чем называть следующую работу, открывай список фаз в `09_IMPLEMENTATION_ROADMAP_RU.md` и читай нужную, а не восстанавливай по памяти: 2026-09-06 такая догадка увела работу на фазу вперёд.
-
-Статус каждого пункта текущей фазы смотреть в чеклисте `09_IMPLEMENTATION_ROADMAP_RU.md`: он обновляется тем же changeset, что и код, и является единственным источником истины о готовности.
+**Порядок фаз менять нельзя молча.** Fastboot — это Phase 5, а не Phase 4;
+Recovery и Sideload — Phase 7. Прежде чем называть следующую работу, открывай
+список фаз в `09` и читай нужную, а не восстанавливай по памяти: 2026-09-06
+такая догадка увела работу на фазу вперёд.

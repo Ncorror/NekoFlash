@@ -62,6 +62,16 @@ def main() -> int:
                 f"got {section_numbers}, expected {expected_sections}"
             )
 
+        listed = re.findall(r"^- §(6\.\d+\..*)$", evidence, flags=re.MULTILINE)
+        titles = re.findall(r"^## (6\.\d+\..*)$", evidence, flags=re.MULTILINE)
+        if listed != titles:
+            only_index = [entry for entry in listed if entry not in titles]
+            only_body = [entry for entry in titles if entry not in listed]
+            raise CheckFailure(
+                "docs/07: the §6.x index must list exactly the sections that exist, in order; "
+                f"index-only={only_index or 'none'}, body-only={only_body or 'none'}"
+            )
+
         handoff = text("docs/99_RECOVERY_HANDOFF_RU.md")
         documented_tests = re.search(r"Тестов\s+(\d+)\s+\(`@Test` в текущем дереве\)", handoff)
         if documented_tests is None:
@@ -80,7 +90,8 @@ def main() -> int:
     phase = next(iter(phases.values()))
     print(
         "docs consistency: PASS "
-        f"(Phase {phase}; evidence 6.1–6.{section_numbers[-1]}; {actual_tests} @Test methods)"
+        f"(Phase {phase}; evidence 6.1–6.{section_numbers[-1]}, index in sync; "
+        f"{actual_tests} @Test methods)"
     )
     return 0
 

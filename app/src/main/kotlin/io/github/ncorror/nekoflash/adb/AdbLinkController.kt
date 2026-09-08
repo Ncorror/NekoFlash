@@ -74,7 +74,7 @@ public class AdbLinkController(
     private val shellSessions = AdbTerminalController(executor, terminalWriterExecutor, diagnostics)
 
     /**
-     * Владелец читающих файловых операций.
+     * Владелец файловых операций — и читающих, и записи.
      *
      * Отдельный класс по той же причине, что и оболочка: у операции своё время
      * жизни, и мешать его с жизнью транспорта не нужно.

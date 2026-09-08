@@ -1,16 +1,11 @@
 # NekoFlash — Recovery Handoff
 
-Если новая сессия потеряла контекст, читать в таком порядке:
+Если новая сессия потеряла контекст, порядок чтения задан в `/CLAUDE.md` —
+единственном месте, где он живёт. Своего списка здесь больше нет: их было три,
+они разошлись, и по одному из них не читались документы из другого.
 
-1. `00_START_HERE_RU.md`
-2. `01_PRODUCT_CHARTER_RU.md`
-3. `03_PROTOCOL_AND_SAFETY_INVARIANTS_RU.md`
-4. `02_CORE_ARCHITECTURE_RU.md`
-5. `05_FINAL_UI_UX_AND_BRAND_RU.md`
-6. `12_FOUNDING_DECISIONS_LOG_RU.md`
-7. `16_AGENT_OPERATING_PROMPT_RU.md` и `/CLAUDE.md` — операционные правила сессии
-8. `17_TERMUX_SETUP_RU.md` — как доставляются и пушатся изменения
-9. актуальный roadmap/status нового repository
+Этот файл — не оглавление, а короткий свод того, что нельзя забыть, и указатель
+на актуальный статус.
 
 ## Нельзя забывать
 
@@ -35,18 +30,16 @@
 
 ## Текущий статус
 
-A2 read-only framing gate на `vayu` для commit `a2479b333ee2f25b0bc86a530d948c48a3423a68` завершён: **PASS**.
+Phase 0, 1, 2 и 3 — **COMPLETE**. Текущая работа — **Phase 4: ADB professional
+services**. Legacy/A2 frozen.
 
-Phase 0, Phase 1, Phase 2 и Phase 3 — COMPLETE. Legacy/A2 frozen.
+Модулей семь: `:app`, `:core:model`, `:core:diagnostics`, `:core:operation`,
+`:usb:api`, `:usb:android`, `:protocol:adb`. Тестов 395 (`@Test` в текущем дереве).
 
-Phase 2 закрыта аппаратным прогоном: discovery, permission с выдачей и отказом, идентичность target с уточнением серийным номером, `SessionGeneration`, detach и re-enumeration, захват и освобождение интерфейса, выгрузка evidence. Критерий PASS и полная таблица проверок — `07_TESTING_CI_HARDWARE_EVIDENCE_RU.md` §6.10.
+**Что готово, а что нет — только в чеклисте `09_IMPLEMENTATION_ROADMAP_RU.md`.**
+Пересказа здесь намеренно нет: он уже расходился с действительностью и устаревал
+раньше самого чеклиста. Аппаратные гейты — `07` §6; открытые видны по заголовку
+«прогон не проведён».
 
-Модулей семь: `:app`, `:core:model`, `:core:diagnostics`, `:core:operation`, `:usb:api`, `:usb:android`, `:protocol:adb`. Тестов 395 (`@Test` в текущем дереве).
-
-Phase 3 закрыта аппаратными прогонами: рукопожатие с авторизацией и с отказом, автоподключение, все три режима ADB, `shell,v2` с кодом возврата, откат на legacy shell, интерактивная оболочка и терминал. Гейты — `07_TESTING_CI_HARDWARE_EVIDENCE_RU.md` §6.13–§6.28.
-
-Текущая работа — **Phase 4: ADB professional services**. AUTH blocker закрыт аппаратно; read-only Sync (`STAT`/`RECV`) доказан на малом и 2 MiB файле с совпавшим SHA-256 (`07` §6.29–§6.32). `SEND` написан вместе с разбором границы мутации по `docs/03` §3, покрыт тестами и подключён к экрану двумя кнопками записи, но на железе не проверялся — гейт `07` §6.34 выполним и ждёт прогона. Полноценное сохранение pull-artifact, install, reboot, raw services и настоящий concurrent service dispatcher остаются открыты.
-
-Порядок фаз читать в `09_IMPLEMENTATION_ROADMAP_RU.md`, а не по памяти: Fastboot — Phase 5, Recovery и Sideload — Phase 7.
-
-Актуальный статус каждого пункта фазы всегда смотреть в чеклисте `09_IMPLEMENTATION_ROADMAP_RU.md`, а не в этом файле: чеклист обновляется тем же changeset, что и код.
+Порядок фаз читать в `09`, а не по памяти: Fastboot — Phase 5, Recovery и
+Sideload — Phase 7.
