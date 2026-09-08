@@ -190,7 +190,7 @@ public class AdbConnection(
         AdbSyncSession(
             reader = reader,
             writer = writer,
-            router = router,
+            dispatcher = dispatcher,
             diagnostics = diagnostics,
         )
 

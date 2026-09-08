@@ -274,7 +274,7 @@ class AdbSyncSessionTest {
         fun session(diagnostics: InMemoryDiagnosticSink = InMemoryDiagnosticSink()) = AdbSyncSession(
             reader = AdbPacketReader(handle, AdbInboundFraming.MODERN_MAX_PAYLOAD_BYTES),
             writer = AdbPacketWriter(handle),
-            router = AdbStreamRouter(),
+            dispatcher = AdbStreamDispatcher(),
             diagnostics = diagnostics,
             elapsedNanos = StepwiseClock(),
         )

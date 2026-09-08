@@ -20,12 +20,21 @@ import java.time.Instant
 internal class AdbSyncExchange(
     private val reader: AdbPacketReader,
     private val writer: AdbPacketWriter,
-    private val router: AdbStreamRouter,
+    private val dispatcher: AdbStreamDispatcher,
     private val diagnostics: DiagnosticSink,
     private val clock: () -> Instant = { Clock.systemUTC().instant() },
     private val elapsedNanos: () -> Long = { System.nanoTime() },
 ) {
     private val incoming = AdbStreamBuffer()
+
+    /**
+     * Ящик открытого потока.
+     *
+     * `null` до открытия и после закрытия: ждать нечего, и спрашивать не у
+     * кого. Шаг 3 плана `docs/adr/0004_CONCURRENT_ADB_DISPATCHER_RU.md` —
+     * пакеты в диспетчер по-прежнему подаёт этот же поток, см. [pump].
+     */
+    private var mailbox: AdbStreamMailbox? = null
 
     private var localId: Int = 0
     private var opened = false
@@ -36,7 +45,9 @@ internal class AdbSyncExchange(
 
     /** Открывает сервис и ждёт подтверждения. */
     fun open(timeoutMillis: Int): AdbSyncOutcome<Unit> {
-        val (id, packet) = router.openRequest(AdbSyncSession.SERVICE)
+        val (box, packet) = dispatcher.open(AdbSyncSession.SERVICE)
+        mailbox = box
+        val id = box.localId
         localId = id
         emit("sync_open", mapOf("stream" to id.toString()))
         var failure = sendPacket(packet)
@@ -53,16 +64,17 @@ internal class AdbSyncExchange(
     fun close() {
         if (localId == 0) return
         opened = false
-        router.closeRequest(localId)?.let { packet ->
+        dispatcher.close(localId)?.let { packet ->
             writer.write(packet.command, packet.arg0, packet.arg1, packet.payload)
         }
         emit("sync_closed", mapOf("stream" to localId.toString()))
+        mailbox = null
         localId = 0
     }
 
     /** Отправляет запрос с путём. */
     fun request(id: String, path: String): AdbSyncOutcome.Failed? {
-        val packet = router.writeRequest(localId, AdbSyncProtocol.request(id, path))
+        val packet = dispatcher.write(localId, AdbSyncProtocol.request(id, path))
             ?: return failure(AdbSyncFailure.NOT_OPEN, "$id $path")
         return sendPacket(packet)
     }
@@ -75,7 +87,7 @@ internal class AdbSyncExchange(
      * запрос. `null` означает, что поток закрыт и отправлять некуда.
      */
     fun writeFrame(payload: ByteArray): AdbWriteOutcome? {
-        val packet = router.writeRequest(localId, payload) ?: return null
+        val packet = dispatcher.write(localId, payload) ?: return null
         return writer.write(packet.command, packet.arg0, packet.arg1, packet.payload)
     }
 
@@ -143,58 +155,99 @@ internal class AdbSyncExchange(
         }
 
     /**
-     * Один приём: принять пакет и разложить его по маршрутизатору.
+     * Один приём: принять пакет, отдать диспетчеру и разобрать свой ящик.
      *
      * Возвращает отказ, когда продолжать нельзя, и `null`, когда можно.
+     *
+     * Подкачивает этот же поток: постоянный цикл переезжает в `AdbConnection`
+     * шагом 5, и до него ящик наполнять некому. Беды транспорта здесь не
+     * становятся исходом сразу — они закрывают ящики, а отказ достаёт [drain].
+     * Так у сессии одно место, где решается, чем всё кончилось.
      */
     private fun pump(deadline: Long): AdbSyncOutcome.Failed? {
         val remaining = remainingMillis(deadline)
         return if (remaining <= 0) {
             failure(AdbSyncFailure.TIMED_OUT, "sync")
         } else {
-            when (val outcome = reader.read(remaining.coerceAtMost(READ_SLICE_MS))) {
-                AdbReadOutcome.Idle -> null
-                AdbReadOutcome.Closed -> failure(AdbSyncFailure.TRANSPORT_CLOSED, "sync")
-                is AdbReadOutcome.Failed -> failure(
-                    AdbSyncFailure.FRAMING_LOST,
-                    "${outcome.reason.name} ${outcome.detail}",
-                )
+            receive(remaining)
+            drain()
+        }
+    }
 
-                is AdbReadOutcome.Received -> handlePumpPacket(outcome.packet)
+    /**
+     * Принимает один пакет.
+     *
+     * Отказа не возвращает ни в одном случае: и обрыв, и потеря кадра
+     * закрывают ящики, а отказ из них достаёт [drain].
+     */
+    private fun receive(remainingMillis: Int) {
+        when (val outcome = reader.read(remainingMillis.coerceAtMost(READ_SLICE_MS))) {
+            AdbReadOutcome.Idle -> Unit
+
+            AdbReadOutcome.Closed ->
+                dispatcher.abandonAll(AdbMailboxEnd.TRANSPORT_CLOSED, "sync")
+
+            is AdbReadOutcome.Failed -> dispatcher.abandonAll(
+                AdbMailboxEnd.FRAMING_LOST,
+                "${outcome.reason.name} ${outcome.detail}",
+            )
+
+            is AdbReadOutcome.Received -> dispatcher.dispatch(outcome.packet).forEach { outgoing ->
+                writer.write(outgoing.command, outgoing.arg0, outgoing.arg1, outgoing.payload)
             }
         }
     }
 
-    private fun handlePumpPacket(packet: AdbPacket): AdbSyncOutcome.Failed? {
-        val step = router.onPacket(packet)
-        step.outbound.forEach { outgoing ->
-            writer.write(outgoing.command, outgoing.arg0, outgoing.arg1, outgoing.payload)
+    /** Забирает из ящика всё, что уже пришло. `null` — можно продолжать. */
+    private fun drain(): AdbSyncOutcome.Failed? {
+        val box = mailbox ?: return null
+        var failed: AdbSyncOutcome.Failed? = null
+        while (failed == null) {
+            val item = box.poll(0) ?: break
+            failed = consume(item)
         }
-        var failure: AdbSyncOutcome.Failed? = null
-        for (event in step.events) {
-            failure = failure ?: when (event) {
-                is AdbStreamEvent.Opened -> {
-                    if (event.localId == localId) opened = true
-                    null
-                }
+        return failed
+    }
 
-                is AdbStreamEvent.Data -> {
-                    if (event.localId == localId) incoming.append(event.payload)
-                    null
-                }
-
-                is AdbStreamEvent.Closed -> if (event.localId == localId) {
-                    opened = false
-                    failure(AdbSyncFailure.TRANSPORT_CLOSED, "device closed sync")
-                } else {
-                    null
-                }
-
-                is AdbStreamEvent.Stale -> null
-                is AdbStreamEvent.Unexpected -> null
-            }
+    private fun consume(item: AdbMailboxItem): AdbSyncOutcome.Failed? = when (item) {
+        is AdbMailboxItem.Opened -> {
+            opened = true
+            null
         }
-        return failure
+
+        is AdbMailboxItem.Data -> {
+            incoming.append(item.payload)
+            null
+        }
+
+        is AdbMailboxItem.Ended -> ended(item)
+    }
+
+    /**
+     * Конец потока.
+     *
+     * Ящик отдаёт конец сколько угодно раз, поэтому дальнейшие операции сессии
+     * будут отказывать той же причиной, а не зависнут в ожидании байт, которых
+     * уже не будет.
+     */
+    private fun ended(item: AdbMailboxItem.Ended): AdbSyncOutcome.Failed {
+        opened = false
+        return when (item.reason) {
+            // Устройство закрыло поток — подтвердив открытие или не подтвердив.
+            // Для сессии это одно и то же: разговаривать больше не с кем.
+            AdbMailboxEnd.COMPLETED, AdbMailboxEnd.REJECTED, AdbMailboxEnd.LOCAL ->
+                failure(AdbSyncFailure.TRANSPORT_CLOSED, "device closed sync")
+
+            AdbMailboxEnd.FRAMING_LOST -> failure(AdbSyncFailure.FRAMING_LOST, item.detail)
+
+            AdbMailboxEnd.TRANSPORT_CLOSED ->
+                failure(AdbSyncFailure.TRANSPORT_CLOSED, item.detail)
+
+            // Как и в AdbServiceCall, ветка ждёт шага 5: пока ящик разбирается
+            // после каждого пакета, переполниться ему нечем.
+            AdbMailboxEnd.OVERFLOWED ->
+                failure(AdbSyncFailure.MAILBOX_OVERFLOWED, item.detail)
+        }
     }
 
     private fun remainingMillis(deadlineNanos: Long): Int =

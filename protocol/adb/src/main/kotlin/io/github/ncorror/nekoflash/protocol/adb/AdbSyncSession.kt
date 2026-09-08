@@ -32,6 +32,15 @@ public enum class AdbSyncFailure {
     SEND_FAILED,
 
     /**
+     * Ящик потока переполнился: устройство слало быстрее, чем сессия забирала.
+     *
+     * Отдельная причина, а не `FRAMING_LOST`: кадр не потерян и соединение
+     * достоверно — не успел потребитель. Путать эти два случая нельзя, они
+     * требуют разных действий.
+     */
+    MAILBOX_OVERFLOWED,
+
+    /**
      * Путь непредставим на проводе.
      *
      * Единственный случай — байт `NUL` внутри пути: на стороне устройства он
@@ -87,7 +96,7 @@ private fun readIntLe(source: ByteArray, offset: Int): Int =
 public class AdbSyncSession(
     reader: AdbPacketReader,
     writer: AdbPacketWriter,
-    router: AdbStreamRouter,
+    dispatcher: AdbStreamDispatcher,
     diagnostics: DiagnosticSink = DiagnosticSink { },
     clock: () -> Instant = { Clock.systemUTC().instant() },
     elapsedNanos: () -> Long = { System.nanoTime() },
@@ -95,7 +104,7 @@ public class AdbSyncSession(
     private val exchange = AdbSyncExchange(
         reader = reader,
         writer = writer,
-        router = router,
+        dispatcher = dispatcher,
         diagnostics = diagnostics,
         clock = clock,
         elapsedNanos = elapsedNanos,
