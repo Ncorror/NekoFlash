@@ -180,6 +180,49 @@ class AdbServiceCallTest {
         assertEquals(2, rejected)
     }
 
+    /**
+     * Вывод соседнего потока в результат не попадает.
+     *
+     * Вызов забирает **свой** ящик, а не всё, что пришло по проводу. До шага 2
+     * это же обеспечивалось сравнением идентификаторов в разборе событий;
+     * проверка оставлена, потому что гарантия та же, а держится теперь на
+     * другом механизме.
+     */
+    @Test
+    fun outputOfAnotherStreamIsNotCollected() {
+        val device = ScriptedDevice(
+            okay(),
+            write("mine"),
+            packet(AdbCommand.WRTE, arg0 = 99, arg1 = OTHER_LOCAL_ID, payload = "theirs".toByteArray()),
+            close(),
+        )
+
+        val outcome = device.call().run(SERVICE) as AdbServiceOutcome.Completed
+
+        assertEquals("mine", outcome.text())
+    }
+
+    /**
+     * Чужой поток закрывается, а вызов продолжается.
+     *
+     * Пакет неизвестного потока — не повод оборвать чужую работу: устройству
+     * отвечает `CLSE` маршрутизатор, а ящик вызова об этом даже не узнаёт.
+     */
+    @Test
+    fun aPacketForAnotherStreamIsRejectedWithoutEndingTheCall() {
+        val device = ScriptedDevice(
+            okay(),
+            packet(AdbCommand.WRTE, arg0 = 99, arg1 = OTHER_LOCAL_ID, payload = "theirs".toByteArray()),
+            write("mine"),
+            close(),
+        )
+
+        val outcome = device.call().run(SERVICE) as AdbServiceOutcome.Completed
+
+        assertEquals("mine", outcome.text())
+        assertTrue(device.handle.sentFrames().any { it.command == AdbCommand.CLSE })
+    }
+
     /** Время идёт само: каждая попытка приёма отъедает у дедлайна. */
     private class FakeElapsed : () -> Long {
         private var nanos = 0L
@@ -201,7 +244,7 @@ class AdbServiceCallTest {
         ) = AdbServiceCall(
             reader = AdbPacketReader(handle, AdbInboundFraming.MODERN_MAX_PAYLOAD_BYTES),
             writer = AdbPacketWriter(handle),
-            router = AdbStreamRouter(),
+            dispatcher = AdbStreamDispatcher(),
             diagnostics = diagnostics,
             elapsedNanos = elapsed ?: { 0L },
         )
@@ -211,6 +254,9 @@ class AdbServiceCallTest {
         const val SERVICE = "shell:getprop ro.product.device"
         const val REMOTE_ID = 42
         const val LOCAL_ID = 1
+
+        /** Идентификатор, который этому вызову не принадлежит. */
+        const val OTHER_LOCAL_ID = 7
 
         fun packet(
             command: Long,

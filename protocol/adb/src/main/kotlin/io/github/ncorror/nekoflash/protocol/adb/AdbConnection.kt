@@ -40,10 +40,16 @@ public class AdbConnection(
      */
     private val router = AdbStreamRouter()
 
+    /**
+     * Диспетчер строится над **тем же** маршрутизатором, что и остальные
+     * потребители, а не над своим: иначе идентификаторы выдавались бы дважды.
+     */
+    private val dispatcher = AdbStreamDispatcher(router)
+
     private val services = AdbServiceCall(
         reader = reader,
         writer = writer,
-        router = router,
+        dispatcher = dispatcher,
         diagnostics = diagnostics,
     )
 

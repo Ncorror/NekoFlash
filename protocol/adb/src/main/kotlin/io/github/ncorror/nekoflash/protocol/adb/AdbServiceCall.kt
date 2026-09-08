@@ -24,6 +24,16 @@ public enum class AdbServiceFailure {
 
     /** Отправить пакет не удалось. */
     SEND_FAILED,
+
+    /**
+     * Ящик потока переполнился: вывод шёл быстрее, чем его забирали.
+     *
+     * Отдельно от [OUTPUT_TOO_LARGE], хотя оба про предел: там превышен потолок
+     * вывода, который назвал вызывающий, а здесь — глубина ящика, о которой он
+     * не просил. Свести их в одну причину значило бы сказать оператору
+     * «вы просили меньше», когда он не просил ничего подобного.
+     */
+    MAILBOX_OVERFLOWED,
 }
 
 /** Исход вызова сервиса. */
@@ -46,11 +56,8 @@ public sealed interface AdbServiceOutcome {
 /**
  * Один вызов сервиса ADB от начала до закрытия потока.
  *
- * Блокирующий и однопоточный: открывает поток, крутит приём, собирает вывод и
- * возвращает его целиком. Читающего цикла в фоне здесь нет намеренно — пока
- * поток один, он не нужен, а лишний поток исполнения принёс бы гонки раньше,
- * чем пользу. Постоянный цикл появится вместе с интерактивным shell, где
- * потоков действительно несколько.
+ * Блокирующий и однопоточный: открывает поток, собирает вывод и возвращает его
+ * целиком.
  *
  * Устроено так же, как ограниченный read-only probe в A2
  * (`AdbUsbTransport.runReadOnlyProbe`): общий дедлайн на весь вызов, отдельный
@@ -58,13 +65,22 @@ public sealed interface AdbServiceOutcome {
  * любом из них. Ограничения обязательны: сервис может не закрыть поток никогда,
  * а `cat` большого файла — переполнить память.
  *
- * Разбор пакетов делегируется [AdbStreamRouter], который отвечает за чужие
- * пакеты и подтверждения. Здесь остаётся только время, предел и сбор вывода.
+ * Вывод берётся из **своего ящика** ([AdbStreamMailbox]), а не из событий
+ * маршрутизатора: шаг 2 плана `docs/adr/0004_CONCURRENT_ADB_DISPATCHER_RU.md`.
+ * Чужие пакеты, подтверждения и раскладку по потокам знает
+ * [AdbStreamDispatcher]; здесь остаётся время, предел и сбор вывода.
+ *
+ * **Пакеты пока подаёт этот же поток.** Приём, `dispatch` и разбор ящика идут
+ * друг за другом в [Call.step]. Одновременности отсюда ещё не появляется, и
+ * заявлять её нечем: постоянный цикл переезжает в `AdbConnection` шагом 5, и
+ * только тогда ожидание здесь станет ожиданием **на ящике**. Раньше его
+ * заводить нельзя — пока `AdbInteractiveShell` и `AdbSyncExchange` читают
+ * транспорт сами, второй читающий цикл нарушил бы `03` §4.
  */
 public class AdbServiceCall(
     private val reader: AdbPacketReader,
     private val writer: AdbPacketWriter,
-    private val router: AdbStreamRouter,
+    private val dispatcher: AdbStreamDispatcher,
     private val diagnostics: DiagnosticSink = DiagnosticSink { },
     private val clock: () -> Instant = { Clock.systemUTC().instant() },
     private val elapsedNanos: () -> Long = { System.nanoTime() },
@@ -85,181 +101,14 @@ public class AdbServiceCall(
         require(maxOutputBytes > 0) { "ADB service output cap must be positive: $maxOutputBytes" }
         require(timeoutMillis > 0) { "ADB service timeout must be positive: $timeoutMillis" }
 
-        val (localId, open) = router.openRequest(service)
-        emit("service_open", mapOf("service" to service, "stream" to localId.toString()))
+        val (mailbox, open) = dispatcher.open(service)
+        emit("service_open", mapOf("service" to service, "stream" to mailbox.localId.toString()))
         val initialFailure = send(open)
         return if (initialFailure != null) {
-            abandon(localId, initialFailure)
+            abandon(mailbox.localId, initialFailure)
         } else {
-            runUntilDone(localId, service, maxOutputBytes, timeoutMillis, payloadOnOpen)
+            Call(service, mailbox, maxOutputBytes, timeoutMillis, payloadOnOpen).await()
         }
-    }
-
-    private fun runUntilDone(
-        localId: Int,
-        service: String,
-        maxOutputBytes: Int,
-        timeoutMillis: Int,
-        payloadOnOpen: ByteArray?,
-    ): AdbServiceOutcome {
-        val deadline = elapsedNanos() + timeoutMillis * NANOS_PER_MILLI
-        val output = ByteArrayBuilder(maxOutputBytes)
-        var outcome: AdbServiceOutcome? = null
-        while (outcome == null) {
-            outcome = nextOutcome(localId, service, deadline, output, payloadOnOpen)
-        }
-        return outcome
-    }
-
-    private fun nextOutcome(
-        localId: Int,
-        service: String,
-        deadline: Long,
-        output: ByteArrayBuilder,
-        payloadOnOpen: ByteArray?,
-    ): AdbServiceOutcome? {
-        val remaining = remainingMillis(deadline)
-        return if (remaining <= 0) {
-            abandon(localId, failure(AdbServiceFailure.TIMED_OUT, "service=$service"))
-        } else {
-            when (val read = reader.read(remaining.coerceAtMost(PACKET_TIMEOUT_MS))) {
-                is AdbReadOutcome.Received ->
-                    receivedOutcome(localId, service, read.packet, output, payloadOnOpen)
-
-                // Тишина — обычное состояние ожидания: сервис думает. Решает
-                // дедлайн, а не одна неудачная попытка приёма.
-                AdbReadOutcome.Idle -> null
-
-                AdbReadOutcome.Closed -> abandon(
-                    localId,
-                    failure(AdbServiceFailure.TRANSPORT_CLOSED, "service=$service"),
-                )
-
-                is AdbReadOutcome.Failed -> abandon(
-                    localId,
-                    failure(
-                        AdbServiceFailure.FRAMING_LOST,
-                        "service=$service ${read.reason.name} ${read.detail}",
-                    ),
-                )
-            }
-        }
-    }
-
-    private fun receivedOutcome(
-        localId: Int,
-        service: String,
-        packet: AdbPacket,
-        output: ByteArrayBuilder,
-        payloadOnOpen: ByteArray?,
-    ): AdbServiceOutcome? {
-        val step = router.onPacket(packet)
-        val sendFailure = sendOutbound(step)
-        return if (sendFailure != null) {
-            abandon(localId, sendFailure)
-        } else {
-            resolve(localId, step, output, service, payloadOnOpen)
-        }
-    }
-
-    private fun sendOutbound(step: AdbRouterStep): AdbServiceOutcome.Failed? {
-        var failure: AdbServiceOutcome.Failed? = null
-        for (packet in step.outbound) {
-            if (failure == null) failure = send(packet)
-        }
-        return failure
-    }
-
-    /**
-     * Превращает события маршрутизатора в исход вызова.
-     *
-     * `null` означает «продолжаем ждать».
-     */
-    private fun resolve(
-        localId: Int,
-        step: AdbRouterStep,
-        output: ByteArrayBuilder,
-        service: String,
-        payloadOnOpen: ByteArray?,
-    ): AdbServiceOutcome? {
-        var outcome: AdbServiceOutcome? = null
-        for (event in step.events) {
-            if (outcome == null) {
-                outcome = resolveEvent(localId, event, output, service, payloadOnOpen)
-            }
-        }
-        return outcome
-    }
-
-    private fun resolveEvent(
-        localId: Int,
-        event: AdbStreamEvent,
-        output: ByteArrayBuilder,
-        service: String,
-        payloadOnOpen: ByteArray?,
-    ): AdbServiceOutcome? = when (event) {
-        is AdbStreamEvent.Opened -> resolveOpened(localId, event, service, payloadOnOpen)
-        is AdbStreamEvent.Data -> resolveData(localId, event, output, service)
-        is AdbStreamEvent.Closed -> if (event.localId == localId) {
-            finish(event.reason, output, service)
-        } else {
-            null
-        }
-
-        // Чужие и неожиданные пакеты маршрутизатор уже отработал: ответ,
-        // если он нужен, лежит в step.outbound и уже отправлен.
-        is AdbStreamEvent.Stale -> null
-        is AdbStreamEvent.Unexpected -> null
-    }
-
-    private fun resolveOpened(
-        localId: Int,
-        event: AdbStreamEvent.Opened,
-        service: String,
-        payloadOnOpen: ByteArray?,
-    ): AdbServiceOutcome? = if (event.localId != localId) {
-        null
-    } else {
-        emit(
-            "service_opened",
-            mapOf("service" to service, "remote" to event.remoteId.toString()),
-        )
-        val write = payloadOnOpen?.let { payload -> router.writeRequest(localId, payload) }
-        write?.let { packet -> send(packet)?.let { failure -> abandon(localId, failure) } }
-    }
-
-    private fun resolveData(
-        localId: Int,
-        event: AdbStreamEvent.Data,
-        output: ByteArrayBuilder,
-        service: String,
-    ): AdbServiceOutcome? = if (event.localId == localId && !output.append(event.payload)) {
-        abandon(
-            localId,
-            failure(
-                AdbServiceFailure.OUTPUT_TOO_LARGE,
-                "service=$service cap=${output.capacity}",
-            ),
-        )
-    } else {
-        null
-    }
-
-    private fun finish(
-        reason: AdbStreamClosure,
-        output: ByteArrayBuilder,
-        service: String,
-    ): AdbServiceOutcome = when (reason) {
-        AdbStreamClosure.COMPLETED -> {
-            emit("service_completed", mapOf("service" to service, "bytes" to output.size.toString()))
-            AdbServiceOutcome.Completed(output.toByteArray())
-        }
-
-        AdbStreamClosure.REJECTED ->
-            failure(AdbServiceFailure.REJECTED, "service=$service closed before OKAY")
-
-        AdbStreamClosure.LOCAL ->
-            failure(AdbServiceFailure.TRANSPORT_CLOSED, "service=$service abandoned")
     }
 
     /**
@@ -269,7 +118,7 @@ public class AdbServiceCall(
      * устройства и держит там сервис.
      */
     private fun abandon(localId: Int, failure: AdbServiceOutcome.Failed): AdbServiceOutcome {
-        router.closeRequest(localId)?.let { packet ->
+        dispatcher.close(localId)?.let { packet ->
             writer.write(packet.command, packet.arg0, packet.arg1, packet.payload)
         }
         return failure
@@ -285,11 +134,6 @@ public class AdbServiceCall(
             )
         }
 
-    private fun remainingMillis(deadlineNanos: Long): Int =
-        ((deadlineNanos - elapsedNanos()) / NANOS_PER_MILLI)
-            .coerceAtMost(Int.MAX_VALUE.toLong())
-            .toInt()
-
     private fun failure(reason: AdbServiceFailure, detail: String): AdbServiceOutcome.Failed {
         emit("service_failed", mapOf("reason" to reason.name, "detail" to detail))
         return AdbServiceOutcome.Failed(reason, detail)
@@ -304,6 +148,152 @@ public class AdbServiceCall(
                 fields = fields,
             ),
         )
+    }
+
+    /**
+     * Состояние одного вызова: дедлайн, накопитель вывода и свой ящик.
+     *
+     * Вынесено в отдельный объект, чтобы эти четыре величины не таскались
+     * параметрами через каждый шаг разбора: раньше именно так и было, и список
+     * параметров рос с каждым новым условием.
+     */
+    private inner class Call(
+        private val service: String,
+        private val mailbox: AdbStreamMailbox,
+        maxOutputBytes: Int,
+        timeoutMillis: Int,
+        private val payloadOnOpen: ByteArray?,
+    ) {
+        private val deadlineNanos = elapsedNanos() + timeoutMillis * NANOS_PER_MILLI
+        private val output = ByteArrayBuilder(maxOutputBytes)
+
+        fun await(): AdbServiceOutcome {
+            var outcome: AdbServiceOutcome? = null
+            while (outcome == null) {
+                outcome = step()
+            }
+            return outcome
+        }
+
+        /** Один шаг: подкачать пакет и разобрать всё, что легло в ящик. */
+        private fun step(): AdbServiceOutcome? {
+            val remaining = remainingMillis()
+            return if (remaining <= 0) {
+                abandon(mailbox.localId, failure(AdbServiceFailure.TIMED_OUT, "service=$service"))
+            } else {
+                pump(remaining) ?: drain()
+            }
+        }
+
+        /**
+         * Принимает один пакет и отдаёт его диспетчеру.
+         *
+         * Беды транспорта не превращаются в исход прямо здесь: они закрывают
+         * ящики, а исход из ящика достаёт [drain]. Так у вызова одно место, где
+         * решается, чем всё кончилось, и принятое до обрыва не теряется.
+         */
+        private fun pump(remainingMillis: Int): AdbServiceOutcome? =
+            when (val read = reader.read(remainingMillis.coerceAtMost(PACKET_TIMEOUT_MS))) {
+                is AdbReadOutcome.Received -> sendOutbound(dispatcher.dispatch(read.packet))
+
+                // Тишина — обычное состояние ожидания: сервис думает. Решает
+                // дедлайн, а не одна неудачная попытка приёма.
+                AdbReadOutcome.Idle -> null
+
+                AdbReadOutcome.Closed -> {
+                    dispatcher.abandonAll(AdbMailboxEnd.TRANSPORT_CLOSED, "service=$service")
+                    null
+                }
+
+                is AdbReadOutcome.Failed -> {
+                    dispatcher.abandonAll(
+                        AdbMailboxEnd.FRAMING_LOST,
+                        "service=$service ${read.reason.name} ${read.detail}",
+                    )
+                    null
+                }
+            }
+
+        private fun sendOutbound(outbound: List<AdbOutboundPacket>): AdbServiceOutcome? {
+            var failed: AdbServiceOutcome.Failed? = null
+            for (packet in outbound) {
+                if (failed == null) failed = send(packet)
+            }
+            return failed?.let { abandon(mailbox.localId, it) }
+        }
+
+        /** Забирает из ящика всё, что уже пришло. `null` — ждём дальше. */
+        private fun drain(): AdbServiceOutcome? {
+            var outcome: AdbServiceOutcome? = null
+            while (outcome == null) {
+                val item = mailbox.poll(0) ?: break
+                outcome = consume(item)
+            }
+            return outcome
+        }
+
+        private fun consume(item: AdbMailboxItem): AdbServiceOutcome? = when (item) {
+            is AdbMailboxItem.Opened -> opened(item)
+            is AdbMailboxItem.Data -> collect(item)
+            is AdbMailboxItem.Ended -> finish(item)
+        }
+
+        private fun opened(item: AdbMailboxItem.Opened): AdbServiceOutcome? {
+            emit(
+                "service_opened",
+                mapOf("service" to service, "remote" to item.remoteId.toString()),
+            )
+            val write = payloadOnOpen?.let { dispatcher.write(mailbox.localId, it) }
+            return write?.let { packet -> send(packet)?.let { abandon(mailbox.localId, it) } }
+        }
+
+        private fun collect(item: AdbMailboxItem.Data): AdbServiceOutcome? =
+            if (output.append(item.payload)) {
+                null
+            } else {
+                abandon(
+                    mailbox.localId,
+                    failure(
+                        AdbServiceFailure.OUTPUT_TOO_LARGE,
+                        "service=$service cap=${output.capacity}",
+                    ),
+                )
+            }
+
+        private fun finish(item: AdbMailboxItem.Ended): AdbServiceOutcome = when (item.reason) {
+            AdbMailboxEnd.COMPLETED -> {
+                emit(
+                    "service_completed",
+                    mapOf("service" to service, "bytes" to output.size.toString()),
+                )
+                AdbServiceOutcome.Completed(output.toByteArray())
+            }
+
+            AdbMailboxEnd.REJECTED ->
+                failure(AdbServiceFailure.REJECTED, "service=$service closed before OKAY")
+
+            AdbMailboxEnd.LOCAL ->
+                failure(AdbServiceFailure.TRANSPORT_CLOSED, "service=$service abandoned")
+
+            // Пока пакеты подаёт этот же поток, ветка недостижима: один пакет
+            // даёт одно событие, и ящик разбирается сразу после каждого. Она
+            // не мёртвая, а преждевременная — оживёт на шаге 5, когда ящик
+            // начнёт наполнять цикл соединения. Ошибиться в ней тогда было бы
+            // хуже, чем написать её сейчас.
+            AdbMailboxEnd.OVERFLOWED ->
+                failure(AdbServiceFailure.MAILBOX_OVERFLOWED, "service=$service ${item.detail}")
+
+            AdbMailboxEnd.FRAMING_LOST ->
+                failure(AdbServiceFailure.FRAMING_LOST, item.detail)
+
+            AdbMailboxEnd.TRANSPORT_CLOSED ->
+                failure(AdbServiceFailure.TRANSPORT_CLOSED, item.detail)
+        }
+
+        private fun remainingMillis(): Int =
+            ((deadlineNanos - elapsedNanos()) / NANOS_PER_MILLI)
+                .coerceAtMost(Int.MAX_VALUE.toLong())
+                .toInt()
     }
 
     /** Накопитель вывода с жёстким потолком. */
