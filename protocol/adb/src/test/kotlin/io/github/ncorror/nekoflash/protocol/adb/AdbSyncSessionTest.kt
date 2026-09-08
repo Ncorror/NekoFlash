@@ -249,6 +249,25 @@ class AdbSyncSessionTest {
         assertTrue(messages.containsAll(listOf("sync_open", "sync_opened", "sync_stat")))
     }
 
+    /**
+     * Без пути evidence не доказывает, что именно спрашивали.
+     *
+     * Прогон 2026-09-08 (`07` §6.36) упёрся ровно в это: решающая проверка
+     * после обрыва записи была записана без пути.
+     */
+    @Test
+    fun statEventNamesThePath() {
+        val sink = InMemoryDiagnosticSink()
+        val device = Device(okay(), data(statBody(mode = REGULAR, size = 7, time = 0)))
+        val session = device.session(sink)
+        session.open()
+
+        session.stat("/sdcard/nf-w3.bin")
+
+        val stat = sink.snapshot().single { it.message == "sync_stat" }
+        assertEquals("/sdcard/nf-w3.bin", stat.fields["path"])
+    }
+
     private class Device(vararg responses: List<FakeUsbTransportHandle.Transfer>) {
         val handle = FakeUsbTransportHandle(inbound = responses.flatMap { it }.toMutableList())
 

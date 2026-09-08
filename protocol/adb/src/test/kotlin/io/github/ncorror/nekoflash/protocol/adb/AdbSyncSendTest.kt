@@ -227,6 +227,37 @@ class AdbSyncSendTest {
         assertEquals(0L, outcome.bytesSent)
     }
 
+    /**
+     * Оборвавшийся блок не засчитывается отправленным.
+     *
+     * Прогон 2026-09-08 (`07` §6.36) отчитался ровно на один блок больше, чем
+     * ушло в провод: счётчик прибавлялся до проверки исхода записи. Врать в
+     * этом поле нельзя — ради честности именно этого числа тип и заведён.
+     */
+    @Test
+    fun chunkWhoseFrameFailedIsNotCounted() {
+        val device = Device(
+            inbound = listOf(okay()),
+            outbound = listOf(
+                sendOk(), sendOk(),                     // OPEN
+                sendOk(), sendOk(),                     // SEND
+                sendOk(), sendOk(),                     // первый блок DATA целиком
+                FakeUsbTransportHandle.Transfer.Failed(UsbTransferFailure.NOT_COMPLETED),
+            ),
+        )
+        val parts = mutableListOf(byteArrayOf(1, 2, 3), byteArrayOf(4, 5))
+
+        val outcome = device.opened().send("/sdcard/a.bin", 1) { buffer ->
+            val part = parts.removeFirstOrNull() ?: return@send 0
+            part.copyInto(buffer)
+            part.size
+        } as AdbSyncSendOutcome.Failed
+
+        assertEquals(AdbSyncFailure.SEND_FAILED, outcome.reason)
+        assertEquals(AdbSyncDestination.UNKNOWN, outcome.destination)
+        assertEquals(3L, outcome.bytesSent)
+    }
+
     @Test
     fun diagnosticsRecordTheBoundaryAndTheResult() {
         val sink = InMemoryDiagnosticSink()

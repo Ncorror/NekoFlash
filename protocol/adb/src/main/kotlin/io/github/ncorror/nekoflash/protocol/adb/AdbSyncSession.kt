@@ -200,7 +200,7 @@ public class AdbSyncSession(
         is AdbSyncOutcome.Done -> when (read.value.id) {
             AdbSyncProtocol.ID_STAT -> when (val body = exchange.readExactly(STAT_BODY_BYTES, deadline)) {
                 is AdbSyncOutcome.Failed -> body
-                is AdbSyncOutcome.Done -> AdbSyncOutcome.Done(decodeStat(read.value, body.value))
+                is AdbSyncOutcome.Done -> AdbSyncOutcome.Done(decodeStat(path, read.value, body.value))
             }
 
             AdbSyncProtocol.ID_FAIL -> exchange.refusal(read.value, deadline, "stat $path")
@@ -264,16 +264,21 @@ public class AdbSyncSession(
     /**
      * Разбирает ответ `STAT`.
      *
+     * Путь попадает в событие: без него evidence не доказывает, **что именно**
+     * спрашивали. Прогон 2026-09-08 (`07` §6.36) упёрся ровно в это — решающая
+     * проверка после обрыва записана без пути и сама по себе ничего не
+     * доказывала.
+     *
      * Число в заголовке здесь — **режим**, а не длина: у `STAT` поле `value`
      * означает именно его, и следом идут только размер и время. Первая версия
      * прочитала его как длину и ждала на четыре байта больше, чем присылает
      * устройство; тест это поймал.
      */
-    private fun decodeStat(header: AdbSyncHeader, body: ByteArray): AdbSyncStat {
+    private fun decodeStat(path: String, header: AdbSyncHeader, body: ByteArray): AdbSyncStat {
         val size = readIntLe(body, 0).toLong() and 0xFFFF_FFFFL
         exchange.emit(
             "sync_stat",
-            mapOf("mode" to header.value.toString(), "size" to size.toString()),
+            mapOf("path" to path, "mode" to header.value.toString(), "size" to size.toString()),
         )
         return AdbSyncStat(
             mode = header.value,

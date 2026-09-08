@@ -98,12 +98,16 @@ internal class AdbSyncUpload(private val exchange: AdbSyncExchange) {
                 finished = true
             } else {
                 digest.update(buffer, 0, read)
-                failure = writeAfterBoundary(
+                val outcome = writeAfterBoundary(
                     AdbSyncProtocol.dataFrame(buffer, read),
                     "send $path data",
                     sent,
                 )
-                sent += read
+                // Блок засчитывается, только если его кадр ушёл целиком.
+                // Прибавлять его до проверки значило бы сообщать об отправке
+                // того, что не отправлено: прогон 2026-09-08 (`07` §6.36) на
+                // обрыве кабеля отчитался ровно на один блок больше, чем ушло.
+                if (outcome == null) sent += read else failure = outcome
             }
         }
         return failure ?: finishTransfer(path, modifiedAtSeconds, deadline, sent, digest)
