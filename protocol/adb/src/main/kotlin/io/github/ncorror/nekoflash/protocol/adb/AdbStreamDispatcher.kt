@@ -118,7 +118,10 @@ public class AdbStreamDispatcher(
     ) {
         val mailbox = mailboxes[localId] ?: return
         if (mailbox.offer(item)) return
-        mailbox.end(AdbMailboxEnd.OVERFLOWED, "mailbox of stream $localId is full")
+        mailbox.end(
+            AdbMailboxEnd.OVERFLOWED,
+            "mailbox of stream $localId is full: ${mailbox.rateDetail()}",
+        )
         mailboxes.remove(localId)
         router.closeRequest(localId)?.let { packet -> outbound += packet }
     }

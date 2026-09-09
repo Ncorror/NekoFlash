@@ -40,6 +40,7 @@ public class AdbTerminalController(
     private val readerExecutor: Executor,
     private val writerExecutor: Executor,
     private val diagnostics: DiagnosticSink = DiagnosticSink { },
+    private val elapsedNanos: () -> Long = { System.nanoTime() },
 ) {
     private val mutableState = MutableStateFlow(AdbTerminalState())
     private val lifecycleLock = Any()
@@ -87,7 +88,7 @@ public class AdbTerminalController(
     /** Прерывает текущую команду, не закрывая оболочку. */
     public fun interrupt() {
         val session = currentReadyShell() ?: return
-        writerExecutor.execute { session.sendInput(byteArrayOf(CTRL_C)) }
+        writerExecutor.execute { session.interrupt() }
     }
 
     /**
@@ -167,18 +168,58 @@ public class AdbTerminalController(
             }
         }
 
-    /** Читающий цикл одной сессии. */
+    /**
+     * Читающий цикл одной сессии.
+     *
+     * Разбор ящика и показ на экране **развязаны по времени**. Раньше каждая
+     * порция вывода тут же копировала весь журнал сессии и толкала его в
+     * состояние экрана; при `logcat` это означало десятки копий по 64 КиБ в
+     * секунду и столько же перерисовок, а ящик потока в это время наполнялся.
+     * Прогон `07` §6.41 показал переполнение именно на `logcat`.
+     *
+     * Забираем поэтому так быстро, как приходит, а показываем не чаще
+     * [PUBLISH_INTERVAL_MS]: терминалу этого хватает, а темп разбора перестаёт
+     * зависеть от скорости перерисовки.
+     */
     private fun pumpUntilClosed(session: AdbInteractiveShell, requestId: Long) {
         val text = StringBuilder()
         var progress = PumpProgress()
+        var shown = ShownState()
 
         while (session.active && isCurrent(requestId)) {
             progress = consumePumpEvents(session, requestId, text, progress)
             trimToLimit(text)
-            publishRunningState(requestId, progress.ready, text)
+            if (shown.shouldPublish(progress, elapsedNanos())) {
+                publishRunningState(requestId, progress.ready, text)
+                shown = ShownState(progress.received, progress.ready, elapsedNanos())
+            }
         }
 
         finishSession(session, requestId, progress.ended ?: CLOSED, text.toString())
+    }
+
+    /**
+     * Что уже показано на экране.
+     *
+     * Держится отдельно от [PumpProgress], потому что отвечает на другой
+     * вопрос: не «что пришло», а «что из этого пользователь уже видит».
+     */
+    private data class ShownState(
+        val received: Long = -1,
+        val ready: Boolean = false,
+        val atNanos: Long = 0,
+    ) {
+        /**
+         * Показывать ли сейчас.
+         *
+         * Готовность оболочки показывается сразу: её ждёт человек, и придержать
+         * её на интервал значило бы соврать, что приглашения ещё нет.
+         */
+        fun shouldPublish(progress: PumpProgress, nowNanos: Long): Boolean {
+            if (progress.ready != ready) return true
+            if (progress.received == received) return false
+            return nowNanos - atNanos >= PUBLISH_INTERVAL_NANOS
+        }
     }
 
     private fun consumePumpEvents(
@@ -189,7 +230,9 @@ public class AdbTerminalController(
     ): PumpProgress {
         var ready = previous.ready
         var ended = previous.ended
+        var received = previous.received
         for (event in session.pump()) {
+            received += 1
             if (event == AdbShellEvent.Opened) {
                 ready = true
                 if (isClosing(requestId)) scheduleClose(session, requestId)
@@ -197,7 +240,7 @@ public class AdbTerminalController(
                 ended = apply(event, text) ?: ended
             }
         }
-        return PumpProgress(ready, ended)
+        return PumpProgress(ready, ended, received)
     }
 
     private fun publishRunningState(requestId: Long, ready: Boolean, text: StringBuilder) {
@@ -293,14 +336,23 @@ public class AdbTerminalController(
     private data class PumpProgress(
         val ready: Boolean = false,
         val ended: String? = null,
+        /** Счётчик принятого: по нему видно, изменилось ли что-нибудь. */
+        val received: Long = 0,
     )
 
     private companion object {
-        const val CTRL_C: Byte = 3
         const val OPEN_FAILED = "open failed"
         const val CLOSED = "closed"
 
         /** Сколько символов вывода держится на экране. */
         const val MAX_TERMINAL_CHARS = 64 * 1024
+
+        /**
+         * Как часто вывод попадает на экран.
+         *
+         * Двадцать раз в секунду человеку читается как непрерывный поток, а
+         * разбор ящика от перерисовки больше не зависит.
+         */
+        const val PUBLISH_INTERVAL_NANOS = 50L * 1_000_000L
     }
 }

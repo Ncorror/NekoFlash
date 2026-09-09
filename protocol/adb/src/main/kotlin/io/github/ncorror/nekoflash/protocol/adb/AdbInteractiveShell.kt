@@ -127,6 +127,20 @@ public class AdbInteractiveShell(
     }
 
     /**
+     * Прерывает текущую команду, не закрывая оболочку.
+     *
+     * Событие пишется с номером потока намеренно: гейт `07` §6.39 требует
+     * показать, что прерывание задело **свой** поток и не тронуло соседний, а
+     * по записи «оператор нажал Ctrl+C» этого не видно. Прогон §6.41 на этом и
+     * остановился — не на поведении, а на ненаблюдаемости.
+     */
+    public fun interrupt(): Boolean = synchronized(lock) {
+        val sent = sendInput(byteArrayOf(CTRL_C))
+        emit("shell_interrupt", mapOf("stream" to localId.toString(), "sent" to sent.toString()))
+        return sent
+    }
+
+    /**
      * Сообщает оболочке о конце ввода.
      *
      * В `shell,v2` это отдельная рамка; в обычном `shell:` конца ввода нет, и
@@ -372,5 +386,8 @@ public class AdbInteractiveShell(
 
         /** Причина по умолчанию: закрыли мы сами. */
         public const val CLOSED_BY_HOST: String = "closed by host"
+
+        /** `ETX` — то же, что нажатие `Ctrl+C` в терминале. */
+        public const val CTRL_C: Byte = 3
     }
 }

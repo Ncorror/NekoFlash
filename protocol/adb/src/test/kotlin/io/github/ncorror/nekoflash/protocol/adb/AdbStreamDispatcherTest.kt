@@ -137,6 +137,30 @@ class AdbStreamDispatcherTest {
     }
 
     /**
+     * Переполнение приносит измеренный темп, а не только факт.
+     *
+     * Гейт `07` §6.39 требует выбирать объём ящика **по измеренному темпу**, а
+     * не подбором. Прогон §6.41 переполнил ящик на `logcat` и не смог назвать
+     * темп: в записи был один факт «полон». Мерить больше негде — событий на
+     * каждый пакет никто не пишет, и писать их при `logcat` значило бы утопить
+     * журнал ровно тем, что изучается.
+     */
+    @Test
+    fun overflowReportsTheMeasuredRate() {
+        val dispatcher = AdbStreamDispatcher(mailboxCapacity = 1)
+        val (mailbox, open) = dispatcher.open("shell:logcat")
+        dispatcher.dispatch(okay(remote = 7, local = open.arg0))
+
+        dispatcher.dispatch(write(remote = 7, local = open.arg0, payload = byteArrayOf(1)))
+
+        mailbox.poll(0)
+        val ended = mailbox.poll(0) as AdbMailboxItem.Ended
+        assertEquals(AdbMailboxEnd.OVERFLOWED, ended.reason)
+        assertTrue(ended.detail, ended.detail.contains("delivered="))
+        assertTrue(ended.detail, ended.detail.contains("capacity=1"))
+    }
+
+    /**
      * Конец доставляется даже из переполненного ящика.
      *
      * Иначе потребитель, из-за которого ящик и переполнился, никогда не узнал

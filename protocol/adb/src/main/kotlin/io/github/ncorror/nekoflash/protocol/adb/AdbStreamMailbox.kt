@@ -65,13 +65,23 @@ public sealed interface AdbMailboxItem {
 public class AdbStreamMailbox internal constructor(
     /** Идентификатор потока, которому принадлежит ящик. */
     public val localId: Int,
-    capacity: Int = DEFAULT_CAPACITY,
+    private val capacity: Int = DEFAULT_CAPACITY,
+    private val elapsedNanos: () -> Long = { System.nanoTime() },
 ) {
     init {
         require(capacity > 0) { "Mailbox capacity must be positive: $capacity" }
     }
 
     private val items = ArrayBlockingQueue<AdbMailboxItem>(capacity)
+
+    private val openedAtNanos = elapsedNanos()
+
+    /**
+     * Сколько событий ящик принял.
+     *
+     * Меняется только в [offer], а его зовёт цикл раскладки — он один.
+     */
+    private var delivered = 0L
 
     @Volatile
     private var terminal: AdbMailboxItem.Ended? = null
@@ -101,8 +111,26 @@ public class AdbStreamMailbox internal constructor(
      * вызывающий, потому что оно требует отправить `CLSE` устройству, а ящик
      * ничего не отправляет.
      */
-    internal fun offer(item: AdbMailboxItem): Boolean =
-        if (terminal != null) true else items.offer(item)
+    internal fun offer(item: AdbMailboxItem): Boolean {
+        if (terminal != null) return true
+        val accepted = items.offer(item)
+        if (accepted) delivered += 1
+        return accepted
+    }
+
+    /**
+     * Измеренный темп: сколько принято и за какое время.
+     *
+     * Нужен там, где ящик переполнился. Гейт `07` §6.39 требует выбирать объём
+     * **по измеренному темпу**, а не подбором, — а измерить его больше негде:
+     * события на каждый пакет никто не пишет, да и писать их при `logcat`
+     * значило бы утопить журнал ровно тем, что мы изучаем.
+     */
+    internal fun rateDetail(): String {
+        val elapsedMillis = (elapsedNanos() - openedAtNanos) / NANOS_PER_MILLI
+        val perSecond = if (elapsedMillis > 0) delivered * MILLIS_PER_SECOND / elapsedMillis else 0
+        return "delivered=$delivered in ${elapsedMillis}ms (~$perSecond/s) capacity=$capacity"
+    }
 
     /**
      * Отмечает конец потока.
@@ -131,5 +159,8 @@ public class AdbStreamMailbox internal constructor(
          * не давая памяти расти без предела.
          */
         public const val DEFAULT_CAPACITY: Int = 64
+
+        private const val NANOS_PER_MILLI = 1_000_000L
+        private const val MILLIS_PER_SECOND = 1_000L
     }
 }

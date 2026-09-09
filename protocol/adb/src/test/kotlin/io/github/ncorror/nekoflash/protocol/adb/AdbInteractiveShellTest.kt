@@ -377,6 +377,43 @@ class AdbInteractiveShellTest {
     }
 
     /**
+     * Прерывание называет свой поток в журнале.
+     *
+     * Гейт §6.39 требует показать, что `Ctrl+C` задел свой поток и не тронул
+     * соседний. По записи «оператор нажал Ctrl+C» этого не видно, и прогон
+     * §6.41 остановился именно на ненаблюдаемости, а не на поведении.
+     */
+    @Test
+    fun interruptNamesItsOwnStream() {
+        val sink = InMemoryDiagnosticSink()
+        val device = Device(okay())
+        val shell = device.shell(useShellV2 = true, diagnostics = sink)
+        shell.open()
+        shell.collect(expected = 1)
+
+        assertTrue(shell.interrupt())
+
+        val event = sink.snapshot().single { it.message == "shell_interrupt" }
+        assertEquals("true", event.fields["sent"])
+        assertEquals(shellStreamId(device), event.fields["stream"])
+    }
+
+    /** `Ctrl+C` уходит как один байт `ETX`, завёрнутый в рамку `stdin`. */
+    @Test
+    fun interruptSendsEtxAsStdin() {
+        val device = Device(okay())
+        val shell = device.opened()
+
+        shell.interrupt()
+
+        val write = device.handle.sentFrames().last { it.command == AdbCommand.WRTE }
+        assertArrayEquals(
+            AdbShellProtocol.encode(AdbShellProtocol.ID_STDIN, byteArrayOf(AdbInteractiveShell.CTRL_C)),
+            write.payload,
+        )
+    }
+
+    /**
      * Копит события, пока их не наберётся [expected] или не выйдет время.
      *
      * Лишнее событие сверх ожидаемого проверку не спасает: сравнение списков
@@ -400,6 +437,10 @@ class AdbInteractiveShellTest {
         repeat(QUIET_STEPS) { events += pump(STEP_MS) }
         return events
     }
+
+    /** Идентификатор потока из отправленного `OPEN`. */
+    private fun shellStreamId(device: Device): String =
+        device.handle.sentFrames().first { it.command == AdbCommand.OPEN }.arg0.toString()
 
     private inner class Device(vararg responses: List<FakeUsbTransportHandle.Transfer>) {
         val handle = FakeUsbTransportHandle(
