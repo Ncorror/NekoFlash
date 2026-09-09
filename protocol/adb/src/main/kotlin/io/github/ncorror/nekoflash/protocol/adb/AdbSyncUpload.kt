@@ -29,7 +29,15 @@ internal class AdbSyncUpload(private val exchange: AdbSyncExchange) {
         source: (ByteArray) -> Int,
     ): AdbSyncSendOutcome {
         if (!exchange.active) {
-            return failed(AdbSyncFailure.NOT_OPEN, "send $path", AdbSyncDestination.UNTOUCHED, 0L)
+            // Назначение не тронуто: запрос `SEND` не уходил. Но **почему**
+            // сессии нет, сказать надо — причина известна.
+            val ended = exchange.endReason()
+            return failed(
+                ended?.reason ?: AdbSyncFailure.NOT_OPEN,
+                ended?.let { "send $path: ${it.detail}" } ?: "send $path",
+                AdbSyncDestination.UNTOUCHED,
+                0L,
+            )
         }
         if (path.contains(NUL)) {
             return failed(

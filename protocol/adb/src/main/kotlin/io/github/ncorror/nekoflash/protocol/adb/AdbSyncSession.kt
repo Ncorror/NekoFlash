@@ -94,7 +94,6 @@ private fun readIntLe(source: ByteArray, offset: Int): Int =
  * `docs/03` §3 и §7; разбор — в KDoc [AdbSyncSendOutcome].
  */
 public class AdbSyncSession(
-    reader: AdbPacketReader,
     writer: AdbPacketWriter,
     dispatcher: AdbStreamDispatcher,
     diagnostics: DiagnosticSink = DiagnosticSink { },
@@ -102,7 +101,6 @@ public class AdbSyncSession(
     elapsedNanos: () -> Long = { System.nanoTime() },
 ) {
     private val exchange = AdbSyncExchange(
-        reader = reader,
         writer = writer,
         dispatcher = dispatcher,
         diagnostics = diagnostics,
@@ -131,7 +129,9 @@ public class AdbSyncSession(
      * не может ответить вовсе.
      */
     public fun stat(path: String, timeoutMillis: Int = DEFAULT_TIMEOUT_MS): AdbSyncOutcome<AdbSyncStat> {
-        if (!exchange.active) return exchange.failure(AdbSyncFailure.NOT_OPEN, "stat $path")
+        if (!exchange.active) {
+            return exchange.endReason() ?: exchange.failure(AdbSyncFailure.NOT_OPEN, "stat $path")
+        }
         val deadline = exchange.deadlineFrom(timeoutMillis)
         return exchange.request(AdbSyncProtocol.ID_STAT, path) ?: readStatResponse(path, deadline)
     }
@@ -149,7 +149,7 @@ public class AdbSyncSession(
         sink: (ByteArray) -> Unit,
     ): AdbSyncOutcome<Long> {
         return if (!exchange.active) {
-            exchange.failure(AdbSyncFailure.NOT_OPEN, "recv $path")
+            exchange.endReason() ?: exchange.failure(AdbSyncFailure.NOT_OPEN, "recv $path")
         } else {
             val deadline = exchange.deadlineFrom(timeoutMillis)
             val digest = MessageDigest.getInstance("SHA-256")

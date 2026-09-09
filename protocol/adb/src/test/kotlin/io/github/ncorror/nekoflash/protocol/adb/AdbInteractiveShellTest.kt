@@ -6,9 +6,28 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.After
 import org.junit.Test
 
+/**
+ * Живая оболочка поверх записанного устройства.
+ *
+ * Утверждения смотрят на **накопленное**, а не на отдельный шаг. Пока приём
+ * крутил сам `pump`, один шаг соответствовал одному принятому пакету, и тест
+ * мог считать шаги. С постоянным циклом раскладки такого соответствия больше
+ * нет: цикл читает сам, и сколько событий успело лечь в ящик к моменту шага —
+ * вопрос планировщика. Требовать от `pump` прежней зернистости значило бы
+ * проверять свойство, которого у системы больше нет, — и такие проверки уже
+ * начали давать разный результат от запуска к запуску.
+ */
 class AdbInteractiveShellTest {
+    private val harnesses = AdbDispatchHarnesses()
+
+    @After
+    fun stopDispatchLoops() {
+        harnesses.stopAll()
+    }
+
     @Test
     fun openRequestsAPtyWhenTheDeviceSupportsShellV2() {
         val device = Device()
@@ -36,7 +55,7 @@ class AdbInteractiveShellTest {
         val shell = device.shell(useShellV2 = true)
         shell.open()
 
-        assertEquals(listOf(AdbShellEvent.Opened), shell.pump())
+        assertEquals(listOf(AdbShellEvent.Opened), shell.collect(expected = 1))
     }
 
     @Test
@@ -46,13 +65,14 @@ class AdbInteractiveShellTest {
             write(AdbShellProtocol.encode(AdbShellProtocol.ID_STDOUT, "out".toByteArray())),
             write(AdbShellProtocol.encode(AdbShellProtocol.ID_STDERR, "err".toByteArray())),
         )
-        val shell = device.opened()
+        val shell = device.opening()
 
-        val first = shell.pump()
-        val second = shell.pump()
+        val events = shell.collect(expected = 3)
 
-        assertEquals(listOf(AdbShellEvent.Output("out")), first)
-        assertEquals(listOf(AdbShellEvent.ErrorOutput("err")), second)
+        assertEquals(
+            listOf(AdbShellEvent.Opened, AdbShellEvent.Output("out"), AdbShellEvent.ErrorOutput("err")),
+            events,
+        )
     }
 
     /** Рамка, разорванная между пакетами, не должна теряться. */
@@ -64,11 +84,12 @@ class AdbInteractiveShellTest {
             write(frame.copyOfRange(0, 4)),
             write(frame.copyOfRange(4, frame.size)),
         )
-        val shell = device.opened()
+        val shell = device.opening()
 
-        assertTrue(shell.pump().isEmpty())
-
-        assertEquals(listOf(AdbShellEvent.Output("halves")), shell.pump())
+        assertEquals(
+            listOf(AdbShellEvent.Opened, AdbShellEvent.Output("halves")),
+            shell.collect(expected = 2),
+        )
     }
 
     /** UTF-8 symbol may be split between two complete shell,v2 frames. */
@@ -82,10 +103,9 @@ class AdbInteractiveShellTest {
             write(AdbShellProtocol.encode(AdbShellProtocol.ID_STDOUT, first)),
             write(AdbShellProtocol.encode(AdbShellProtocol.ID_STDOUT, second)),
         )
-        val shell = device.opened()
+        val shell = device.opening()
 
-        assertTrue(shell.pump().isEmpty())
-        assertEquals(listOf(AdbShellEvent.Output("кот")), shell.pump())
+        assertEquals(listOf(AdbShellEvent.Opened, AdbShellEvent.Output("кот")), shell.collect(expected = 2))
     }
 
     @Test
@@ -99,9 +119,9 @@ class AdbInteractiveShellTest {
                 ),
             ),
         )
-        val shell = device.opened()
+        val shell = device.opening()
 
-        assertEquals(listOf(AdbShellEvent.Output("aб")), shell.pump())
+        assertEquals(listOf(AdbShellEvent.Opened, AdbShellEvent.Output("aб")), shell.collect(expected = 2))
     }
 
     /** Legacy shell has the same byte-stream rule even without shell,v2 frames. */
@@ -111,10 +131,9 @@ class AdbInteractiveShellTest {
         val first = bytes.copyOfRange(0, 1)
         val second = bytes.copyOfRange(1, bytes.size)
         val device = Device(okay(), write(first), write(second))
-        val shell = device.opened(useShellV2 = false)
+        val shell = device.opening(useShellV2 = false)
 
-        assertTrue(shell.pump().isEmpty())
-        assertEquals(listOf(AdbShellEvent.Output("ёж")), shell.pump())
+        assertEquals(listOf(AdbShellEvent.Opened, AdbShellEvent.Output("ёж")), shell.collect(expected = 2))
     }
 
     @Test
@@ -123,11 +142,11 @@ class AdbInteractiveShellTest {
             okay(),
             write(AdbShellProtocol.encode(AdbShellProtocol.ID_EXIT, byteArrayOf(7))),
         )
-        val shell = device.opened()
+        val shell = device.opening()
 
-        val events = shell.pump()
+        val events = shell.collect(expected = 2)
 
-        assertEquals(listOf(AdbShellEvent.Exited(7)), events)
+        assertEquals(listOf(AdbShellEvent.Opened, AdbShellEvent.Exited(7)), events)
         assertFalse(shell.active)
     }
 
@@ -138,8 +157,8 @@ class AdbInteractiveShellTest {
             okay(),
             write(AdbShellProtocol.encode(AdbShellProtocol.ID_EXIT, byteArrayOf(0))),
         )
-        val shell = device.opened()
-        shell.pump()
+        val shell = device.opening()
+        shell.collect(expected = 2)
         val sentAfterExit = device.handle.sentFrames().size
 
         assertTrue(shell.pump().isEmpty())
@@ -222,11 +241,11 @@ class AdbInteractiveShellTest {
     @Test
     fun deviceClosingTheStreamEndsTheSessionWithoutACode() {
         val device = Device(okay(), close())
-        val shell = device.opened()
+        val shell = device.opening()
 
-        val events = shell.pump()
+        val events = shell.collect(expected = 2)
 
-        assertEquals(listOf(AdbShellEvent.Exited(null)), events)
+        assertEquals(listOf(AdbShellEvent.Opened, AdbShellEvent.Exited(null)), events)
         assertFalse(shell.active)
     }
 
@@ -238,23 +257,24 @@ class AdbInteractiveShellTest {
             write(AdbShellProtocol.encode(AdbShellProtocol.ID_STDOUT, "bye".toByteArray())),
             close(),
         )
-        val shell = device.opened()
-        val output = shell.pump()
+        val shell = device.opening()
 
-        val closing = shell.pump()
+        val events = shell.collect(expected = 3)
 
-        assertEquals(listOf(AdbShellEvent.Output("bye")), output)
-        assertEquals(listOf(AdbShellEvent.Exited(null)), closing)
+        assertEquals(
+            listOf(AdbShellEvent.Opened, AdbShellEvent.Output("bye"), AdbShellEvent.Exited(null)),
+            events,
+        )
     }
 
     @Test
     fun lostTransportBreaksTheSession() {
         val device = Device(okay(), failed(UsbTransferFailure.NOT_HELD))
-        val shell = device.opened()
+        val shell = device.opening()
 
-        val events = shell.pump()
+        val events = shell.collect(expected = 2)
 
-        assertTrue((events.single() as AdbShellEvent.Broken).reason.contains("transport"))
+        assertTrue((events.last() as AdbShellEvent.Broken).reason.contains("transport"))
         assertFalse(shell.active)
     }
 
@@ -264,11 +284,11 @@ class AdbInteractiveShellTest {
             okay(),
             write(byteArrayOf(1, 0xFF.toByte(), 0xFF.toByte(), 0xFF.toByte(), 0x7F)),
         )
-        val shell = device.opened()
+        val shell = device.opening()
 
-        val events = shell.pump()
+        val events = shell.collect(expected = 2)
 
-        assertTrue(events.single() is AdbShellEvent.Broken)
+        assertTrue(events.last() is AdbShellEvent.Broken)
         assertFalse(shell.active)
     }
 
@@ -278,7 +298,7 @@ class AdbInteractiveShellTest {
         val device = Device(okay(), silence())
         val shell = device.opened()
 
-        assertTrue(shell.pump().isEmpty())
+        assertTrue(shell.collectNothing().isEmpty())
         assertTrue(shell.active)
     }
 
@@ -300,32 +320,91 @@ class AdbInteractiveShellTest {
             write(AdbShellProtocol.encode(AdbShellProtocol.ID_EXIT, ByteArray(0))),
         )
 
-        val events = device.opened().pump()
+        val events = device.opening().collect(expected = 2)
 
-        assertNull((events.single() as AdbShellEvent.Exited).code)
+        assertEquals(listOf(AdbShellEvent.Opened), events.dropLast(1))
+        assertNull((events.last() as AdbShellEvent.Exited).code)
     }
 
-    private class Device(vararg responses: List<FakeUsbTransportHandle.Transfer>) {
-        val handle = FakeUsbTransportHandle(inbound = responses.flatMap { it }.toMutableList())
+    /**
+     * Копит события, пока их не наберётся [expected] или не выйдет время.
+     *
+     * Лишнее событие сверх ожидаемого проверку не спасает: сравнение списков
+     * такое расхождение покажет.
+     */
+    private fun AdbInteractiveShell.collect(
+        expected: Int,
+        timeoutMillis: Long = COLLECT_TIMEOUT_MS,
+    ): List<AdbShellEvent> {
+        val events = mutableListOf<AdbShellEvent>()
+        val deadline = System.nanoTime() + timeoutMillis * NANOS_PER_MILLI
+        while (events.size < expected && System.nanoTime() < deadline && active) {
+            events += pump(STEP_MS)
+        }
+        return events
+    }
+
+    /** Убеждается, что за отведённое время ничего не пришло. */
+    private fun AdbInteractiveShell.collectNothing(): List<AdbShellEvent> {
+        val events = mutableListOf<AdbShellEvent>()
+        repeat(QUIET_STEPS) { events += pump(STEP_MS) }
+        return events
+    }
+
+    private inner class Device(vararg responses: List<FakeUsbTransportHandle.Transfer>) {
+        val handle = FakeUsbTransportHandle(
+            inbound = responses.flatMap { it }.toMutableList(),
+            answerOnlyAfterRequest = true,
+        )
+
+        private val harness = harnesses.start(handle)
 
         fun shell(useShellV2: Boolean) = AdbInteractiveShell(
-            reader = AdbPacketReader(handle, AdbInboundFraming.MODERN_MAX_PAYLOAD_BYTES),
-            writer = AdbPacketWriter(handle),
-            dispatcher = AdbStreamDispatcher(),
+            writer = harness.writer,
+            dispatcher = harness.dispatcher,
             useShellV2 = useShellV2,
         )
 
-        /** Открытая и подтверждённая сессия: первый шаг съедает `OKAY`. */
+        /**
+         * Открытая и подтверждённая сессия.
+         *
+         * Подтверждения приходится **дожидаться**: раньше первый `pump` сам
+         * читал `OKAY` и потому не мог его не увидеть, а теперь его кладёт в
+         * ящик цикл раскладки, и успел он или нет — вопрос планировщика.
+         */
+        /**
+         * Открытая, но ещё не разобранная сессия.
+         *
+         * Нужна там, где за подтверждением сразу идёт вывод: цикл раскладки
+         * кладёт в ящик всё сразу, один шаг забирает всё лежащее, и [opened]
+         * съел бы вместе с подтверждением то, ради чего тест написан. Поэтому
+         * такие тесты проверяют **всю** последовательность, начиная с
+         * [AdbShellEvent.Opened].
+         */
+        fun opening(useShellV2: Boolean = true): AdbInteractiveShell =
+            shell(useShellV2).also { shell -> shell.open() }
+
         fun opened(useShellV2: Boolean = true): AdbInteractiveShell =
             shell(useShellV2).also { shell ->
                 shell.open()
-                shell.pump()
+                shell.collect(expected = 1)
             }
     }
 
     private companion object {
         const val REMOTE_ID = 42
         const val LOCAL_ID = 1
+
+        /** Сколько ждать события, которое обязано прийти. */
+        const val COLLECT_TIMEOUT_MS = 5_000L
+
+        /** Шаг ожидания: короткий, чтобы накопление не спало лишнего. */
+        const val STEP_MS = 25
+
+        /** Сколько шагов тишины считать достаточным доказательством тишины. */
+        const val QUIET_STEPS = 4
+
+        const val NANOS_PER_MILLI = 1_000_000L
 
         fun packet(
             command: Long,

@@ -27,9 +27,18 @@ public sealed interface AdbWriteOutcome {
 /**
  * Отправка кадров ADB в единственный поток записи.
  *
- * Экземпляр не сериализует вызовы: два одновременных отправителя перемешали бы
- * кадры. Владелец транспорта обязан сделать запись последовательной — так же
- * это решено в A2 (`adbWriteLock`).
+ * Экземпляр **сериализует** отправку сам: [write] берёт замок на всё время
+ * кадра. Раньше это было обязанностью владельца транспорта, как `adbWriteLock`
+ * в A2, и до постоянного читающего цикла работало — писали либо reader
+ * executor, либо writer executor оболочки, а оболочка держала свой замок.
+ * С приходом цикла (`docs/adr/0004_CONCURRENT_ADB_DISPATCHER_RU.md`, шаг 5)
+ * появился третий пишущий: цикл подтверждает принятые блоки. Требовать
+ * сериализации от владельца стало нельзя — цикл принадлежит соединению, а не
+ * ему, и владелец не может обернуть замком то, чего не запускал.
+ *
+ * Замок нужен не только ради порядка кадров: [headerBuffer] один на экземпляр,
+ * и два отправителя затёрли бы друг другу заголовок, отправив устройству
+ * мусор с правильной контрольной суммой.
  *
  * Кадр уходит как заголовок и следом payload. Обе части дописываются до конца
  * кусками не больше [USB_BULK_CHUNK_BYTES]: в сторону хост → устройство это
@@ -42,6 +51,9 @@ public class AdbPacketWriter(
     private val localVersion: Int = AdbChecksum.VERSION_WITH_CHECKSUM,
 ) {
     private val headerBuffer = ByteArray(AdbPacketHeader.SIZE_BYTES)
+
+    /** Кадр уходит целиком или не уходит: чужой отправитель в середину не влезет. */
+    private val writeLock = Any()
 
     /**
      * Версия протокола peer'а: определяет, считается ли контрольная сумма.
@@ -70,7 +82,7 @@ public class AdbPacketWriter(
         arg1: Int,
         payload: ByteArray = EMPTY_PAYLOAD,
         timeoutMillis: Int = DEFAULT_SEND_TIMEOUT_MS,
-    ): AdbWriteOutcome {
+    ): AdbWriteOutcome = synchronized(writeLock) {
         val checksum = if (AdbChecksum.isRequired(localVersion, peerVersion)) {
             AdbChecksum.compute(payload)
         } else {
@@ -79,7 +91,7 @@ public class AdbPacketWriter(
         AdbPacketHeader.encode(headerBuffer, command, arg0, arg1, payload, checksum)
 
         val header = sendFully(headerBuffer, headerBuffer.size, 0, timeoutMillis)
-        return when {
+        when {
             header !is AdbWriteOutcome.Sent -> header
             payload.isEmpty() -> AdbWriteOutcome.Sent
             else -> sendFully(payload, payload.size, headerBuffer.size, timeoutMillis)

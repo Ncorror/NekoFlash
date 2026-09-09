@@ -70,15 +70,13 @@ public sealed interface AdbServiceOutcome {
  * Чужие пакеты, подтверждения и раскладку по потокам знает
  * [AdbStreamDispatcher]; здесь остаётся время, предел и сбор вывода.
  *
- * **Пакеты пока подаёт этот же поток.** Приём, `dispatch` и разбор ящика идут
- * друг за другом в [Call.step]. Одновременности отсюда ещё не появляется, и
- * заявлять её нечем: постоянный цикл переезжает в `AdbConnection` шагом 5, и
- * только тогда ожидание здесь станет ожиданием **на ящике**. Раньше его
- * заводить нельзя — пока `AdbInteractiveShell` и `AdbSyncExchange` читают
- * транспорт сами, второй читающий цикл нарушил бы `03` §4.
+ * **Транспорт этот класс не читает.** Ящик наполняет [AdbDispatchLoop], один
+ * на соединение, и вызов просто ждёт на своём ящике (шаг 5 того же плана).
+ * Отсюда и берётся одновременность: пока ждёт этот вызов, рядом может ждать
+ * оболочка или файловая операция — каждый на своём ящике, а читатель
+ * по-прежнему один.
  */
 public class AdbServiceCall(
-    private val reader: AdbPacketReader,
     private val writer: AdbPacketWriter,
     private val dispatcher: AdbStreamDispatcher,
     private val diagnostics: DiagnosticSink = DiagnosticSink { },
@@ -175,56 +173,30 @@ public class AdbServiceCall(
             return outcome
         }
 
-        /** Один шаг: подкачать пакет и разобрать всё, что легло в ящик. */
+        /**
+         * Один шаг: дождаться содержимого ящика и разобрать его.
+         *
+         * Ожидание нарезано на куски не длиннее [PACKET_TIMEOUT_MS], чтобы
+         * дедлайн проверялся, даже когда сервис молчит.
+         */
         private fun step(): AdbServiceOutcome? {
             val remaining = remainingMillis()
             return if (remaining <= 0) {
                 abandon(mailbox.localId, failure(AdbServiceFailure.TIMED_OUT, "service=$service"))
             } else {
-                pump(remaining) ?: drain()
+                await(remaining)
             }
         }
 
         /**
-         * Принимает один пакет и отдаёт его диспетчеру.
+         * Ждёт первое событие, потом забирает всё, что уже лежит рядом.
          *
-         * Беды транспорта не превращаются в исход прямо здесь: они закрывают
-         * ящики, а исход из ящика достаёт [drain]. Так у вызова одно место, где
-         * решается, чем всё кончилось, и принятое до обрыва не теряется.
+         * `null` означает «за отведённый кусок ничего не пришло»: решает
+         * дедлайн, а не одна неудачная попытка.
          */
-        private fun pump(remainingMillis: Int): AdbServiceOutcome? =
-            when (val read = reader.read(remainingMillis.coerceAtMost(PACKET_TIMEOUT_MS))) {
-                is AdbReadOutcome.Received -> sendOutbound(dispatcher.dispatch(read.packet))
-
-                // Тишина — обычное состояние ожидания: сервис думает. Решает
-                // дедлайн, а не одна неудачная попытка приёма.
-                AdbReadOutcome.Idle -> null
-
-                AdbReadOutcome.Closed -> {
-                    dispatcher.abandonAll(AdbMailboxEnd.TRANSPORT_CLOSED, "service=$service")
-                    null
-                }
-
-                is AdbReadOutcome.Failed -> {
-                    dispatcher.abandonAll(
-                        AdbMailboxEnd.FRAMING_LOST,
-                        "service=$service ${read.reason.name} ${read.detail}",
-                    )
-                    null
-                }
-            }
-
-        private fun sendOutbound(outbound: List<AdbOutboundPacket>): AdbServiceOutcome? {
-            var failed: AdbServiceOutcome.Failed? = null
-            for (packet in outbound) {
-                if (failed == null) failed = send(packet)
-            }
-            return failed?.let { abandon(mailbox.localId, it) }
-        }
-
-        /** Забирает из ящика всё, что уже пришло. `null` — ждём дальше. */
-        private fun drain(): AdbServiceOutcome? {
-            var outcome: AdbServiceOutcome? = null
+        private fun await(remainingMillis: Int): AdbServiceOutcome? {
+            var outcome = mailbox.poll(remainingMillis.coerceAtMost(PACKET_TIMEOUT_MS).toLong())
+                ?.let { item -> consume(item) }
             while (outcome == null) {
                 val item = mailbox.poll(0) ?: break
                 outcome = consume(item)

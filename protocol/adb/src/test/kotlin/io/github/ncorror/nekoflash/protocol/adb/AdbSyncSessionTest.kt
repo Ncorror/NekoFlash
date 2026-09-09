@@ -6,9 +6,17 @@ import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.After
 import org.junit.Test
 
 class AdbSyncSessionTest {
+    private val harnesses = AdbDispatchHarnesses()
+
+    @After
+    fun stopDispatchLoops() {
+        harnesses.stopAll()
+    }
+
     @Test
     fun openAsksForTheSyncService() {
         val device = Device(okay())
@@ -268,13 +276,17 @@ class AdbSyncSessionTest {
         assertEquals("/sdcard/nf-w3.bin", stat.fields["path"])
     }
 
-    private class Device(vararg responses: List<FakeUsbTransportHandle.Transfer>) {
-        val handle = FakeUsbTransportHandle(inbound = responses.flatMap { it }.toMutableList())
+    private inner class Device(vararg responses: List<FakeUsbTransportHandle.Transfer>) {
+        val handle = FakeUsbTransportHandle(
+            inbound = responses.flatMap { it }.toMutableList(),
+            answerOnlyAfterRequest = true,
+        )
+
+        private val harness = harnesses.start(handle)
 
         fun session(diagnostics: InMemoryDiagnosticSink = InMemoryDiagnosticSink()) = AdbSyncSession(
-            reader = AdbPacketReader(handle, AdbInboundFraming.MODERN_MAX_PAYLOAD_BYTES),
-            writer = AdbPacketWriter(handle),
-            dispatcher = AdbStreamDispatcher(),
+            writer = harness.writer,
+            dispatcher = harness.dispatcher,
             diagnostics = diagnostics,
             elapsedNanos = StepwiseClock(),
         )

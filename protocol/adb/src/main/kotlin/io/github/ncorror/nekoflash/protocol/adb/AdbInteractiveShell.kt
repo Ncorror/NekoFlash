@@ -51,7 +51,6 @@ public sealed interface AdbShellEvent {
  * кода возврата; так же выбирает Legacy.
  */
 public class AdbInteractiveShell(
-    private val reader: AdbPacketReader,
     private val writer: AdbPacketWriter,
     private val dispatcher: AdbStreamDispatcher,
     private val useShellV2: Boolean,
@@ -69,9 +68,9 @@ public class AdbInteractiveShell(
     /**
      * Ящик открытого потока.
      *
-     * Шаг 4 плана `docs/adr/0004_CONCURRENT_ADB_DISPATCHER_RU.md`. Пакеты в
-     * диспетчер по-прежнему подаёт [pump], то есть цикл владельца: постоянный
-     * цикл переезжает в `AdbConnection` шагом 5.
+     * Ящик наполняет `AdbDispatchLoop`, один на соединение
+     * (`docs/adr/0004_CONCURRENT_ADB_DISPATCHER_RU.md`). Сессия транспорт не
+     * читает: [pump] ждёт на ящике.
      */
     private var mailbox: AdbStreamMailbox? = null
 
@@ -138,20 +137,20 @@ public class AdbInteractiveShell(
     }
 
     /**
-     * Один шаг: принять то, что пришло, и разобрать.
+     * Один шаг: дождаться того, что пришло, и разобрать.
      *
-     * [timeoutMillis] короткий намеренно: цикл должен возвращать управление,
-     * даже когда устройство молчит, иначе остановить сессию можно будет только
-     * закрытием транспорта. Значение из Legacy.
+     * [timeoutMillis] короткий намеренно: цикл владельца должен получать
+     * управление, даже когда оболочка молчит, иначе остановить сессию можно
+     * будет только закрытием транспорта. Значение из Legacy.
      */
     public fun pump(timeoutMillis: Int = PUMP_TIMEOUT_MS): List<AdbShellEvent> {
         if (!active) return emptyList()
 
-        // Ожидание снаружи замка: пока идёт приём, ввод должен уходить без
-        // задержки.
-        val outcome = reader.read(timeoutMillis)
+        // Ожидание снаружи замка: пока сессия ждёт вывод, ввод должен уходить
+        // без задержки. Замок берётся только на разбор принятого.
+        val first = mailbox?.poll(timeoutMillis.toLong())
         return synchronized(lock) {
-            if (finished) emptyList() else receive(outcome)
+            if (finished || first == null) emptyList() else drainMailbox(first)
         }
     }
 
@@ -164,34 +163,14 @@ public class AdbInteractiveShell(
     }
 
     /**
-     * Отдаёт принятое диспетчеру и разбирает свой ящик.
+     * Разбирает дождавшееся событие и всё, что уже лежит рядом с ним.
      *
-     * Вызывается уже под замком. Беды транспорта не превращаются в событие
-     * прямо здесь: они закрывают ящики, а разбор конца остаётся один — в
-     * [applyEnd].
+     * Вызывается уже под замком.
      */
-    private fun receive(outcome: AdbReadOutcome): List<AdbShellEvent> {
-        when (outcome) {
-            // Тишина — обычное состояние оболочки, которая ждёт ввода.
-            AdbReadOutcome.Idle -> Unit
-
-            AdbReadOutcome.Closed ->
-                dispatcher.abandonAll(AdbMailboxEnd.TRANSPORT_CLOSED, "transport closed")
-
-            is AdbReadOutcome.Failed -> dispatcher.abandonAll(
-                AdbMailboxEnd.FRAMING_LOST,
-                "${outcome.reason.name} ${outcome.detail}",
-            )
-
-            is AdbReadOutcome.Received -> dispatcher.dispatch(outcome.packet).forEach(::send)
-        }
-        return drainMailbox()
-    }
-
-    private fun drainMailbox(): List<AdbShellEvent> {
+    private fun drainMailbox(first: AdbMailboxItem): List<AdbShellEvent> {
         val box = mailbox ?: return emptyList()
         val events = mutableListOf<AdbShellEvent>()
-        var terminal: List<AdbShellEvent>? = null
+        var terminal = applyItem(first, events)
         while (terminal == null) {
             val item = box.poll(0) ?: break
             terminal = applyItem(item, events)

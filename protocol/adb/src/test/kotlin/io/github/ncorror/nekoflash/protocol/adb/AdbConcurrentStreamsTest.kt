@@ -5,6 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.After
 import org.junit.Test
 
 /**
@@ -16,6 +17,13 @@ import org.junit.Test
  * до сих пор поток всегда был один.
  */
 class AdbConcurrentStreamsTest {
+    private val harnesses = AdbDispatchHarnesses()
+
+    @After
+    fun stopDispatchLoops() {
+        harnesses.stopAll()
+    }
+
     @Test
     fun outputOfTwoStreamsIsNotMixed() {
         val session = TwoStreams()
@@ -145,21 +153,29 @@ class AdbConcurrentStreamsTest {
         inbound += transfers(AdbCommand.OKAY, arg0 = 42, arg1 = 1)
         inbound += transfers(AdbCommand.WRTE, arg0 = 99, arg1 = 77, payload = foreign)
         inbound += transfers(AdbCommand.WRTE, arg0 = 42, arg1 = 1, payload = mine)
-        val handle = FakeUsbTransportHandle(inbound = inbound)
+        val handle = FakeUsbTransportHandle(inbound = inbound, answerOnlyAfterRequest = true)
+        val harness = harnesses.start(handle)
         val shell = AdbInteractiveShell(
-            reader = AdbPacketReader(handle, AdbInboundFraming.MODERN_MAX_PAYLOAD_BYTES),
-            writer = AdbPacketWriter(handle),
-            dispatcher = AdbStreamDispatcher(),
+            writer = harness.writer,
+            dispatcher = harness.dispatcher,
             useShellV2 = true,
         )
         shell.open()
-        shell.pump()
 
-        val foreignStep = shell.pump()
-        val mineStep = shell.pump()
+        // Утверждение о **накопленном**, а не о шаге: приём крутит цикл
+        // раскладки, и сколько событий успело лечь в ящик к моменту шага —
+        // вопрос планировщика. Существенно здесь то, что вывода чужого потока
+        // в этой последовательности нет вовсе.
+        val events = mutableListOf<AdbShellEvent>()
+        val deadline = System.nanoTime() + COLLECT_TIMEOUT_MS * NANOS_PER_MILLI
+        while (events.size < EXPECTED_EVENTS && System.nanoTime() < deadline && shell.active) {
+            events += shell.pump(STEP_MS)
+        }
 
-        assertTrue("чужой поток не должен давать вывод", foreignStep.isEmpty())
-        assertEquals(listOf(AdbShellEvent.Output("mine")), mineStep)
+        assertEquals(
+            listOf(AdbShellEvent.Opened, AdbShellEvent.Output("mine")),
+            events,
+        )
         assertTrue(shell.active)
     }
 
@@ -187,6 +203,13 @@ class AdbConcurrentStreamsTest {
     }
 
     private companion object {
+        /** Подтверждение открытия и собственный вывод — больше ничему взяться неоткуда. */
+        const val EXPECTED_EVENTS = 2
+
+        const val COLLECT_TIMEOUT_MS = 5_000L
+        const val STEP_MS = 25
+        const val NANOS_PER_MILLI = 1_000_000L
+
         fun packet(command: Long, arg0: Int, arg1: Int, payload: ByteArray = ByteArray(0)) =
             AdbPacket(command, arg0, arg1, payload)
 

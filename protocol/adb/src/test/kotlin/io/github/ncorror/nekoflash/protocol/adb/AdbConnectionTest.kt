@@ -83,21 +83,40 @@ class AdbConnectionTest {
         val handle = FakeUsbTransportHandle(
             inbound = mutableListOf(
                 *serviceExchange(localId = 1, output = "first"),
+                // Ответы второго вызова придерживаются до его запроса: иначе
+                // цикл раскладки вычитал бы их, пока второго потока ещё нет.
+                FakeUsbTransportHandle.Transfer.Gate(minimumFrames = OPENS_AND_ACKS_BEFORE_SECOND),
                 *serviceExchange(localId = 2, output = "second"),
             ),
+            answerOnlyAfterRequest = true,
         )
         val connection = AdbConnection(handle, keyStore, apiLevel = 36)
 
-        val first = connection.call("shell:one") as AdbServiceOutcome.Completed
-        val second = connection.call("shell:two") as AdbServiceOutcome.Completed
+        try {
+            val first = connection.call("shell:one") as AdbServiceOutcome.Completed
+            val second = connection.call("shell:two") as AdbServiceOutcome.Completed
 
-        assertEquals("first", first.text())
-        assertEquals("second", second.text())
-        val opens = handle.sentFrames().filter { it.command == AdbCommand.OPEN }
-        assertEquals(listOf(1, 2), opens.map { it.arg0 })
+            assertEquals("first", first.text())
+            assertEquals("second", second.text())
+            val opens = handle.sentFrames().filter { it.command == AdbCommand.OPEN }
+            assertEquals(listOf(1, 2), opens.map { it.arg0 })
+        } finally {
+            // Цикл раскладки принадлежит соединению: не закрыв его, тест
+            // оставил бы за собой крутящийся поток.
+            connection.close()
+        }
     }
 
     private companion object {
+        /**
+         * Сколько кадров уходит до запроса второго вызова.
+         *
+         * `OPEN` первого, подтверждение его вывода, `CLSE` при закрытии и
+         * `OPEN` второго — четвёртый кадр и есть тот запрос, после которого
+         * второму вызову можно отвечать.
+         */
+        const val OPENS_AND_ACKS_BEFORE_SECOND = 4
+
         val BANNER = "recovery::ro.product.name=vayu\u0000".toByteArray()
 
         /** Полный обмен одного сервиса: подтверждение, вывод, закрытие. */

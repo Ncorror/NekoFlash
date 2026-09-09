@@ -2,6 +2,13 @@ package io.github.ncorror.nekoflash.protocol.adb
 
 import io.github.ncorror.nekoflash.core.diagnostics.DiagnosticSink
 import io.github.ncorror.nekoflash.usb.api.UsbTransportHandle
+import kotlinx.coroutines.CoroutineName
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 /**
  * Одно ADB-соединение поверх одного захваченного интерфейса.
@@ -43,8 +50,49 @@ public class AdbConnection(
      */
     private val dispatcher = AdbStreamDispatcher()
 
+    private val dispatchLoop = AdbDispatchLoop(reader, writer, dispatcher)
+
+    /**
+     * Scope цикла принадлежит соединению.
+     *
+     * ADR-0003 §2 требует, чтобы каждый запуск принадлежал явному scope, живущему
+     * не дольше своей `SessionGeneration`. Соединение одноразовое и кончается
+     * вместе с захватом интерфейса, поэтому его scope — ровно та граница.
+     */
+    private val dispatchScope = CoroutineScope(
+        SupervisorJob() + Dispatchers.IO + CoroutineName("adb-dispatch"),
+    )
+
+    private val dispatchLock = Any()
+    private var dispatchJob: Job? = null
+
+    /**
+     * Поднимает цикл раскладки, если он ещё не работает.
+     *
+     * Запуск отложен до первой потоковой операции намеренно (`ADR-0004` §3):
+     * `CNXN`/`AUTH` читает [connect] сам, логических потоков до рукопожатия не
+     * существует, и работающий рядом цикл был бы вторым физическим читателем.
+     */
+    private fun ensureDispatching() {
+        synchronized(dispatchLock) {
+            if (dispatchJob == null) {
+                dispatchJob = dispatchScope.launch { dispatchLoop.run() }
+            }
+        }
+    }
+
+    /**
+     * Останавливает цикл и закрывает ящики.
+     *
+     * Соединение одноразовое: заново цикл не поднимется, а следующее соединение
+     * — это новый захват интерфейса.
+     */
+    public fun close() {
+        dispatchLoop.stop()
+        dispatchScope.cancel()
+    }
+
     private val services = AdbServiceCall(
-        reader = reader,
         writer = writer,
         dispatcher = dispatcher,
         diagnostics = diagnostics,
@@ -102,6 +150,7 @@ public class AdbConnection(
         maxOutputBytes: Int = AdbServiceCall.DEFAULT_MAX_OUTPUT_BYTES,
         timeoutMillis: Int = AdbServiceCall.DEFAULT_TIMEOUT_MS,
     ): AdbShellOutcome {
+        ensureDispatching()
         val shellV2 = if (supportsShellV2) {
             shellV2(command, maxOutputBytes, timeoutMillis)
         } else {
@@ -156,7 +205,10 @@ public class AdbConnection(
         service: String,
         maxOutputBytes: Int = AdbServiceCall.DEFAULT_MAX_OUTPUT_BYTES,
         timeoutMillis: Int = AdbServiceCall.DEFAULT_TIMEOUT_MS,
-    ): AdbServiceOutcome = services.run(service, maxOutputBytes, timeoutMillis)
+    ): AdbServiceOutcome {
+        ensureDispatching()
+        return services.run(service, maxOutputBytes, timeoutMillis)
+    }
 
     /**
      * Открывает живую оболочку.
@@ -167,14 +219,15 @@ public class AdbConnection(
      * проверяется, потому что проверять пришлось бы состояние чужого потока
      * исполнения.
      */
-    public fun interactiveShell(diagnostics: DiagnosticSink = DiagnosticSink { }): AdbInteractiveShell =
-        AdbInteractiveShell(
-            reader = reader,
+    public fun interactiveShell(diagnostics: DiagnosticSink = DiagnosticSink { }): AdbInteractiveShell {
+        ensureDispatching()
+        return AdbInteractiveShell(
             writer = writer,
             dispatcher = dispatcher,
             useShellV2 = supportsShellV2,
             diagnostics = diagnostics,
         )
+    }
 
     /**
      * Открывает сессию сервиса `sync:`.
@@ -183,13 +236,14 @@ public class AdbConnection(
      * время работы. Владелец соединения обязан не допускать одновременных
      * вызовов.
      */
-    public fun syncSession(diagnostics: DiagnosticSink = DiagnosticSink { }): AdbSyncSession =
-        AdbSyncSession(
-            reader = reader,
+    public fun syncSession(diagnostics: DiagnosticSink = DiagnosticSink { }): AdbSyncSession {
+        ensureDispatching()
+        return AdbSyncSession(
             writer = writer,
             dispatcher = dispatcher,
             diagnostics = diagnostics,
         )
+    }
 
     private companion object {
         const val SHELL_V2_FEATURE = "shell_v2"

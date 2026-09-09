@@ -5,6 +5,7 @@ import io.github.ncorror.nekoflash.usb.api.UsbTransferFailure
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
+import org.junit.After
 import org.junit.Test
 
 /**
@@ -14,6 +15,13 @@ import org.junit.Test
  * назначения говорится ровно столько, сколько доказано.
  */
 class AdbSyncSendTest {
+    private val harnesses = AdbDispatchHarnesses()
+
+    @After
+    fun stopDispatchLoops() {
+        harnesses.stopAll()
+    }
+
     @Test
     fun requestCarriesPathAndModeSeparatedByComma() {
         val device = Device(okay(), verdict(AdbSyncProtocol.ID_OKAY))
@@ -133,7 +141,10 @@ class AdbSyncSendTest {
 
     @Test
     fun transportLossAfterTheRequestLeavesTheDestinationUnknown() {
-        val device = Device(okay(), close())
+        // Условие держит `CLSE` до тех пор, пока запрос `SEND` не ушёл: без
+        // него цикл раскладки вычитал бы закрытие раньше запроса, и проверялся
+        // бы не обрыв после границы мутации, а отказ до неё.
+        val device = Device(okay(), gate(afterFrames = 2), close())
 
         val outcome = device.opened()
             .send("/sdcard/a.bin", 1, source = once(byteArrayOf(1))) as AdbSyncSendOutcome.Failed
@@ -275,7 +286,7 @@ class AdbSyncSendTest {
     @Test
     fun diagnosticsNameTheDestinationStateOnFailure() {
         val sink = InMemoryDiagnosticSink()
-        val device = Device(okay(), close())
+        val device = Device(okay(), gate(afterFrames = 2), close())
         val session = device.session(sink)
         session.open()
 
@@ -285,7 +296,7 @@ class AdbSyncSendTest {
         assertEquals(AdbSyncDestination.UNKNOWN.name, failure.fields["destination"])
     }
 
-    private class Device(
+    private inner class Device(
         inbound: List<List<FakeUsbTransportHandle.Transfer>>,
         outbound: List<FakeUsbTransportHandle.Transfer>,
     ) {
@@ -295,12 +306,14 @@ class AdbSyncSendTest {
         val handle = FakeUsbTransportHandle(
             inbound = inbound.flatten().toMutableList(),
             outbound = outbound.toMutableList(),
+            answerOnlyAfterRequest = true,
         )
 
+        private val harness = harnesses.start(handle)
+
         fun session(diagnostics: InMemoryDiagnosticSink = InMemoryDiagnosticSink()) = AdbSyncSession(
-            reader = AdbPacketReader(handle, AdbInboundFraming.MODERN_MAX_PAYLOAD_BYTES),
-            writer = AdbPacketWriter(handle),
-            dispatcher = AdbStreamDispatcher(),
+            writer = harness.writer,
+            dispatcher = harness.dispatcher,
             diagnostics = diagnostics,
             elapsedNanos = StepwiseClock(),
         )
@@ -377,6 +390,10 @@ class AdbSyncSendTest {
         fun okay() = packet(AdbCommand.OKAY)
 
         fun data(payload: ByteArray) = packet(AdbCommand.WRTE, payload = payload)
+
+        /** Условие: следующее отдаётся, когда host отправил столько кадров. */
+        fun gate(afterFrames: Int) =
+            listOf<FakeUsbTransportHandle.Transfer>(FakeUsbTransportHandle.Transfer.Gate(afterFrames))
 
         fun close() = packet(AdbCommand.CLSE)
 

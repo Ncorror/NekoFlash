@@ -4,9 +4,17 @@ import io.github.ncorror.nekoflash.core.diagnostics.InMemoryDiagnosticSink
 import io.github.ncorror.nekoflash.usb.api.UsbTransferFailure
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.After
 import org.junit.Test
 
 class AdbServiceCallTest {
+    private val harnesses = AdbDispatchHarnesses()
+
+    @After
+    fun stopDispatchLoops() {
+        harnesses.stopAll()
+    }
+
     @Test
     fun serviceOutputIsCollectedUntilTheStreamCloses() {
         val device = ScriptedDevice(
@@ -233,18 +241,26 @@ class AdbServiceCallTest {
         }
     }
 
-    private class ScriptedDevice(vararg responses: List<FakeUsbTransportHandle.Transfer>) {
+    /**
+     * Записанный ответ устройства с работающим циклом раскладки.
+     *
+     * Ответы отдаются только после первого вопроса: цикл начинает читать
+     * раньше, чем вызов успевает открыть поток.
+     */
+    private inner class ScriptedDevice(vararg responses: List<FakeUsbTransportHandle.Transfer>) {
         val handle = FakeUsbTransportHandle(
             inbound = responses.flatMap { it }.toMutableList(),
+            answerOnlyAfterRequest = true,
         )
+
+        private val harness = harnesses.start(handle)
 
         fun call(
             diagnostics: InMemoryDiagnosticSink = InMemoryDiagnosticSink(),
             elapsed: (() -> Long)? = null,
         ) = AdbServiceCall(
-            reader = AdbPacketReader(handle, AdbInboundFraming.MODERN_MAX_PAYLOAD_BYTES),
-            writer = AdbPacketWriter(handle),
-            dispatcher = AdbStreamDispatcher(),
+            writer = harness.writer,
+            dispatcher = harness.dispatcher,
             diagnostics = diagnostics,
             elapsedNanos = elapsed ?: { 0L },
         )

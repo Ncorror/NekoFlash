@@ -73,13 +73,9 @@ internal fun AdbLinkSection(
         style = MaterialTheme.typography.bodySmall,
     )
     if (connected) {
-        ShellSection(
-            command = adbCommand,
-            terminalActive = terminal.active,
-            onRunCommand = onRunCommand,
-        )
+        ShellSection(command = adbCommand, onRunCommand = onRunCommand)
         TerminalSection(terminal = terminal, actions = terminalActions)
-        FilesSection(files = files, actions = fileActions, enabled = !terminal.active)
+        FilesSection(files = files, actions = fileActions)
     }
 }
 
@@ -104,13 +100,15 @@ private const val LARGE_WRITE_BYTES = 16L * 1024L * 1024L
 /**
  * Операции с файлами устройства: проверка пути, чтение и запись.
  *
- * Пока открыта оболочка, они недоступны: читатель один. Кнопки гасятся, а не
- * ставятся в очередь — иначе нажатие выглядело бы как бездействие.
+ * Живая оболочка им больше не мешает: у каждой операции свой логический поток
+ * и свой ящик (`docs/adr/0004_CONCURRENT_ADB_DISPATCHER_RU.md`). Гасит кнопки
+ * только своя же незаконченная операция — показать два результата этот экран
+ * пока не умеет, и это ограничение вида, а не возможности.
  */
 @Composable
-private fun FilesSection(files: AdbFileState, actions: FileActions, enabled: Boolean) {
+private fun FilesSection(files: AdbFileState, actions: FileActions) {
     val path = remember { mutableStateOf("") }
-    val idle = enabled && files !is AdbFileState.Busy
+    val idle = files !is AdbFileState.Busy
 
     LabelledValue(label = stringResource(R.string.files_label), value = fileStateText(files))
     OutlinedTextField(
@@ -272,15 +270,18 @@ private fun TerminalSection(terminal: AdbTerminalState, actions: TerminalActions
  *
  * Показывается только у подключённого устройства: команда без соединения
  * никуда не уйдёт, а кнопка, которая ничего не делает, врёт о состоянии.
+ *
+ * Живая интерактивная оболочка команде больше не мешает: у неё свой логический
+ * поток. Гасит кнопку только предыдущая незаконченная команда — на экране один
+ * слот результата.
  */
 @Composable
 private fun ShellSection(
     command: AdbCommandState,
-    terminalActive: Boolean,
     onRunCommand: (String) -> Unit,
 ) {
     val input = remember { mutableStateOf("") }
-    val running = command is AdbCommandState.Running || terminalActive
+    val running = command is AdbCommandState.Running
 
     OutlinedTextField(
         value = input.value,

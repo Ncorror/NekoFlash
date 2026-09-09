@@ -18,7 +18,6 @@ import java.time.Instant
  * здесь, между «как разговаривать» и «о чём».
  */
 internal class AdbSyncExchange(
-    private val reader: AdbPacketReader,
     private val writer: AdbPacketWriter,
     private val dispatcher: AdbStreamDispatcher,
     private val diagnostics: DiagnosticSink,
@@ -31,8 +30,9 @@ internal class AdbSyncExchange(
      * Ящик открытого потока.
      *
      * `null` до открытия и после закрытия: ждать нечего, и спрашивать не у
-     * кого. Шаг 3 плана `docs/adr/0004_CONCURRENT_ADB_DISPATCHER_RU.md` —
-     * пакеты в диспетчер по-прежнему подаёт этот же поток, см. [pump].
+     * кого. Ящик наполняет `AdbDispatchLoop`, один на соединение
+     * (`docs/adr/0004_CONCURRENT_ADB_DISPATCHER_RU.md`), а сессия только ждёт
+     * на нём — транспорт она не читает.
      */
     private var mailbox: AdbStreamMailbox? = null
 
@@ -42,6 +42,16 @@ internal class AdbSyncExchange(
     /** Открыт ли поток. */
     val active: Boolean
         get() = opened
+
+    /**
+     * Почему потока больше нет. `null` — он и не открывался.
+     *
+     * С постоянным циклом раскладки конец обнаруживается **между** операциями
+     * сессии: цикл читает сам, а не по просьбе вызывающего. Ответить на
+     * следующую операцию безличным `NOT_OPEN`, зная, что устройство закрыло
+     * поток или что интерфейс отпущен, значило бы утаить известную причину.
+     */
+    fun endReason(): AdbSyncOutcome.Failed? = drain(0)
 
     /** Открывает сервис и ждёт подтверждения. */
     fun open(timeoutMillis: Int): AdbSyncOutcome<Unit> {
@@ -72,10 +82,17 @@ internal class AdbSyncExchange(
         localId = 0
     }
 
-    /** Отправляет запрос с путём. */
+    /**
+     * Отправляет запрос с путём.
+     *
+     * Если потока уже нет, отвечает **почему** его нет, а не безличным
+     * `NOT_OPEN`: с постоянным циклом раскладки конец потока обнаруживается
+     * между операциями сессии, и сказать оператору «сессия не открыта» вместо
+     * «устройство закрыло поток» значило бы утаить причину, которая известна.
+     */
     fun request(id: String, path: String): AdbSyncOutcome.Failed? {
         val packet = dispatcher.write(localId, AdbSyncProtocol.request(id, path))
-            ?: return failure(AdbSyncFailure.NOT_OPEN, "$id $path")
+            ?: return drain(0) ?: failure(AdbSyncFailure.NOT_OPEN, "$id $path")
         return sendPacket(packet)
     }
 
@@ -155,53 +172,30 @@ internal class AdbSyncExchange(
         }
 
     /**
-     * Один приём: принять пакет, отдать диспетчеру и разобрать свой ящик.
+     * Один шаг ожидания: дождаться содержимого ящика и разобрать его.
      *
      * Возвращает отказ, когда продолжать нельзя, и `null`, когда можно.
-     *
-     * Подкачивает этот же поток: постоянный цикл переезжает в `AdbConnection`
-     * шагом 5, и до него ящик наполнять некому. Беды транспорта здесь не
-     * становятся исходом сразу — они закрывают ящики, а отказ достаёт [drain].
-     * Так у сессии одно место, где решается, чем всё кончилось.
+     * Ожидание нарезано на куски не длиннее [READ_SLICE_MS], чтобы дедлайн
+     * проверялся, даже когда устройство молчит.
      */
     private fun pump(deadline: Long): AdbSyncOutcome.Failed? {
         val remaining = remainingMillis(deadline)
         return if (remaining <= 0) {
             failure(AdbSyncFailure.TIMED_OUT, "sync")
         } else {
-            receive(remaining)
-            drain()
+            drain(remaining.coerceAtMost(READ_SLICE_MS).toLong())
         }
     }
 
     /**
-     * Принимает один пакет.
+     * Ждёт первое событие, потом забирает всё, что уже лежит рядом.
      *
-     * Отказа не возвращает ни в одном случае: и обрыв, и потеря кадра
-     * закрывают ящики, а отказ из них достаёт [drain].
+     * `null` — можно продолжать: либо за отведённый кусок ничего не пришло,
+     * либо принятое разобрано и поток жив.
      */
-    private fun receive(remainingMillis: Int) {
-        when (val outcome = reader.read(remainingMillis.coerceAtMost(READ_SLICE_MS))) {
-            AdbReadOutcome.Idle -> Unit
-
-            AdbReadOutcome.Closed ->
-                dispatcher.abandonAll(AdbMailboxEnd.TRANSPORT_CLOSED, "sync")
-
-            is AdbReadOutcome.Failed -> dispatcher.abandonAll(
-                AdbMailboxEnd.FRAMING_LOST,
-                "${outcome.reason.name} ${outcome.detail}",
-            )
-
-            is AdbReadOutcome.Received -> dispatcher.dispatch(outcome.packet).forEach { outgoing ->
-                writer.write(outgoing.command, outgoing.arg0, outgoing.arg1, outgoing.payload)
-            }
-        }
-    }
-
-    /** Забирает из ящика всё, что уже пришло. `null` — можно продолжать. */
-    private fun drain(): AdbSyncOutcome.Failed? {
+    private fun drain(waitMillis: Long): AdbSyncOutcome.Failed? {
         val box = mailbox ?: return null
-        var failed: AdbSyncOutcome.Failed? = null
+        var failed = box.poll(waitMillis)?.let { item -> consume(item) }
         while (failed == null) {
             val item = box.poll(0) ?: break
             failed = consume(item)

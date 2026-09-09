@@ -75,14 +75,20 @@ public class NekoFlashApplication : Application() {
     private val adbKeys by lazy { AdbKeyStore(File(filesDir, ADB_KEY_FOLDER)) }
 
     /**
-     * Единственный поток чтения ADB.
+     * Потоки операций ADB.
      *
-     * Ровно один физический reader — протокольный инвариант. Запись этим же
-     * потоком не обязана выполняться: интерактивный ввод должен уходить, пока
-     * reader ждёт входящий пакет.
+     * Раньше здесь был **один** поток, и это был способ соблюсти инвариант
+     * единственного физического читателя: кто читает — тот и в очереди. После
+     * `docs/adr/0004_CONCURRENT_ADB_DISPATCHER_RU.md` транспорт читает цикл
+     * раскладки внутри `AdbConnection`, а операции ждут каждая на своём ящике
+     * и потому идут одновременно. Держать их в одной очереди значило бы
+     * сохранить ограничение, у которого больше нет причины.
+     *
+     * Рукопожатие по-прежнему единственное, но не из-за очереди: до его
+     * окончания соединения нет, а без соединения ни одна операция не начнётся.
      */
-    private val adbReaderThread by lazy {
-        Executors.newSingleThreadExecutor { runnable -> Thread(runnable, "nekoflash-adb-reader") }
+    private val adbOperationThreads by lazy {
+        Executors.newCachedThreadPool { runnable -> Thread(runnable, "nekoflash-adb-operation") }
     }
 
     /**
@@ -102,7 +108,7 @@ public class NekoFlashApplication : Application() {
             coordinator = usbSessions,
             keyStore = adbKeys,
             apiLevel = Build.VERSION.SDK_INT,
-            executor = adbReaderThread,
+            executor = adbOperationThreads,
             terminalWriterExecutor = adbWriterThread,
             diagnostics = events,
         )

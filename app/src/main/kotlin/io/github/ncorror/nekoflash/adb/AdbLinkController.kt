@@ -33,12 +33,17 @@ private fun isPresent(session: UsbSession): Boolean = !session.closed
  * рукопожатие живут вместе намеренно: удерживать исключительный ресурс без
  * протокольного обмена незачем, а обмен без удержания невозможен.
  *
- * Рукопожатия и одноразовые service calls идут на [executor] с
- * **единственным reader-потоком**. Это не деталь исполнения, а требование
- * контракта: физический читатель входящего потока должен быть один.
- * Интерактивные записи имеют отдельный последовательный writer executor, но
- * никогда не читают транспорт. Одновременно запущенные рукопожатия разрушили
- * бы кадр ещё до того, как появился бы маршрутизатор потоков.
+ * Рукопожатие идёт на [executor] и обязано быть единственным: оно читает
+ * транспорт само, до того как поднимется цикл раскладки. Два одновременных
+ * рукопожатия разрушили бы кадр ещё до того, как появился бы маршрутизатор
+ * потоков; порядок держится тем, что [connection] до конца рукопожатия пуст, а
+ * все операции без него ничего не делают.
+ *
+ * Дальше единственность читателя обеспечивает не этот класс, а `AdbConnection`
+ * со своим циклом раскладки (`docs/adr/0004_CONCURRENT_ADB_DISPATCHER_RU.md`).
+ * Поэтому операции больше не выстроены в одну очередь и не гасят друг друга:
+ * оболочка, файловая операция и одноразовая команда идут одновременно, каждая
+ * ждёт на своём ящике.
  *
  * Подключение происходит само, как только устройство готово: приложение
  * существует ради работы с устройством, и требовать нажатия ради того, что
@@ -115,14 +120,14 @@ public class AdbLinkController(
     /** Спрашивает сведения о пути на устройстве. */
     public fun describeFile(path: String) {
         val live = connection ?: return
-        if (busy()) return
+        if (fileOperations.active) return
         fileOperations.describe(live, path)
     }
 
     /** Читает файл целиком, считая размер и отпечаток. */
     public fun readFile(path: String) {
         val live = connection ?: return
-        if (busy()) return
+        if (fileOperations.active) return
         fileOperations.read(live, path)
     }
 
@@ -136,19 +141,19 @@ public class AdbLinkController(
      */
     public fun writeFile(path: String, sizeBytes: Long) {
         val live = connection ?: return
-        if (busy()) return
+        if (fileOperations.active) return
         fileOperations.write(live, path, sizeBytes)
     }
 
     /**
      * Открывает интерактивную оболочку по этому соединению.
      *
-     * Пока она жива, одноразовые команды недоступны: читатель один, и команда
-     * разобрала бы пакеты сессии.
+     * Одноразовые команды и файловые операции при этом остаются доступны:
+     * каждая работает на своём логическом потоке и ждёт на своём ящике.
      */
     public fun startShell() {
         val live = connection ?: return
-        if (busy()) return
+        if (shellSessions.active) return
         shellSessions.start(live)
     }
 
@@ -168,23 +173,14 @@ public class AdbLinkController(
     }
 
     /**
-     * Занят ли текущий production reader.
-     *
-     * Живая оболочка, файловая операция и одноразовая команда пока используют
-     * один physical reader и потому не могут безопасно читать параллельно.
-     */
-    private fun busy(): Boolean =
-        shellSessions.active ||
-            fileOperations.active ||
-            mutableCommand.value is AdbCommandState.Running
-
-    /**
      * Выполняет команду в неинтерактивной оболочке устройства.
      *
-     * Уходит на тот же единственный reader executor, что и рукопожатие:
-     * читатель один, и две команды одновременно разобрали бы пакеты друг
-     * друга. Очередь
-     * получается сама собой — исполнитель последовательный.
+     * Живая оболочка и файловая операция этому больше не мешают: у команды
+     * свой логический поток и свой ящик.
+     *
+     * Второй команде мешает только то, что показать её некуда: на экране один
+     * слот результата. Это ограничение **вида**, а не возможности, и снимется
+     * оно вместе с экраном, который сможет показать больше одного результата.
      *
      * Команда выполняется как есть. Приложение не проверяет, что она делает:
      * оболочка на то и оболочка. Предохранители лежат в правилах мутации
@@ -193,9 +189,12 @@ public class AdbLinkController(
     public fun runCommand(command: String) {
         val trimmed = command.trim()
         val live = connection
-        // Пустая команда, отсутствующее соединение и занятый reader —
-        // три разные причины ничего не делать, и ни одна из них не ошибка.
-        if (trimmed.isEmpty() || live == null || busy()) return
+        // Пустая команда, отсутствующее соединение и уже занятый слот
+        // результата — три разные причины ничего не делать, и ни одна из них
+        // не ошибка.
+        if (trimmed.isEmpty() || live == null || mutableCommand.value is AdbCommandState.Running) {
+            return
+        }
 
         mutableCommand.value = AdbCommandState.Running(trimmed)
         executor.execute {
@@ -274,6 +273,10 @@ public class AdbLinkController(
      */
     private fun forgetConnection() {
         shellSessions.stop()
+        // Цикл раскладки принадлежит соединению и обязан кончиться вместе с
+        // ним: иначе он пережил бы SessionGeneration и продолжил читать
+        // отпущенный интерфейс (ADR-0003 §2, ADR-0004 §4).
+        connection?.close()
         connection = null
         mutableCommand.value = AdbCommandState.None
         mutableState.value = AdbLinkState.Idle
