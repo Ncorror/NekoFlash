@@ -9,7 +9,7 @@
 | USB | Java USB fallback + native high-performance backend | A2 | Да, после пересмотра API |
 | ADB | CNXN/AUTH/RSA | Legacy + A2 | Да |
 | ADB | generic `openService(destination)` | Legacy/AOSP | **Обязательно** |
-| ADB | concurrent multi-stream router | новый фундамент | **Обязательно** |
+| ADB | concurrent multi-stream router | **готово** (ADR-0004; `07` §6.40–§6.43) | **Обязательно** |
 | ADB | `shell,v2` stdout/stderr/exit | Legacy/AOSP | **Обязательно** |
 | ADB | legacy shell fallback | Legacy | Да |
 | ADB | interactive PTY shell | Legacy | **Обязательно** |
