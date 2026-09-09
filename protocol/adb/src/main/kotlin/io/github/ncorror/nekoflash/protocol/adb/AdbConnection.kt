@@ -98,6 +98,12 @@ public class AdbConnection(
         diagnostics = diagnostics,
     )
 
+    private val reboots = AdbReboot(
+        writer = writer,
+        dispatcher = dispatcher,
+        diagnostics = diagnostics,
+    )
+
     private val handshake = AdbHandshake(
         reader = reader,
         writer = writer,
@@ -208,6 +214,25 @@ public class AdbConnection(
     ): AdbServiceOutcome {
         ensureDispatching()
         return services.run(service, maxOutputBytes, timeoutMillis)
+    }
+
+    /**
+     * Просит устройство перезагрузиться.
+     *
+     * Сервис односторонний: устройство обычно рвёт USB, не ответив, и это
+     * успех, а не отказ. Разбор — в [AdbReboot]; здесь важно лишь то, что
+     * перезагрузка идёт по тому же логическому потоку, что и всё остальное, и
+     * соседей не трогает.
+     *
+     * Цель не ограничивается списком (`01` §3): какие цели существуют, знает
+     * устройство.
+     */
+    public fun reboot(
+        target: String,
+        timeoutMillis: Int = AdbReboot.DEFAULT_TIMEOUT_MS,
+    ): AdbRebootOutcome {
+        ensureDispatching()
+        return reboots.reboot(target, timeoutMillis)
     }
 
     /**
