@@ -1,5 +1,6 @@
 package io.github.ncorror.nekoflash.protocol.adb
 
+import io.github.ncorror.nekoflash.core.diagnostics.InMemoryDiagnosticSink
 import io.github.ncorror.nekoflash.usb.api.UsbTransferFailure
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -327,6 +328,55 @@ class AdbInteractiveShellTest {
     }
 
     /**
+     * Закрытие по нашей просьбе называет себя в журнале.
+     *
+     * Без причины запись `shell_closed` не отвечает на вопрос, ради которого её
+     * и читают. Прогон §6.39 на этом споткнулся: гейт требует, чтобы при обрыве
+     * оба потока закрылись одной причиной, а сверять было не с чем.
+     */
+    @Test
+    fun closingByHostNamesItselfInTheLog() {
+        val sink = InMemoryDiagnosticSink()
+        val device = Device(okay())
+        val shell = device.shell(useShellV2 = true, diagnostics = sink)
+        shell.open()
+        shell.collect(expected = 1)
+
+        shell.close()
+
+        val closed = sink.snapshot().single { it.message == "shell_closed" }
+        assertEquals(AdbInteractiveShell.CLOSED_BY_HOST, closed.fields["reason"])
+    }
+
+    /** Конец, пришедший от устройства, записывается как его конец, а не как наш. */
+    @Test
+    fun theDeviceClosingTheStreamIsNamedAsSuch() {
+        val sink = InMemoryDiagnosticSink()
+        val device = Device(okay(), close())
+        val shell = device.shell(useShellV2 = true, diagnostics = sink)
+        shell.open()
+
+        shell.collect(expected = 2)
+
+        val closed = sink.snapshot().single { it.message == "shell_closed" }
+        assertEquals("device closed the stream", closed.fields["reason"])
+    }
+
+    /** Обрыв записывается своей причиной: по ней потоки и сверяются между собой. */
+    @Test
+    fun aBrokenSessionRecordsWhatBrokeIt() {
+        val sink = InMemoryDiagnosticSink()
+        val device = Device(okay(), failed(UsbTransferFailure.NOT_HELD))
+        val shell = device.shell(useShellV2 = true, diagnostics = sink)
+        shell.open()
+
+        shell.collect(expected = 2)
+
+        val closed = sink.snapshot().single { it.message == "shell_closed" }
+        assertTrue(closed.fields["reason"].orEmpty().contains("transport"))
+    }
+
+    /**
      * Копит события, пока их не наберётся [expected] или не выйдет время.
      *
      * Лишнее событие сверх ожидаемого проверку не спасает: сравнение списков
@@ -359,10 +409,14 @@ class AdbInteractiveShellTest {
 
         private val harness = harnesses.start(handle)
 
-        fun shell(useShellV2: Boolean) = AdbInteractiveShell(
+        fun shell(
+            useShellV2: Boolean,
+            diagnostics: InMemoryDiagnosticSink = InMemoryDiagnosticSink(),
+        ) = AdbInteractiveShell(
             writer = harness.writer,
             dispatcher = harness.dispatcher,
             useShellV2 = useShellV2,
+            diagnostics = diagnostics,
         )
 
         /**

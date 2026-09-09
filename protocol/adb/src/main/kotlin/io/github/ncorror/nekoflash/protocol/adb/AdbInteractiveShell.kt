@@ -35,9 +35,11 @@ public sealed interface AdbShellEvent {
  * приложению, а тесты обходятся без него и остаются определёнными. Так же
  * разделены пакетный автомат и транспорт во всём остальном модуле.
  *
- * Пока сессия открыта, других вызовов по этому соединению быть не должно:
- * физический читатель один, и одноразовая команда разобрала бы её пакеты.
- * Запрет обеспечивает владелец соединения.
+ * Пока сессия открыта, по этому соединению спокойно идут и одноразовые
+ * команды, и файловые операции: у каждой свой логический поток и свой ящик
+ * (`docs/adr/0004_CONCURRENT_ADB_DISPATCHER_RU.md`). Раньше здесь стоял запрет —
+ * он держался на том, что читатель один и потребитель поэтому мог быть только
+ * один; читатель по-прежнему один, но крутит его цикл соединения.
  *
  * Внутри класса потоков **два**: читающий цикл зовёт [pump], а ввод приходит
  * оттуда, где его печатают. Приём и передача идут по разным эндпоинтам и могут
@@ -154,12 +156,20 @@ public class AdbInteractiveShell(
         }
     }
 
-    /** Закрывает поток. Устройство узнает, что оболочка больше не нужна. */
-    public fun close(): Unit = synchronized(lock) {
+    /**
+     * Закрывает поток. Устройство узнает, что оболочка больше не нужна.
+     *
+     * [reason] попадает в журнал. Без неё запись `shell_closed` не отвечала на
+     * вопрос, ради которого её и читают: закрылась оболочка сама, по просьбе
+     * оператора или вместе с оборвавшимся транспортом. Прогон §6.39 на этом и
+     * споткнулся — гейт требует, чтобы при обрыве оба потока закрылись **одной**
+     * причиной, а сверить было не с чем.
+     */
+    public fun close(reason: String = CLOSED_BY_HOST): Unit = synchronized(lock) {
         if (localId == 0 || finished) return
         finished = true
         dispatcher.close(localId)?.let(::send)
-        emit("shell_closed", mapOf("stream" to localId.toString()))
+        emit("shell_closed", mapOf("stream" to localId.toString(), "reason" to reason))
     }
 
     /**
@@ -295,8 +305,20 @@ public class AdbInteractiveShell(
     /** Вызывается уже под замком: [close] берёт его повторно, что разрешено. */
     private fun finish(event: AdbShellEvent): List<AdbShellEvent> {
         if (finished) return emptyList()
-        close()
+        close(reasonOf(event))
         return listOf(event)
+    }
+
+    /**
+     * Причина конца для журнала.
+     *
+     * Берётся из самого события, а не из места вызова: так в журнале оказывается
+     * то, что случилось на самом деле, а не то, что предполагал вызывающий.
+     */
+    private fun reasonOf(event: AdbShellEvent): String = when (event) {
+        is AdbShellEvent.Exited -> "device closed the stream"
+        is AdbShellEvent.Broken -> event.reason
+        else -> CLOSED_BY_HOST
     }
 
     private fun send(packet: AdbOutboundPacket): Boolean =
@@ -347,5 +369,8 @@ public class AdbInteractiveShell(
 
         /** Значение из Legacy: цикл возвращает управление и когда peer молчит. */
         public const val PUMP_TIMEOUT_MS: Int = 250
+
+        /** Причина по умолчанию: закрыли мы сами. */
+        public const val CLOSED_BY_HOST: String = "closed by host"
     }
 }

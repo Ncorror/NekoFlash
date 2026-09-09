@@ -84,7 +84,7 @@
     <string name="terminal_closing">Закрываем оболочку; ждём освобождения ADB-потока…</string>
     <string name="terminal_waiting">Оболочка открыта и ждёт ввода.</string>
     <string name="terminal_ended">Сессия завершена: %1$s</string>
-    <string name="terminal_note">Оболочка живёт, пока её не закрыть, поэтому одиночные команды в это время недоступны: читатель ровно один. Управляющие последовательности показываются как есть, они пока не разбираются.</string>
+    <string name="terminal_note">Оболочка живёт, пока её не закрыть. Одиночные команды и файловые операции при этом продолжают работать — у каждой свой поток. Управляющие последовательности показываются как есть, они пока не разбираются.</string>
     <string name="files_label">Файлы устройства</string>
     <string name="files_path_hint">Путь на устройстве, например /sdcard/Download/file.zip</string>
     <string name="files_describe">Проверить</string>
