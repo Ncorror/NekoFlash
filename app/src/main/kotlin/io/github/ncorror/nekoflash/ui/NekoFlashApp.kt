@@ -33,6 +33,22 @@ import io.github.ncorror.nekoflash.usb.api.UsbSession
 import io.github.ncorror.nekoflash.usb.api.UsbSessionState
 
 @OptIn(ExperimentalMaterial3Api::class)
+/** Название и подзаголовок приложения: своя вещь, и в теле экрана ей тесно. */
+@Composable
+private fun NekoFlashTopBar() {
+    TopAppBar(
+        title = {
+            Column {
+                Text(stringResource(R.string.app_name))
+                Text(
+                    text = stringResource(R.string.app_tagline),
+                    style = MaterialTheme.typography.labelMedium,
+                )
+            }
+        },
+    )
+}
+
 @Composable
 fun NekoFlashApp(
     sessions: List<UsbSession> = emptyList(),
@@ -50,6 +66,7 @@ fun NekoFlashApp(
     onAdbDisconnect: (UsbSession) -> Unit = {},
     onRunCommand: (String) -> Unit = {},
     reboot: RebootPanel = RebootPanel(),
+    rawService: RawServicePanel = RawServicePanel(),
     terminalActions: TerminalActions = TerminalActions(),
     fileActions: FileActions = FileActions(),
     onExportDiagnostics: () -> Unit = {},
@@ -76,26 +93,13 @@ fun NekoFlashApp(
             onAdbDisconnect = onAdbDisconnect,
             onRunCommand = onRunCommand,
             reboot = reboot,
+            rawService = rawService,
             onExportDiagnostics = onExportDiagnostics,
             modifier = modifier,
         )
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(stringResource(R.string.app_name))
-                        Text(
-                            text = stringResource(R.string.app_tagline),
-                            style = MaterialTheme.typography.labelMedium,
-                        )
-                    }
-                },
-            )
-        },
-    ) { innerPadding ->
+    Scaffold(topBar = { NekoFlashTopBar() }) { innerPadding ->
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
@@ -152,6 +156,7 @@ private fun Workspace(
     onAdbDisconnect: (UsbSession) -> Unit,
     onRunCommand: (String) -> Unit,
     reboot: RebootPanel,
+    rawService: RawServicePanel,
     onExportDiagnostics: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -181,6 +186,7 @@ private fun Workspace(
             onAdbDisconnect = onAdbDisconnect,
             onRunCommand = onRunCommand,
             reboot = reboot,
+            rawService = rawService,
         )
         ActionsCard(
             exportStatus = exportStatus,
@@ -208,6 +214,7 @@ private fun SessionList(
     onAdbDisconnect: (UsbSession) -> Unit,
     onRunCommand: (String) -> Unit,
     reboot: RebootPanel,
+    rawService: RawServicePanel,
 ) {
     if (sessions.isEmpty()) {
         Text(
@@ -238,6 +245,7 @@ private fun SessionList(
             onAdbDisconnect = { onAdbDisconnect(session) },
             onRunCommand = onRunCommand,
             reboot = reboot,
+            rawService = rawService,
         )
     }
     Text(
@@ -338,6 +346,7 @@ private fun SessionCard(
     onAdbDisconnect: () -> Unit,
     onRunCommand: (String) -> Unit,
     reboot: RebootPanel,
+    rawService: RawServicePanel,
 ) {
     // Удерживается ли интерфейс, видно по самому состоянию сессии. Отдельный
     // список захваченных был бы вторым источником истины о том же самом.
@@ -370,6 +379,7 @@ private fun SessionCard(
                         onAdbDisconnect = onAdbDisconnect,
                         onRunCommand = onRunCommand,
                         reboot = reboot,
+                        rawService = rawService,
                     )
                 } else {
                     Button(onClick = if (claimed) onRelease else onClaim) {

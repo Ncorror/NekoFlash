@@ -66,6 +66,41 @@ public sealed interface AdbCommandState {
 }
 
 /**
+ * Что происходит с последним вызовом произвольного сервиса.
+ */
+public sealed interface AdbRawServiceState {
+    /** Сервисов ещё не вызывали. */
+    public data object None : AdbRawServiceState
+
+    /** Вызов идёт. */
+    public data class Running(val service: String) : AdbRawServiceState
+
+    /**
+     * Сервис отработал.
+     *
+     * [bytes] отдельно от [text] намеренно: ответ может быть не текстом вовсе,
+     * и тогда число байт — единственное, что о нём известно достоверно.
+     */
+    public data class Finished(
+        val service: String,
+        val bytes: Int,
+        val text: String,
+    ) : AdbRawServiceState
+
+    /**
+     * Односторонний сервис принят.
+     *
+     * Отдельно от [Finished], потому что вывода здесь нет и не будет:
+     * устройство ушло с шины. Показывать это как «отработал, 0 байт» значило бы
+     * назвать успешный переход пустым ответом.
+     */
+    public data class OneWay(val service: String, val evidence: String) : AdbRawServiceState
+
+    /** Сервис не отработал. */
+    public data class Failed(val service: String, val reason: String) : AdbRawServiceState
+}
+
+/**
  * Что происходит с последним запросом перезагрузки.
  *
  * Состояние **запроса**; что стало с устройством, говорит `AdbRebootDevice`

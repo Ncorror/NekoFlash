@@ -15,6 +15,7 @@ import io.github.ncorror.nekoflash.R
 import io.github.ncorror.nekoflash.adb.AdbCommandState
 import io.github.ncorror.nekoflash.adb.AdbFileState
 import io.github.ncorror.nekoflash.adb.AdbLinkState
+import io.github.ncorror.nekoflash.adb.AdbRawServiceState
 import io.github.ncorror.nekoflash.adb.AdbRebootState
 import io.github.ncorror.nekoflash.adb.AdbTerminalState
 import io.github.ncorror.nekoflash.core.model.SessionGeneration
@@ -42,6 +43,7 @@ internal fun AdbLinkSection(
     onAdbDisconnect: () -> Unit,
     onRunCommand: (String) -> Unit,
     reboot: RebootPanel,
+    rawService: RawServicePanel,
 ) {
     val linkForThisSession = adbLink.takeIf { it.generationOrNull() == session.generation }
     val connected = linkForThisSession is AdbLinkState.Connected
@@ -79,8 +81,19 @@ internal fun AdbLinkSection(
         TerminalSection(terminal = terminal, actions = terminalActions)
         FilesSection(files = files, actions = fileActions)
         RebootSection(panel = reboot)
+        RawServiceSection(panel = rawService)
     }
 }
+
+/**
+ * Произвольный сервис: состояние вызова и само действие.
+ *
+ * Собраны в один объект по той же причине, что и [RebootPanel].
+ */
+data class RawServicePanel(
+    val state: AdbRawServiceState = AdbRawServiceState.None,
+    val onCall: (String) -> Unit = {},
+)
 
 /**
  * Перезагрузка: состояние запроса и само действие.
@@ -279,6 +292,62 @@ private fun TerminalSection(terminal: AdbTerminalState, actions: TerminalActions
         text = stringResource(R.string.terminal_note),
         style = MaterialTheme.typography.bodySmall,
     )
+}
+
+/**
+ * Вызов произвольного сервиса ADB.
+ *
+ * Имя сервиса вводится целиком — `shell:ls`, `sync:`, `exec:id`, `track-devices`.
+ * Списка нет намеренно (`01` §3): какие сервисы существуют, знает устройство.
+ *
+ * Набранный здесь `reboot:` ведёт себя как кнопка перезагрузки: устройство
+ * уходит с шины, не ответив, и показывать это отказом было бы неправдой.
+ */
+@Composable
+private fun RawServiceSection(panel: RawServicePanel) {
+    val service = remember { mutableStateOf("") }
+    val running = panel.state is AdbRawServiceState.Running
+
+    LabelledValue(
+        label = stringResource(R.string.raw_service_label),
+        value = rawServiceText(panel.state),
+    )
+    OutlinedTextField(
+        value = service.value,
+        onValueChange = { text -> service.value = text },
+        label = { Text(stringResource(R.string.raw_service_hint)) },
+        singleLine = true,
+        enabled = !running,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    Button(
+        onClick = { panel.onCall(service.value) },
+        enabled = !running && service.value.isNotBlank(),
+    ) {
+        Text(stringResource(R.string.raw_service_run))
+    }
+    (panel.state as? AdbRawServiceState.Finished)?.takeIf { it.text.isNotEmpty() }?.let { done ->
+        Text(text = done.text, style = MaterialTheme.typography.bodySmall)
+    }
+    Text(
+        text = stringResource(R.string.raw_service_note),
+        style = MaterialTheme.typography.bodySmall,
+    )
+}
+
+/** Размер ответа называется всегда: он известен даже тогда, когда текст бессмыслен. */
+@Composable
+private fun rawServiceText(state: AdbRawServiceState): String = when (state) {
+    AdbRawServiceState.None -> stringResource(R.string.raw_service_none)
+    is AdbRawServiceState.Running -> stringResource(R.string.raw_service_running, state.service)
+    is AdbRawServiceState.Finished ->
+        stringResource(R.string.raw_service_finished, state.service, state.bytes)
+
+    is AdbRawServiceState.OneWay ->
+        stringResource(R.string.raw_service_one_way, state.service, state.evidence)
+
+    is AdbRawServiceState.Failed ->
+        stringResource(R.string.raw_service_failed, state.service, state.reason)
 }
 
 /**

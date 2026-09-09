@@ -93,6 +93,9 @@ public class AdbLinkController(
      */
     private val reboots = AdbRebootController(executor)
 
+    /** Владелец вызовов произвольного сервиса. */
+    private val rawServices = AdbRawServiceController(executor)
+
     /**
      * Живое соединение.
      *
@@ -126,6 +129,21 @@ public class AdbLinkController(
 
     /** Состояние последнего запроса перезагрузки. */
     public val reboot: StateFlow<AdbRebootState> = reboots.state
+
+    /** Состояние последнего вызова произвольного сервиса. */
+    public val rawService: StateFlow<AdbRawServiceState> = rawServices.state
+
+    /**
+     * Вызывает произвольный сервис ADB.
+     *
+     * Имя сервиса не проверяется и не ограничивается (`01` §3). Односторонние
+     * сервисы узнаются по имени и обрабатываются как перезагрузка — иначе
+     * ожидаемый разрыв показался бы отказом.
+     */
+    public fun callRawService(service: String) {
+        val live = connection ?: return
+        rawServices.call(live, service)
+    }
 
     /**
      * Просит устройство перезагрузиться.

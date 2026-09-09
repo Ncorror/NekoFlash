@@ -8,6 +8,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -18,6 +19,7 @@ import androidx.lifecycle.lifecycleScope
 import io.github.ncorror.nekoflash.ui.NekoFlashApp
 import io.github.ncorror.nekoflash.adb.AdbLinkController
 import io.github.ncorror.nekoflash.ui.FileActions
+import io.github.ncorror.nekoflash.ui.RawServicePanel
 import io.github.ncorror.nekoflash.ui.RebootPanel
 import io.github.ncorror.nekoflash.ui.TerminalActions
 import io.github.ncorror.nekoflash.ui.theme.NekoFlashTheme
@@ -46,7 +48,6 @@ class MainActivity : ComponentActivity() {
             val commandState by adbLink.command.collectAsState()
             val terminalState by adbLink.terminal.collectAsState()
             val fileState by adbLink.files.collectAsState()
-            val rebootState by adbLink.reboot.collectAsState()
             var exportStatus by remember { mutableStateOf<String?>(null) }
 
             val savedTemplate = stringResource(R.string.diagnostics_export_done)
@@ -85,16 +86,28 @@ class MainActivity : ComponentActivity() {
                     onAdbConnect = { session -> adbLink.connect(session.generation) },
                     onAdbDisconnect = { session -> adbLink.disconnect(session.generation) },
                     onRunCommand = adbLink::runCommand,
-                    reboot = RebootPanel(
-                        state = rebootState,
-                        onReboot = adbLink::requestReboot,
-                    ),
+                    reboot = rebootPanel(adbLink),
+                    rawService = rawServicePanel(adbLink),
                     onExportDiagnostics = { saveLauncher.launch(application.suggestedDiagnosticsFileName()) },
                 )
             }
         }
     }
 }
+
+/** Проводка панели перезагрузки: состояние экрана и действие контроллера. */
+@Composable
+private fun rebootPanel(adbLink: AdbLinkController): RebootPanel = RebootPanel(
+    state = adbLink.reboot.collectAsState().value,
+    onReboot = adbLink::requestReboot,
+)
+
+/** То же для произвольного сервиса. */
+@Composable
+private fun rawServicePanel(adbLink: AdbLinkController): RawServicePanel = RawServicePanel(
+    state = adbLink.rawService.collectAsState().value,
+    onCall = adbLink::callRawService,
+)
 
 private fun MainActivity.exportDiagnostics(
     application: NekoFlashApplication,

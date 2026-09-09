@@ -50,6 +50,37 @@ class AdbRebootTest {
         assertEquals("reboot:recovery", AdbRebootService.of("  recovery  "))
     }
 
+    /**
+     * Односторонним сервис делает его имя, а не нажатая кнопка.
+     *
+     * Прямо из Legacy: оператор может набрать `reboot:` в поле произвольного
+     * сервиса, и обойтись с этим надо так же. Иначе ожидаемый разрыв будет
+     * показан как отказ.
+     */
+    @Test
+    fun rebootServicesAreRecognisedByName() {
+        assertTrue(AdbServicePolicy.expectsOneWayDisconnect("reboot:"))
+        assertTrue(AdbServicePolicy.expectsOneWayDisconnect("reboot:bootloader"))
+        assertTrue(AdbServicePolicy.expectsOneWayDisconnect("  REBOOT:recovery  "))
+    }
+
+    /** Послабление не распространяется ни на что, кроме перезагрузки. */
+    @Test
+    fun otherServicesAreNotOneWay() {
+        assertTrue(!AdbServicePolicy.expectsOneWayDisconnect("shell:ls"))
+        assertTrue(!AdbServicePolicy.expectsOneWayDisconnect("sync:"))
+        assertTrue(!AdbServicePolicy.expectsOneWayDisconnect("exec:reboot"))
+        assertTrue(!AdbServicePolicy.expectsOneWayDisconnect("rebooting:"))
+    }
+
+    /** Цель достаётся из имени сервиса, чтобы отдать её тому же коду. */
+    @Test
+    fun theTargetIsTakenOutOfTheServiceName() {
+        assertEquals("bootloader", AdbServicePolicy.rebootTargetOf("reboot:bootloader"))
+        assertEquals("", AdbServicePolicy.rebootTargetOf("reboot:"))
+        assertEquals("recovery", AdbServicePolicy.rebootTargetOf("REBOOT:recovery"))
+    }
+
     /** Закрытие потока устройством — признак того, что команда принята. */
     @Test
     fun theDeviceClosingTheStreamMeansAccepted() {

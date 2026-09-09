@@ -133,4 +133,13 @@
     <string name="reboot_accepted">Принята: %1$s — устройство уходит в перезагрузку</string>
     <string name="reboot_failed">Не подтвердилась, устройство: %1$s. %2$s</string>
     <string name="reboot_note">Успех выглядит как обрыв: устройство уходит с шины, и подключение закрывается. Список целей не ограничен — какие из них есть, знает устройство. UNTOUCHED означает, что запрос не ушёл и повтор безопасен; UNKNOWN — что запрос ушёл, а подтверждения нет, и повторять нельзя.</string>
+    <string name="raw_service_label">Произвольный сервис</string>
+    <string name="raw_service_hint">Имя сервиса, например shell:ls или sync:</string>
+    <string name="raw_service_run">Вызвать</string>
+    <string name="raw_service_none">Не вызывался</string>
+    <string name="raw_service_running">Идёт: %1$s</string>
+    <string name="raw_service_finished">%1$s — получено %2$d байт</string>
+    <string name="raw_service_one_way">%1$s — принят, устройство ушло с шины (%2$s)</string>
+    <string name="raw_service_failed">%1$s — не получилось: %2$s</string>
+    <string name="raw_service_note">Имя сервиса передаётся как есть, списка нет: какие сервисы существуют, знает устройство. Размер ответа называется всегда — сервис может отвечать не текстом, и тогда число байт единственное, что известно достоверно. Набранный здесь reboot: ведёт себя как кнопка перезагрузки.</string>
 </resources>

@@ -86,6 +86,43 @@ internal object AdbRebootService {
 }
 
 /**
+ * Какие сервисы ведут себя односторонне.
+ *
+ * Решает **имя сервиса**, а не нажатая кнопка, и это прямо из Legacy
+ * (`AdbServiceCompletionPolicy.expectsOneWayDisconnect`). Оператор может
+ * набрать `reboot:bootloader` в поле произвольного сервиса, и обойтись с этим
+ * надо так же, как с нажатием «Перезагрузить»: иначе ожидаемый разрыв будет
+ * показан как отказ, то есть экран соврёт.
+ *
+ * Послабление ограничено `reboot:*` намеренно и никогда не распространяется на
+ * `shell`, `sync`, `install` и произвольные сервисы: для них разрыв — это
+ * именно разрыв.
+ */
+public object AdbServicePolicy {
+    /** Ждать ли от сервиса того, что устройство уйдёт с шины, не ответив. */
+    public fun expectsOneWayDisconnect(service: String): Boolean =
+        service.trim().startsWith(AdbRebootService.PREFIX, ignoreCase = true)
+
+    /**
+     * Цель перезагрузки, спрятанная в имени сервиса.
+     *
+     * `reboot:bootloader` — это цель `bootloader`; `reboot:` — обычная
+     * перезагрузка. Нужна, чтобы набранное в поле сервиса можно было отдать
+     * тому же коду, что и набранное в поле цели.
+     */
+    public fun rebootTargetOf(service: String): String {
+        val trimmed = service.trim()
+        // Префикс снимается ровно по длине: сравнение выше было без учёта
+        // регистра, и `removePrefix` здесь ошибся бы на `REBOOT:`.
+        return if (expectsOneWayDisconnect(trimmed)) {
+            trimmed.substring(AdbRebootService.PREFIX.length)
+        } else {
+            trimmed
+        }
+    }
+}
+
+/**
  * Перезагрузка устройства через сервис `reboot:`.
  *
  * **Это односторонний сервис, и в этом вся его особенность.** Устройство
