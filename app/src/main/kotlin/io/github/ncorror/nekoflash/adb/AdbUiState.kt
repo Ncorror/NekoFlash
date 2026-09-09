@@ -3,6 +3,7 @@ package io.github.ncorror.nekoflash.adb
 import io.github.ncorror.nekoflash.core.model.SessionGeneration
 import io.github.ncorror.nekoflash.protocol.adb.AdbHandshakeFailure
 import io.github.ncorror.nekoflash.protocol.adb.AdbPeerMode
+import io.github.ncorror.nekoflash.protocol.adb.AdbRebootDevice
 
 /** Что происходит с ADB-соединением прямо сейчас. */
 public sealed interface AdbLinkState {
@@ -62,4 +63,34 @@ public sealed interface AdbCommandState {
 
     /** Команда не выполнилась. */
     public data class Failed(val command: String, val reason: String) : AdbCommandState
+}
+
+/**
+ * Что происходит с последним запросом перезагрузки.
+ *
+ * Состояние **запроса**; что стало с устройством, говорит `AdbRebootDevice`
+ * внутри [Failed]. Это разные вопросы: запрос мог не удаться, а устройство при
+ * этом уже уходить в перезагрузку.
+ */
+public sealed interface AdbRebootState {
+    /** Перезагрузку ещё не просили. */
+    public data object None : AdbRebootState
+
+    /** Запрос отправлен, ждём признака перехода. */
+    public data class Running(val target: String) : AdbRebootState
+
+    /** Устройство приняло команду и начало переход. */
+    public data class Accepted(val target: String, val service: String) : AdbRebootState
+
+    /**
+     * Перехода не подтвердилось.
+     *
+     * [device] решает, можно ли повторять: `UNTOUCHED` — да, `UNKNOWN` — нет,
+     * пока не выяснится, что с устройством.
+     */
+    public data class Failed(
+        val target: String,
+        val reason: String,
+        val device: AdbRebootDevice,
+    ) : AdbRebootState
 }

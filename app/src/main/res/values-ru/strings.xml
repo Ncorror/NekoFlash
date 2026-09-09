@@ -124,4 +124,13 @@
         <item quantity="many">Записано %1$d байт, SHA-256 %2$s</item>
         <item quantity="other">Записано %1$d байта, SHA-256 %2$s</item>
     </plurals>
+    <string name="reboot_label">Перезагрузка</string>
+    <string name="reboot_target_hint">Цель: пусто — система, bootloader, recovery</string>
+    <string name="reboot_run">Перезагрузить</string>
+    <string name="reboot_none">Не запрашивалась</string>
+    <string name="reboot_target_system">система</string>
+    <string name="reboot_running">Запрошена: %1$s</string>
+    <string name="reboot_accepted">Принята: %1$s — устройство уходит в перезагрузку</string>
+    <string name="reboot_failed">Не подтвердилась, устройство: %1$s. %2$s</string>
+    <string name="reboot_note">Успех выглядит как обрыв: устройство уходит с шины, и подключение закрывается. Список целей не ограничен — какие из них есть, знает устройство. UNTOUCHED означает, что запрос не ушёл и повтор безопасен; UNKNOWN — что запрос ушёл, а подтверждения нет, и повторять нельзя.</string>
 </resources>

@@ -49,6 +49,7 @@ fun NekoFlashApp(
     onAdbConnect: (UsbSession) -> Unit = {},
     onAdbDisconnect: (UsbSession) -> Unit = {},
     onRunCommand: (String) -> Unit = {},
+    reboot: RebootPanel = RebootPanel(),
     terminalActions: TerminalActions = TerminalActions(),
     fileActions: FileActions = FileActions(),
     onExportDiagnostics: () -> Unit = {},
@@ -74,6 +75,7 @@ fun NekoFlashApp(
             onAdbConnect = onAdbConnect,
             onAdbDisconnect = onAdbDisconnect,
             onRunCommand = onRunCommand,
+            reboot = reboot,
             onExportDiagnostics = onExportDiagnostics,
             modifier = modifier,
         )
@@ -149,6 +151,7 @@ private fun Workspace(
     onAdbConnect: (UsbSession) -> Unit,
     onAdbDisconnect: (UsbSession) -> Unit,
     onRunCommand: (String) -> Unit,
+    reboot: RebootPanel,
     onExportDiagnostics: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -177,6 +180,7 @@ private fun Workspace(
             onAdbConnect = onAdbConnect,
             onAdbDisconnect = onAdbDisconnect,
             onRunCommand = onRunCommand,
+            reboot = reboot,
         )
         ActionsCard(
             exportStatus = exportStatus,
@@ -203,6 +207,7 @@ private fun SessionList(
     onAdbConnect: (UsbSession) -> Unit,
     onAdbDisconnect: (UsbSession) -> Unit,
     onRunCommand: (String) -> Unit,
+    reboot: RebootPanel,
 ) {
     if (sessions.isEmpty()) {
         Text(
@@ -232,6 +237,7 @@ private fun SessionList(
             onAdbConnect = { onAdbConnect(session) },
             onAdbDisconnect = { onAdbDisconnect(session) },
             onRunCommand = onRunCommand,
+            reboot = reboot,
         )
     }
     Text(
@@ -285,6 +291,38 @@ private fun BuildBaselineCard() {
     }
 }
 
+/**
+ * Пять строк, которыми сессия себя называет.
+ *
+ * Вынесены из карточки не ради длины, а потому что это одна вещь: кто перед
+ * нами, чем опознан, в какой роли, в каком состоянии и в каком поколении.
+ * Читать их порознь незачем.
+ */
+@Composable
+private fun SessionIdentity(session: UsbSession) {
+    LabelledValue(
+        label = stringResource(R.string.target_label),
+        value = session.targetId.value,
+    )
+    LabelledValue(
+        label = stringResource(R.string.session_identity_label),
+        value = localizedIdentitySource(session.identity.source),
+    )
+    LabelledValue(
+        label = stringResource(R.string.session_interface_label),
+        value = localizedInterfaceKind(session.candidate.kind) + " · " +
+            localizedMatchConfidence(session.candidate.confidence),
+    )
+    LabelledValue(
+        label = stringResource(R.string.session_state_label),
+        value = localizedSessionState(session.state),
+    )
+    LabelledValue(
+        label = stringResource(R.string.session_generation_label),
+        value = session.generation.value.toString(),
+    )
+}
+
 @Composable
 private fun SessionCard(
     session: UsbSession,
@@ -299,6 +337,7 @@ private fun SessionCard(
     onAdbConnect: () -> Unit,
     onAdbDisconnect: () -> Unit,
     onRunCommand: (String) -> Unit,
+    reboot: RebootPanel,
 ) {
     // Удерживается ли интерфейс, видно по самому состоянию сессии. Отдельный
     // список захваченных был бы вторым источником истины о том же самом.
@@ -308,27 +347,7 @@ private fun SessionCard(
             modifier = Modifier.padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            LabelledValue(
-                label = stringResource(R.string.target_label),
-                value = session.targetId.value,
-            )
-            LabelledValue(
-                label = stringResource(R.string.session_identity_label),
-                value = localizedIdentitySource(session.identity.source),
-            )
-            LabelledValue(
-                label = stringResource(R.string.session_interface_label),
-                value = localizedInterfaceKind(session.candidate.kind) + " · " +
-                    localizedMatchConfidence(session.candidate.confidence),
-            )
-            LabelledValue(
-                label = stringResource(R.string.session_state_label),
-                value = localizedSessionState(session.state),
-            )
-            LabelledValue(
-                label = stringResource(R.string.session_generation_label),
-                value = session.generation.value.toString(),
-            )
+            SessionIdentity(session = session)
 
             if (session.state == UsbSessionState.READY || session.state == UsbSessionState.CLAIMED) {
                 // У интерфейса ADB владение одно: подключение захватывает
@@ -350,6 +369,7 @@ private fun SessionCard(
                         onAdbConnect = onAdbConnect,
                         onAdbDisconnect = onAdbDisconnect,
                         onRunCommand = onRunCommand,
+                        reboot = reboot,
                     )
                 } else {
                     Button(onClick = if (claimed) onRelease else onClaim) {

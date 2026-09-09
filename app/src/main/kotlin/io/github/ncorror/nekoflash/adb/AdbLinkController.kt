@@ -87,6 +87,13 @@ public class AdbLinkController(
     private val fileOperations = AdbSyncController(executor, diagnostics)
 
     /**
+     * Владелец запросов перезагрузки.
+     *
+     * Отдельный класс по той же причине, что оболочка и файловые операции.
+     */
+    private val reboots = AdbRebootController(executor)
+
+    /**
      * Живое соединение.
      *
      * Хранится, потому что после рукопожатия оно продолжает быть нужным: через
@@ -116,6 +123,21 @@ public class AdbLinkController(
 
     /** Состояние последней файловой операции. */
     public val files: StateFlow<AdbFileState> = fileOperations.state
+
+    /** Состояние последнего запроса перезагрузки. */
+    public val reboot: StateFlow<AdbRebootState> = reboots.state
+
+    /**
+     * Просит устройство перезагрузиться.
+     *
+     * Успех здесь выглядит как обрыв: устройство уходит с шины, generation
+     * закрывается по `DETACHED`, и это ожидаемо. Состояние запроса живёт
+     * отдельно от состояния соединения именно поэтому.
+     */
+    public fun requestReboot(target: String) {
+        val live = connection ?: return
+        reboots.request(live, target)
+    }
 
     /** Спрашивает сведения о пути на устройстве. */
     public fun describeFile(path: String) {

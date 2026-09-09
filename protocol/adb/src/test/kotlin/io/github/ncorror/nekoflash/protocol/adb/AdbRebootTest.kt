@@ -83,7 +83,7 @@ class AdbRebootTest {
         val outcome = device.reboot().reboot("recovery") as AdbRebootOutcome.Failed
 
         assertEquals(AdbRebootFailure.DEVICE_REFUSED, outcome.reason)
-        assertEquals(AdbRebootState.UNTOUCHED, outcome.state)
+        assertEquals(AdbRebootDevice.UNTOUCHED, outcome.device)
         assertTrue(outcome.detail.contains("reboot not permitted"))
     }
 
@@ -101,7 +101,7 @@ class AdbRebootTest {
         val outcome = device.reboot().reboot("") as AdbRebootOutcome.Failed
 
         assertEquals(AdbRebootFailure.FRAMING_LOST, outcome.reason)
-        assertEquals(AdbRebootState.UNKNOWN, outcome.state)
+        assertEquals(AdbRebootDevice.UNKNOWN, outcome.device)
     }
 
     /**
@@ -120,7 +120,7 @@ class AdbRebootTest {
         val outcome = device.reboot().reboot("", timeoutMillis = 300) as AdbRebootOutcome.Failed
 
         assertEquals(AdbRebootFailure.NO_TRANSITION, outcome.reason)
-        assertEquals(AdbRebootState.UNKNOWN, outcome.state)
+        assertEquals(AdbRebootDevice.UNKNOWN, outcome.device)
     }
 
     /** Запрос, не ушедший в провод, оставляет устройство нетронутым. */
@@ -131,7 +131,7 @@ class AdbRebootTest {
         val outcome = device.reboot().reboot("") as AdbRebootOutcome.Failed
 
         assertEquals(AdbRebootFailure.TRANSPORT_CLOSED, outcome.reason)
-        assertEquals(AdbRebootState.UNTOUCHED, outcome.state)
+        assertEquals(AdbRebootDevice.UNTOUCHED, outcome.device)
     }
 
     /**
@@ -149,7 +149,7 @@ class AdbRebootTest {
         val outcome = device.reboot().reboot("") as AdbRebootOutcome.Failed
 
         assertEquals(AdbRebootFailure.SEND_FAILED, outcome.reason)
-        assertEquals(AdbRebootState.UNTOUCHED, outcome.state)
+        assertEquals(AdbRebootDevice.UNTOUCHED, outcome.device)
     }
 
     /** Исход и состояние устройства попадают в журнал: по ним потом разбирают прогон. */
@@ -174,7 +174,7 @@ class AdbRebootTest {
         device.reboot(sink).reboot("")
 
         val failure = sink.snapshot().single { it.message == "reboot_failed" }
-        assertEquals(AdbRebootState.UNTOUCHED.name, failure.fields["state"])
+        assertEquals(AdbRebootDevice.UNTOUCHED.name, failure.fields["device"])
         assertEquals(AdbRebootFailure.DEVICE_REFUSED.name, failure.fields["reason"])
     }
 

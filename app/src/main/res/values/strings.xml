@@ -121,4 +121,13 @@
         <item quantity="one">%1$d byte written, SHA-256 %2$s</item>
         <item quantity="other">%1$d bytes written, SHA-256 %2$s</item>
     </plurals>
+    <string name="reboot_label">Reboot</string>
+    <string name="reboot_target_hint">Target: empty for system, bootloader, recovery</string>
+    <string name="reboot_run">Reboot</string>
+    <string name="reboot_none">Not requested</string>
+    <string name="reboot_target_system">system</string>
+    <string name="reboot_running">Requested: %1$s</string>
+    <string name="reboot_accepted">Accepted: %1$s — the device is going down</string>
+    <string name="reboot_failed">Not confirmed, device: %1$s. %2$s</string>
+    <string name="reboot_note">Success looks like a disconnect: the device leaves the bus and the link closes. Targets are not restricted — the device knows which ones exist. UNTOUCHED means the request never left the host and retrying is safe; UNKNOWN means it left without confirmation, so do not retry.</string>
 </resources>

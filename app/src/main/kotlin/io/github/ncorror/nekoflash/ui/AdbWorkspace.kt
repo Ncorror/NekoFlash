@@ -15,6 +15,7 @@ import io.github.ncorror.nekoflash.R
 import io.github.ncorror.nekoflash.adb.AdbCommandState
 import io.github.ncorror.nekoflash.adb.AdbFileState
 import io.github.ncorror.nekoflash.adb.AdbLinkState
+import io.github.ncorror.nekoflash.adb.AdbRebootState
 import io.github.ncorror.nekoflash.adb.AdbTerminalState
 import io.github.ncorror.nekoflash.core.model.SessionGeneration
 import io.github.ncorror.nekoflash.protocol.adb.AdbPeerMode
@@ -40,6 +41,7 @@ internal fun AdbLinkSection(
     onAdbConnect: () -> Unit,
     onAdbDisconnect: () -> Unit,
     onRunCommand: (String) -> Unit,
+    reboot: RebootPanel,
 ) {
     val linkForThisSession = adbLink.takeIf { it.generationOrNull() == session.generation }
     val connected = linkForThisSession is AdbLinkState.Connected
@@ -76,8 +78,22 @@ internal fun AdbLinkSection(
         ShellSection(command = adbCommand, onRunCommand = onRunCommand)
         TerminalSection(terminal = terminal, actions = terminalActions)
         FilesSection(files = files, actions = fileActions)
+        RebootSection(panel = reboot)
     }
 }
+
+/**
+ * Перезагрузка: состояние запроса и само действие.
+ *
+ * Состояние и действие здесь в одном объекте, в отличие от файлов и терминала,
+ * и причина не в красоте. Список аргументов экрана уже однажды разъехался — об
+ * этом сказано прямо в `NekoFlashApp`, — и каждая лишняя пара строк в нём это
+ * ещё один шанс разъехаться снова.
+ */
+data class RebootPanel(
+    val state: AdbRebootState = AdbRebootState.None,
+    val onReboot: (String) -> Unit = {},
+)
 
 /** Действия с файлами устройства. */
 data class FileActions(
@@ -264,6 +280,62 @@ private fun TerminalSection(terminal: AdbTerminalState, actions: TerminalActions
         style = MaterialTheme.typography.bodySmall,
     )
 }
+
+/**
+ * Перезагрузка устройства.
+ *
+ * Успех здесь выглядит как обрыв: устройство уходит с шины, и подключение
+ * закрывается. Поэтому состояние запроса показывается отдельно от состояния
+ * соединения — иначе «отключилось» затёрло бы «перезагружается».
+ *
+ * Цель — свободная строка. Списка целей нет намеренно (`01` §3): какие из них
+ * существуют, знает устройство, и его отказ — это ответ, а не наша ошибка.
+ */
+@Composable
+private fun RebootSection(panel: RebootPanel) {
+    val target = remember { mutableStateOf("") }
+    val running = panel.state is AdbRebootState.Running
+
+    LabelledValue(label = stringResource(R.string.reboot_label), value = rebootText(panel.state))
+    OutlinedTextField(
+        value = target.value,
+        onValueChange = { text -> target.value = text },
+        label = { Text(stringResource(R.string.reboot_target_hint)) },
+        singleLine = true,
+        enabled = !running,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    Button(onClick = { panel.onReboot(target.value) }, enabled = !running) {
+        Text(stringResource(R.string.reboot_run))
+    }
+    Text(
+        text = stringResource(R.string.reboot_note),
+        style = MaterialTheme.typography.bodySmall,
+    )
+}
+
+/**
+ * Что показать про перезагрузку.
+ *
+ * У отказа состояние устройства выносится вперёд: оператору сначала важно,
+ * тронуто ли устройство, и только потом — почему не получилось.
+ */
+@Composable
+private fun rebootText(reboot: AdbRebootState): String = when (reboot) {
+    AdbRebootState.None -> stringResource(R.string.reboot_none)
+    is AdbRebootState.Running -> stringResource(R.string.reboot_running, reboot.service())
+    is AdbRebootState.Accepted -> stringResource(R.string.reboot_accepted, reboot.service)
+    is AdbRebootState.Failed -> stringResource(
+        R.string.reboot_failed,
+        reboot.device.name,
+        reboot.reason,
+    )
+}
+
+/** Пустая цель — обычная перезагрузка; показываем это словом, а не пустотой. */
+@Composable
+private fun AdbRebootState.Running.service(): String =
+    target.ifBlank { stringResource(R.string.reboot_target_system) }
 
 /**
  * Неинтерактивная оболочка.

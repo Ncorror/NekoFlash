@@ -32,9 +32,11 @@ public enum class AdbRebootFailure {
  *
  * Отдельно от исхода по той же причине, что и `AdbSyncDestination` у записи
  * файла: оператору важно не только «получилось или нет», но и «тронули ли мы
- * устройство». Ответ на второй вопрос решает, можно ли повторять.
+ * устройство». Ответ на второй вопрос решает, можно ли повторять. Имя говорит
+ * о том, **чьё** это состояние: состояние самого запроса живёт в UI и зовётся
+ * иначе.
  */
-public enum class AdbRebootState {
+public enum class AdbRebootDevice {
     /** Запрос в провод не ушёл: устройство не тронуто, повтор безопасен. */
     UNTOUCHED,
 
@@ -55,7 +57,7 @@ public sealed interface AdbRebootOutcome {
         val service: String,
         val reason: AdbRebootFailure,
         val detail: String,
-        val state: AdbRebootState,
+        val device: AdbRebootDevice,
     ) : AdbRebootOutcome
 }
 
@@ -95,7 +97,7 @@ internal object AdbRebootService {
  *
  * **Граница мутации — записанный целиком пакет `OPEN`** (`03` §3). До неё
  * устройство не тронуто и повтор безопасен; после — уже нет, и ответ об этом
- * говорит прямо через [AdbRebootState].
+ * говорит прямо через [AdbRebootDevice].
  *
  * **Расхождение с Legacy, сделанное сознательно.** Legacy считал ожидаемым
  * завершением и молчание устройства: у него не было способа отличить «peer
@@ -134,7 +136,7 @@ public class AdbReboot(
 
             // Интерфейс не удерживается: запрос не ушёл, устройство не тронуто.
             AdbWriteOutcome.Closed ->
-                failed(service, AdbRebootFailure.TRANSPORT_CLOSED, "open", AdbRebootState.UNTOUCHED)
+                failed(service, AdbRebootFailure.TRANSPORT_CLOSED, "open", AdbRebootDevice.UNTOUCHED)
 
             is AdbWriteOutcome.Interrupted -> interrupted(service, sent)
         }
@@ -150,7 +152,7 @@ public class AdbReboot(
      * которое уже уходит в перезагрузку.
      */
     private fun interrupted(service: String, outcome: AdbWriteOutcome.Interrupted): AdbRebootOutcome {
-        val state = if (outcome.sentBytes == 0) AdbRebootState.UNTOUCHED else AdbRebootState.UNKNOWN
+        val state = if (outcome.sentBytes == 0) AdbRebootDevice.UNTOUCHED else AdbRebootDevice.UNKNOWN
         return failed(
             service,
             AdbRebootFailure.SEND_FAILED,
@@ -181,7 +183,7 @@ public class AdbReboot(
                     service,
                     AdbRebootFailure.NO_TRANSITION,
                     "no end of stream in ${timeoutMillis}ms${saidSuffix(said)}",
-                    AdbRebootState.UNKNOWN,
+                    AdbRebootDevice.UNKNOWN,
                 )
             } else {
                 outcome = consume(service, mailbox.poll(remaining.coerceAtMost(SLICE_MS)), said)
@@ -226,7 +228,7 @@ public class AdbReboot(
                     service,
                     AdbRebootFailure.DEVICE_REFUSED,
                     said.toString().trim(),
-                    AdbRebootState.UNTOUCHED,
+                    AdbRebootDevice.UNTOUCHED,
                 )
             }
 
@@ -234,14 +236,14 @@ public class AdbReboot(
             service,
             AdbRebootFailure.FRAMING_LOST,
             item.detail,
-            AdbRebootState.UNKNOWN,
+            AdbRebootDevice.UNKNOWN,
         )
 
         AdbMailboxEnd.OVERFLOWED -> failed(
             service,
             AdbRebootFailure.MAILBOX_OVERFLOWED,
             item.detail,
-            AdbRebootState.UNKNOWN,
+            AdbRebootDevice.UNKNOWN,
         )
 
         // Своей рукой этот поток никто не закрывает: закрывать нечего, ответа
@@ -250,7 +252,7 @@ public class AdbReboot(
             service,
             AdbRebootFailure.NO_TRANSITION,
             item.detail,
-            AdbRebootState.UNKNOWN,
+            AdbRebootDevice.UNKNOWN,
         )
     }
 
@@ -263,18 +265,18 @@ public class AdbReboot(
         service: String,
         reason: AdbRebootFailure,
         detail: String,
-        state: AdbRebootState,
+        device: AdbRebootDevice,
     ): AdbRebootOutcome.Failed {
         emit(
             "reboot_failed",
             mapOf(
                 "service" to service,
                 "reason" to reason.name,
-                "state" to state.name,
+                "device" to device.name,
                 "detail" to detail,
             ),
         )
-        return AdbRebootOutcome.Failed(service, reason, detail, state)
+        return AdbRebootOutcome.Failed(service, reason, detail, device)
     }
 
     private fun saidSuffix(said: StringBuilder): String =
