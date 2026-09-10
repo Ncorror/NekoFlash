@@ -11,6 +11,7 @@ import io.github.ncorror.nekoflash.usb.api.UsbInterfaceCandidate
 import io.github.ncorror.nekoflash.usb.api.UsbInterfaceKind
 import io.github.ncorror.nekoflash.usb.api.UsbMatchConfidence
 import io.github.ncorror.nekoflash.usb.api.UsbTransferType
+import org.junit.Assert.assertTrue
 
 /**
  * Подставной интерфейс: заранее заданная очередь исходов передачи.
@@ -232,12 +233,18 @@ internal data class SentPacket(
  * Писатель отправляет заголовок и следом payload, возможно кусками, поэтому
  * собрать кадр обратно можно только по объявленной в заголовке длине — что
  * заодно проверяет, что заголовок и payload действительно согласованы.
+ *
+ * Незаконченный хвост снимка отбрасывается. Отправлять может **чужой** поток —
+ * цикл раскладки подтверждает принятое, — и снимок, взятый между заголовком и
+ * payload, показал бы половину кадра. Раньше на таком снимке функция падала по
+ * выходу за границу списка, что выглядело бы как поломка писателя.
  */
 internal fun FakeUsbTransportHandle.sentFrames(): List<SentPacket> {
     val sent = sentSnapshot()
     val frames = mutableListOf<SentPacket>()
     var index = 0
-    while (index < sent.size) {
+    var torn = false
+    while (index < sent.size && !torn) {
         val headerBytes = sent[index]
         index += 1
         val decoded = AdbPacketHeader.decode(headerBytes, AdbInboundFraming.MODERN_MAX_PAYLOAD_BYTES)
@@ -245,16 +252,67 @@ internal fun FakeUsbTransportHandle.sentFrames(): List<SentPacket> {
         val header = decoded.header
         val payload = ByteArray(header.payloadLength)
         var collected = 0
-        while (collected < header.payloadLength) {
+        while (collected < header.payloadLength && index < sent.size) {
             val part = sent[index]
             index += 1
             part.copyInto(payload, collected)
             collected += part.size
         }
-        frames += SentPacket(header.command, header.arg0, header.arg1, payload)
+        if (collected < header.payloadLength) {
+            torn = true
+        } else {
+            frames += SentPacket(header.command, header.arg0, header.arg1, payload)
+        }
     }
     return frames
 }
+
+/**
+ * Ждёт, пока отправленных кадров станет не меньше [count], и отдаёт их.
+ *
+ * Нужно там, где кадр пишет не тот поток, что вернул управление тесту. Долг
+ * устройству — `OKAY` за принятый блок и ответное `CLSE` — платит
+ * [AdbDispatchLoop], и платит **после** того, как разложил пакет по ящикам, то
+ * есть уже разбудив потребителя. Порядок такой намеренно: отправлять под
+ * замком диспетчера значило бы держать замок всё время передачи (до пяти
+ * секунд по [AdbPacketWriter.DEFAULT_SEND_TIMEOUT_MS]) и блокировать этим
+ * открытие чужих потоков — ровно ту одновременность, ради которой затевался
+ * `docs/adr/0004_CONCURRENT_ADB_DISPATCHER_RU.md`.
+ *
+ * Поэтому «мы отправили X» проверяется ожиданием, а не снимком сразу после
+ * возврата вызова. Снимок наблюдает чужой поток и держится на планировщике:
+ * на одном ядре такая проверка падала в половине прогонов и однажды уронила CI
+ * (`07` §6.49).
+ */
+internal fun FakeUsbTransportHandle.awaitSentFrames(
+    count: Int,
+    timeoutMillis: Long = AWAIT_FRAMES_MS,
+): List<SentPacket> {
+    val deadline = System.nanoTime() + timeoutMillis * NANOS_PER_MILLI
+    var frames = sentFrames()
+    while (frames.size < count && System.nanoTime() < deadline) {
+        Thread.sleep(AWAIT_POLL_MS)
+        frames = sentFrames()
+    }
+    assertTrue(
+        "ждали кадров: $count, отправлено ${frames.size} — " +
+            frames.joinToString { frame -> commandName(frame.command) },
+        frames.size >= count,
+    )
+    return frames
+}
+
+/** Команда как четыре буквы: в сообщении об ошибке число ничего не говорит. */
+internal fun commandName(command: Long): String =
+    (0 until COMMAND_BYTES).joinToString("") { index ->
+        (((command shr (index * Byte.SIZE_BITS)) and BYTE_MASK).toInt().toChar()).toString()
+    }
+
+private const val AWAIT_FRAMES_MS = 5_000L
+private const val AWAIT_POLL_MS = 2L
+private const val NANOS_PER_MILLI = 1_000_000L
+private const val COMMAND_BYTES = 4
+private const val BYTE_MASK = 0xFFL
 
 /** Собирает 24-байтный заголовок для теста. */
 internal fun header(

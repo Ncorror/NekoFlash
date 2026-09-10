@@ -160,7 +160,11 @@ class AdbInteractiveShellTest {
         )
         val shell = device.opening()
         shell.collect(expected = 2)
-        val sentAfterExit = device.handle.sentFrames().size
+        // К этому моменту ушли три кадра: OPEN и CLSE от сессии, OKAY за
+        // принятый блок — от цикла раскладки. Последних двух ждём: порядок у
+        // них не определён, и без ожидания «ничего не изменилось» сравнивало бы
+        // два разных момента, а не два состояния (`07` §6.49).
+        val sentAfterExit = device.handle.awaitSentFrames(3).size
 
         assertTrue(shell.pump().isEmpty())
         assertEquals(sentAfterExit, device.handle.sentFrames().size)

@@ -51,13 +51,23 @@ class AdbServiceCallTest {
         assertEquals(2, acknowledgements)
     }
 
+    /**
+     * Закрытие устройства подтверждается ответным `CLSE`.
+     *
+     * Кадра приходится **дожидаться**: его пишет цикл раскладки, и пишет уже
+     * после того, как разбудил вызов концом ящика. Снимок сразу после возврата
+     * `run` наблюдал бы чужой поток — так эта проверка и падала (`07` §6.49).
+     */
     @Test
     fun closedStreamIsAcknowledgedBack() {
         val device = ScriptedDevice(okay(), close())
 
         device.call().run(SERVICE)
 
-        assertEquals(AdbCommand.CLSE, device.handle.sentFrames().last().command)
+        assertEquals(
+            listOf(AdbCommand.OPEN, AdbCommand.CLSE),
+            device.handle.awaitSentFrames(2).map { it.command },
+        )
     }
 
     /** Закрытие без OKAY — отказ сервиса, а не пустой ответ. */
@@ -99,7 +109,10 @@ class AdbServiceCallTest {
         val outcome = device.call().run(SERVICE, maxOutputBytes = 15)
 
         assertEquals(AdbServiceFailure.OUTPUT_TOO_LARGE, (outcome as AdbServiceOutcome.Failed).reason)
-        assertEquals(AdbCommand.CLSE, device.handle.sentFrames().last().command)
+        // Порядок двух последних кадров не определён: `OKAY` за второй блок
+        // пишет цикл раскладки, `CLSE` — сам вызов, и это разные потоки.
+        // Утверждается то, что здесь и требуется: поток закрыт ровно один раз.
+        assertEquals(1, device.handle.awaitSentFrames(4).count { it.command == AdbCommand.CLSE })
     }
 
     @Test
