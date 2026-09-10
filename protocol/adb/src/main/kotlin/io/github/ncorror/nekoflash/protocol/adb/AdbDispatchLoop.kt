@@ -30,9 +30,27 @@ internal class AdbDispatchLoop(
     @Volatile
     private var running = true
 
+    @Volatile
+    private var transportEnd: AdbMailboxEnd? = null
+
     /** Работает ли цикл. */
     val active: Boolean
         get() = running
+
+    /**
+     * Чем кончился **транспорт**. `null` — жив.
+     *
+     * Отличается от [active] намеренно: остановленный по просьбе цикл — это не
+     * умерший транспорт, и путать их нельзя. Поле заполняется только там, где
+     * читатель принёс беду, и не заполняется при [stop].
+     *
+     * Нужно тому, кто уже получил конец своего потока и не может узнать о
+     * судьбе транспорта из ящика: ящик хранит **первую** причину, и поздний
+     * обрыв в нём не виден. Так устроен разбор ответа на `reboot:`
+     * (`07` §6.47).
+     */
+    val transportEndedBy: AdbMailboxEnd?
+        get() = transportEnd
 
     /**
      * Крутит приём, пока транспорт жив или пока не попросят остановиться.
@@ -64,6 +82,7 @@ internal class AdbDispatchLoop(
             AdbReadOutcome.Idle -> Unit
 
             AdbReadOutcome.Closed -> {
+                transportEnd = AdbMailboxEnd.TRANSPORT_CLOSED
                 dispatcher.abandonAll(AdbMailboxEnd.TRANSPORT_CLOSED, "transport closed")
                 running = false
             }
@@ -72,6 +91,7 @@ internal class AdbDispatchLoop(
             // логический поток: после неё неизвестно, где начинается следующий
             // пакет. Уцелевших потоков не бывает (`03` §3).
             is AdbReadOutcome.Failed -> {
+                transportEnd = AdbMailboxEnd.FRAMING_LOST
                 dispatcher.abandonAll(
                     AdbMailboxEnd.FRAMING_LOST,
                     "${outcome.reason.name} ${outcome.detail}",

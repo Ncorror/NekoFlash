@@ -101,6 +101,9 @@ public class AdbConnection(
     private val reboots = AdbReboot(
         writer = writer,
         dispatcher = dispatcher,
+        // Судьбу транспорта знает цикл: ящик потока хранит первую причину, и
+        // поздний обрыв в нём не виден (`07` §6.47).
+        transportEnd = { dispatchLoop.transportEndedBy },
         diagnostics = diagnostics,
     )
 

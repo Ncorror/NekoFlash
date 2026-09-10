@@ -165,6 +165,22 @@ public object AdbServicePolicy {
 public class AdbReboot(
     private val writer: AdbPacketWriter,
     private val dispatcher: AdbStreamDispatcher,
+    /**
+     * Чем кончился транспорт. `null` — жив.
+     *
+     * Спрашивается уже после конца своего потока, когда ящик ничего нового не
+     * расскажет: он хранит первую причину. По умолчанию — «жив всегда», и
+     * тогда ответ текстом остаётся `UNKNOWN`, как было до `07` §6.47.
+     */
+    private val transportEnd: () -> AdbMailboxEnd? = { null },
+    /**
+     * Сколько ждать ухода с шины после ответа словами.
+     *
+     * Вынесено в параметр, а не оставлено константой, по той же причине, что и
+     * таймаут вызова: тест не должен платить за него настоящими секундами.
+     * Значение по умолчанию выбрано по измеренной паузе — см. [ANSWER_GRACE_MS].
+     */
+    private val answerGraceMillis: Long = ANSWER_GRACE_MS,
     private val diagnostics: DiagnosticSink = DiagnosticSink { },
     private val clock: () -> Instant = { Clock.systemUTC().instant() },
     private val elapsedNanos: () -> Long = { System.nanoTime() },
@@ -276,18 +292,7 @@ public class AdbReboot(
             if (said.isEmpty()) {
                 accepted(service, item.detail)
             } else {
-                // Состояние здесь **неизвестно**, а не «не тронуто». Граница
-                // мутации осталась позади ещё при записи `OPEN`, и после неё
-                // доказать нетронутость нечем. Прежде тут стояло `UNTOUCHED`,
-                // и это противоречило правилу, записанному в KDoc этого же
-                // класса; §6.46 показал цену: recovery сказала `reboot.` и
-                // ушла в перезагрузку через треть секунды после нашего ответа.
-                failed(
-                    service,
-                    AdbRebootFailure.DEVICE_ANSWERED,
-                    said.toString().trim(),
-                    AdbRebootDevice.UNKNOWN,
-                )
+                answered(service, said.toString().trim())
             }
 
         AdbMailboxEnd.FRAMING_LOST -> failed(
@@ -312,6 +317,39 @@ public class AdbReboot(
             item.detail,
             AdbRebootDevice.UNKNOWN,
         )
+    }
+
+    /**
+     * Устройство ответило словами. Что дальше — решает шина, а не текст.
+     *
+     * Толковать сказанное мы не беремся: `reboot.` и `not permitted` для нас
+     * одинаково непрозрачны. Зато видно наблюдаемое — уйдёт устройство с шины
+     * или останется. Ушло: перешло, и слова переносятся в evidence целиком.
+     * Осталось: состояние **неизвестно**, потому что граница мутации позади
+     * (`03` §3), и доказать нетронутость нечем.
+     *
+     * Ожидание добавляется к общему таймауту, а не отнимается от него: цена —
+     * несколько секунд, выигрыш — верный ответ вместо «не знаю» (`07` §6.47).
+     */
+    private fun answered(service: String, said: String): AdbRebootOutcome {
+        val deadline = elapsedNanos() + answerGraceMillis * NANOS_PER_MILLI
+        var end = transportEnd()
+        while (end == null && elapsedNanos() < deadline) {
+            Thread.sleep(POLL_MS)
+            end = transportEnd()
+        }
+        return when (end) {
+            AdbMailboxEnd.TRANSPORT_CLOSED ->
+                accepted(service, "device said: $said; then left the bus")
+
+            // Потеря кадра ожидаемым разрывом не становится ни при каких
+            // условиях — прямое требование Legacy, сохранённое и здесь.
+            AdbMailboxEnd.FRAMING_LOST ->
+                failed(service, AdbRebootFailure.FRAMING_LOST, said, AdbRebootDevice.UNKNOWN)
+
+            else ->
+                failed(service, AdbRebootFailure.DEVICE_ANSWERED, said, AdbRebootDevice.UNKNOWN)
+        }
     }
 
     private fun accepted(service: String, evidence: String): AdbRebootOutcome {
@@ -364,6 +402,19 @@ public class AdbReboot(
 
         /** Ожидание режется, чтобы дедлайн проверялся, даже когда устройство молчит. */
         private const val SLICE_MS = 250L
+
+        /**
+         * Сколько ждать ухода с шины после ответа словами.
+         *
+         * В §6.46 recovery ушла через 336 мс. Две секунды дают запас почти в
+         * шесть раз и не заставляют оператора ждать заметно дольше. Значение
+         * выбрано по **измеренной** паузе, и если прогон §6.47 покажет
+         * большую — менять надо по новому числу, а не подбором.
+         */
+        public const val ANSWER_GRACE_MS: Long = 2_000L
+
+        /** Шаг опроса шины: спрашивать чаще незачем, реже — терять точность. */
+        private const val POLL_MS = 25L
 
         private const val NANOS_PER_MILLI = 1_000_000L
     }

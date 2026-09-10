@@ -122,6 +122,54 @@ class AdbRebootTest {
     }
 
     /**
+     * Ответ словами и уход с шины — это переход, а не отказ.
+     *
+     * Случай §6.46: recovery сказала `reboot.` и через 336 мс ушла. Решает
+     * наблюдаемое — шина, — а не толкование текста. Слова при этом не
+     * теряются: оператору они нужны.
+     */
+    @Test
+    fun wordsFollowedByLeavingTheBusAreATransition() {
+        val device = ScriptedDevice(okay(), write("reboot."), close())
+
+        val outcome = device.reboot(transportEnd = { AdbMailboxEnd.TRANSPORT_CLOSED })
+            .reboot("") as AdbRebootOutcome.Accepted
+
+        assertTrue(outcome.evidence, outcome.evidence.contains("reboot."))
+        assertTrue(outcome.evidence, outcome.evidence.contains("left the bus"))
+    }
+
+    /**
+     * Ответ словами при живой шине оставляет состояние неизвестным.
+     *
+     * Ветка, ради которой всё и делалось. На подопытном устройстве её вызвать
+     * нечем — `vayu` в перезагрузке не отказывает, — и `07` §6.47 записывает
+     * это прямо: проверяется она только здесь.
+     */
+    @Test
+    fun wordsWithoutLeavingTheBusStayUnknown() {
+        val device = ScriptedDevice(okay(), write("not permitted"), close())
+
+        val outcome = device.reboot().reboot("") as AdbRebootOutcome.Failed
+
+        assertEquals(AdbRebootFailure.DEVICE_ANSWERED, outcome.reason)
+        assertEquals(AdbRebootDevice.UNKNOWN, outcome.device)
+        assertTrue(outcome.detail.contains("not permitted"))
+    }
+
+    /** Потеря кадра ожидаемым разрывом не становится даже после слов. */
+    @Test
+    fun wordsFollowedByALostFrameAreNotATransition() {
+        val device = ScriptedDevice(okay(), write("reboot."), close())
+
+        val outcome = device.reboot(transportEnd = { AdbMailboxEnd.FRAMING_LOST })
+            .reboot("") as AdbRebootOutcome.Failed
+
+        assertEquals(AdbRebootFailure.FRAMING_LOST, outcome.reason)
+        assertEquals(AdbRebootDevice.UNKNOWN, outcome.device)
+    }
+
+    /**
      * `UNTOUCHED` остаётся только до границы мутации.
      *
      * Два случая, и оба про то, что запрос не ушёл. Всё после границы —
@@ -241,14 +289,24 @@ class AdbRebootTest {
 
         private val harness = harnesses.start(handle)
 
-        fun reboot(diagnostics: InMemoryDiagnosticSink = InMemoryDiagnosticSink()) = AdbReboot(
+        fun reboot(
+            diagnostics: InMemoryDiagnosticSink = InMemoryDiagnosticSink(),
+            transportEnd: () -> AdbMailboxEnd? = { null },
+        ) = AdbReboot(
             writer = harness.writer,
             dispatcher = harness.dispatcher,
+            transportEnd = transportEnd,
+            // Ждать настоящие две секунды в каждом тесте про ответ словами —
+            // это десять секунд на сюиту, которые платят все и всегда.
+            answerGraceMillis = GRACE_MS,
             diagnostics = diagnostics,
         )
     }
 
     private companion object {
+        /** Окно ожидания в тестах: проверяется логика, а не терпение. */
+        const val GRACE_MS = 50L
+
         const val REMOTE_ID = 42
         const val LOCAL_ID = 1
 
