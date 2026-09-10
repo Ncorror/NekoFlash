@@ -102,20 +102,40 @@ class AdbRebootTest {
     }
 
     /**
-     * Слово устройства весомее молчаливого закрытия.
+     * Ответ текстом — это слова устройства, а не вердикт, и состояние после
+     * него **неизвестно**.
      *
-     * `reboot:` в норме молчит; если оно ответило текстом, значит отказало.
-     * Это class B из `03` §2 — авторитет устройства, а не наша догадка.
+     * Проверка переписана по итогам `07` §6.46. Раньше здесь утверждалось, что
+     * текст означает отказ и нетронутое устройство. Живая recovery ответила
+     * словом `reboot.` и ушла в перезагрузку через 336 мс — то есть прежнее
+     * утверждение было ложью ровно в том месте, где цена лжи наибольшая.
      */
     @Test
-    fun textFromTheDeviceIsARefusalAndNotATransition() {
+    fun textFromTheDeviceLeavesTheStateUnknown() {
         val device = ScriptedDevice(okay(), write("reboot not permitted"), close())
 
         val outcome = device.reboot().reboot("recovery") as AdbRebootOutcome.Failed
 
-        assertEquals(AdbRebootFailure.DEVICE_REFUSED, outcome.reason)
-        assertEquals(AdbRebootDevice.UNTOUCHED, outcome.device)
+        assertEquals(AdbRebootFailure.DEVICE_ANSWERED, outcome.reason)
+        assertEquals(AdbRebootDevice.UNKNOWN, outcome.device)
         assertTrue(outcome.detail.contains("reboot not permitted"))
+    }
+
+    /**
+     * `UNTOUCHED` остаётся только до границы мутации.
+     *
+     * Два случая, и оба про то, что запрос не ушёл. Всё после границы —
+     * `UNKNOWN`, каким бы понятным ни казался ответ.
+     */
+    @Test
+    fun untouchedIsClaimedOnlyBeforeTheBoundary() {
+        val refused = ScriptedDevice(okay(), write("no"), close())
+            .reboot().reboot("") as AdbRebootOutcome.Failed
+        val neverSent = ScriptedDevice(outbound = listOf(FakeUsbTransportHandle.Transfer.Completed(0)))
+            .reboot().reboot("") as AdbRebootOutcome.Failed
+
+        assertEquals(AdbRebootDevice.UNKNOWN, refused.device)
+        assertEquals(AdbRebootDevice.UNTOUCHED, neverSent.device)
     }
 
     /**
@@ -205,8 +225,8 @@ class AdbRebootTest {
         device.reboot(sink).reboot("")
 
         val failure = sink.snapshot().single { it.message == "reboot_failed" }
-        assertEquals(AdbRebootDevice.UNTOUCHED.name, failure.fields["device"])
-        assertEquals(AdbRebootFailure.DEVICE_REFUSED.name, failure.fields["reason"])
+        assertEquals(AdbRebootDevice.UNKNOWN.name, failure.fields["device"])
+        assertEquals(AdbRebootFailure.DEVICE_ANSWERED.name, failure.fields["reason"])
     }
 
     private inner class ScriptedDevice(
