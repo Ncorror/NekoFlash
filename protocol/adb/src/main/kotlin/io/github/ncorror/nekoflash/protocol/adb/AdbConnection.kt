@@ -27,7 +27,7 @@ import kotlinx.coroutines.launch
  * знает, где этот поток живёт.
  */
 public class AdbConnection(
-    handle: UsbTransportHandle,
+    private val handle: UsbTransportHandle,
     keyStore: AdbKeyStore,
     apiLevel: Int,
     diagnostics: DiagnosticSink = DiagnosticSink { },
@@ -101,9 +101,10 @@ public class AdbConnection(
     private val reboots = AdbReboot(
         writer = writer,
         dispatcher = dispatcher,
-        // Судьбу транспорта знает цикл: ящик потока хранит первую причину, и
-        // поздний обрыв в нём не виден (`07` §6.47).
-        transportEnd = { dispatchLoop.transportEndedBy },
+        // Ящик потока хранит первую причину, и поздний обрыв в нём не виден,
+        // поэтому судьба транспорта спрашивается отдельно — и у него самого,
+        // а не только у цикла (`07` §6.48).
+        transportEnd = { AdbTransportEnd.of(dispatchLoop.transportEndedBy, handle.held) },
         diagnostics = diagnostics,
     )
 

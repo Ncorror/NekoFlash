@@ -4,6 +4,7 @@ import io.github.ncorror.nekoflash.core.diagnostics.InMemoryDiagnosticSink
 import io.github.ncorror.nekoflash.usb.api.UsbTransferFailure
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -119,6 +120,37 @@ class AdbRebootTest {
         assertEquals(AdbRebootFailure.DEVICE_ANSWERED, outcome.reason)
         assertEquals(AdbRebootDevice.UNKNOWN, outcome.device)
         assertTrue(outcome.detail.contains("reboot not permitted"))
+    }
+
+    /**
+     * Устройство ушло, а цикл кончился по просьбе — это всё равно уход.
+     *
+     * Регрессия на прогон `07` §6.48. Там `transportEnd` смотрел только на
+     * цикл, а цикл в production останавливает владелец: об отпадении первым
+     * узнаёт USB-слой. Поле цикла оставалось пустым, и уход устройства через
+     * 306 мс мы не заметили.
+     */
+    @Test
+    fun aReleasedInterfaceCountsAsLeavingTheBus() {
+        assertEquals(
+            AdbMailboxEnd.TRANSPORT_CLOSED,
+            AdbTransportEnd.of(loopEnd = null, held = false),
+        )
+    }
+
+    /** Пока интерфейс удерживается и цикл молчит — транспорт жив. */
+    @Test
+    fun aHeldInterfaceMeansTheTransportIsAlive() {
+        assertNull(AdbTransportEnd.of(loopEnd = null, held = true))
+    }
+
+    /** Причина, которую назвал цикл, весомее: она точнее. */
+    @Test
+    fun theLoopsOwnReasonWins() {
+        assertEquals(
+            AdbMailboxEnd.FRAMING_LOST,
+            AdbTransportEnd.of(loopEnd = AdbMailboxEnd.FRAMING_LOST, held = false),
+        )
     }
 
     /**
