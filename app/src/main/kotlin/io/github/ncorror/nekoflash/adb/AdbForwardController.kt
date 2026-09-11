@@ -111,6 +111,20 @@ public class AdbForwardController(
     private val listen: (Int) -> ServerSocket = { port ->
         ServerSocket(port, BACKLOG, InetAddress.getLoopbackAddress())
     },
+    /**
+     * Что платформа говорит о праве открыть сокет.
+     *
+     * Подставляется владельцем, потому что `Context` сюда не спускается. По
+     * умолчанию — `unknown`: соврать «granted» там, где не спрашивали, хуже,
+     * чем сказать, что не знаем.
+     *
+     * Нужно ровно для одной строки — отказа завести слушатель. Прогон `07`
+     * §6.52 показал, зачем: сокет отказывал **на создании**, до всякой
+     * привязки, и по журналу нельзя было отличить «мы не просили разрешения»
+     * от «просили, дали, а отказывает всё равно кто-то другой». Первое — наша
+     * ошибка, второе — нет, и лечатся они по-разному.
+     */
+    private val networkPermission: () -> String = { UNKNOWN_PERMISSION },
 ) {
     private val mutableState = MutableStateFlow(AdbForwardState.None)
 
@@ -156,7 +170,8 @@ public class AdbForwardController(
         val server = try {
             listen(requestedPort)
         } catch (failure: IOException) {
-            fail("port $requestedPort: ${failure.message ?: failure.javaClass.simpleName}")
+            val reason = failure.message ?: failure.javaClass.simpleName
+            fail("port $requestedPort: $reason (INTERNET=${networkPermission()})")
             return
         }
         val forward = Forward(server, address)
@@ -305,6 +320,9 @@ public class AdbForwardController(
         private const val BACKLOG = 8
 
         private const val DIAGNOSTIC_CATEGORY = "adb"
+
+        /** Владелец не сказал — значит не знаем, и так и записываем. */
+        private const val UNKNOWN_PERMISSION = "unknown"
 
         private fun closeQuietly(closeable: java.io.Closeable) {
             try {

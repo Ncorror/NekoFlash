@@ -48,8 +48,43 @@ public object HostFacts {
         put("host.supportedAbis", Build.SUPPORTED_ABIS.joinToString(","))
 
         put("host.usbHostFeature", usbHostFeature(context))
+        put("app.permissions", permissions(context))
         put("host.androidId", androidId(context))
         put("host.serial", HOST_SERIAL_UNAVAILABLE)
+    }
+
+    /**
+     * Состояние разрешения, как его видит сама платформа.
+     *
+     * Строка вида `INTERNET=granted`. Нужна ровно затем, зачем нужен
+     * [usbHostFeature]: отличить «приложение не просило» от «просило, дали, а
+     * не работает всё равно». Прогон `07` §6.52 упёрся именно в это — сокет
+     * отказывал на создании, и по журналу нельзя было понять, чей это отказ.
+     */
+    public fun permissionState(context: Context, permission: String): String =
+        if (context.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED) {
+            GRANTED
+        } else {
+            DENIED
+        }
+
+    /**
+     * Все объявленные разрешения с их состоянием.
+     *
+     * Объявленное, но не выданное разрешение — самая частая причина «работает у
+     * меня и не работает у тебя», и в отчёте оно должно быть видно, а не
+     * выводиться из поведения.
+     */
+    private fun permissions(context: Context): String = try {
+        val info = context.packageManager.getPackageInfo(
+            context.packageName,
+            PackageManager.GET_PERMISSIONS,
+        )
+        info.requestedPermissions
+            ?.joinToString(",") { name -> "${name.substringAfterLast('.')}=${permissionState(context, name)}" }
+            ?: NONE_DECLARED
+    } catch (unavailable: PackageManager.NameNotFoundException) {
+        "$UNAVAILABLE:${unavailable.javaClass.simpleName}"
     }
 
     /**
@@ -104,6 +139,11 @@ public object HostFacts {
     private fun legacyVersionCode(info: PackageInfo): Long = info.versionCode.toLong()
 
     private const val UNAVAILABLE = "unavailable"
+    private const val NONE_DECLARED = "none"
+
+    /** Ответ платформы называется её словами, а не пересказывается. */
+    private const val GRANTED = "granted"
+    private const val DENIED = "denied"
 
     /**
      * Серийный номер хоста платформа не отдаёт обычному приложению.

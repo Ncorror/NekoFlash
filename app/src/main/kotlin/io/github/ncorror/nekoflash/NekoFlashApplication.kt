@@ -1,5 +1,6 @@
 package io.github.ncorror.nekoflash
 
+import android.Manifest
 import android.app.Application
 import android.net.Uri
 import android.os.Build
@@ -111,6 +112,8 @@ public class NekoFlashApplication : Application() {
             executor = adbOperationThreads,
             terminalWriterExecutor = adbWriterThread,
             diagnostics = events,
+            // Факт, а не догадка: спрашивается у платформы в момент отказа.
+            networkPermission = { HostFacts.permissionState(this, Manifest.permission.INTERNET) },
         )
     }
 

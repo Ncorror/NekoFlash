@@ -80,6 +80,42 @@ class AdbForwardControllerTest {
         assertTrue(controller.state.value.forwards.isEmpty())
     }
 
+    /**
+     * Отказ завести слушатель называет и состояние разрешения.
+     *
+     * Без этого по журналу не отличить «мы не просили разрешения» от «просили,
+     * дали, а отказывает всё равно кто-то другой» — первое наша ошибка, второе
+     * нет. Прогон `07` §6.52 упёрся ровно в это.
+     */
+    @Test
+    fun aRefusedListenerNamesThePermissionItHas() {
+        val taken = loopbackListener()
+        val controller = AdbForwardController(
+            executor = pool,
+            networkPermission = { "granted" },
+        ).also { live -> opened += AutoCloseable { live.stopAll("test finished") } }
+
+        controller.add(HeldSource(), localPort = taken.localPort, address = ADDRESS)
+
+        assertTrue(await { controller.state.value.failure != null })
+        assertTrue(
+            "отказ должен называть разрешение: ${controller.state.value.failure}",
+            controller.state.value.failure.orEmpty().contains("INTERNET=granted"),
+        )
+    }
+
+    /** Не спросили — так и записываем, а не выдаём умолчание за ответ платформы. */
+    @Test
+    fun anUnaskedPermissionIsReportedAsUnknown() {
+        val taken = loopbackListener()
+        val controller = controller()
+
+        controller.add(HeldSource(), localPort = taken.localPort, address = ADDRESS)
+
+        assertTrue(await { controller.state.value.failure != null })
+        assertTrue(controller.state.value.failure.orEmpty().contains("INTERNET=unknown"))
+    }
+
     @Test
     fun aClientConnectionIsHandedToTheDevice() {
         val source = HeldSource()
