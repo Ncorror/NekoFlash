@@ -2,6 +2,11 @@
 
 Статус в этой таблице — **целевой контракт нового продукта**, а не обещание первого milestone.
 
+**Готовности здесь нет и быть не должно.** Колонки называют источник опыта и
+обязательность, а не сделанное: готовность живёт только в чеклисте
+`09_IMPLEMENTATION_ROADMAP_RU.md`. Слово «готово» один раз просочилось сюда в
+колонку источника и пережило свою правду — аудит перед Phase 5 его убрал.
+
 | Область | Обязательная capability | Источник опыта | Новый контракт |
 |---|---|---|---|
 | USB | descriptor-based discovery/classification | A2 | Да |
@@ -9,7 +14,7 @@
 | USB | Java USB fallback + native high-performance backend | A2 | Да, после пересмотра API |
 | ADB | CNXN/AUTH/RSA | Legacy + A2 | Да |
 | ADB | generic `openService(destination)` | Legacy/AOSP | **Обязательно** |
-| ADB | concurrent multi-stream router | **готово** (ADR-0004; `07` §6.40–§6.43) | **Обязательно** |
+| ADB | concurrent multi-stream router | new architecture (ADR-0004) | **Обязательно** |
 | ADB | `shell,v2` stdout/stderr/exit | Legacy/AOSP | **Обязательно** |
 | ADB | legacy shell fallback | Legacy | Да |
 | ADB | interactive PTY shell | Legacy | **Обязательно** |
@@ -19,7 +24,7 @@
 | ADB | push/pull | Legacy | **Обязательно** |
 | ADB | install / install-multiple strategy | Legacy/AOSP | **Обязательно** |
 | ADB | reboot targets | Legacy | Да |
-| ADB | forward/reverse / advanced services | AOSP | Планируется как normal professional capability |
+| ADB | forward/reverse / advanced services | AOSP + new architecture (ADR-0005) | Да, обычная профессиональная возможность |
 | Recovery | detect/identify Recovery | A2 | Да |
 | Recovery | bounded logs/evidence | A2 | Да, поверх generic ADB |
 | Recovery | ADB Sideload request-driven transfer | A2 | **Обязательно** |

@@ -1,6 +1,6 @@
 # NekoFlash — canonical documentation for the clean new project
 
-Дата актуализации: **2026-09-07**
+Дата актуализации: **2026-09-11**
 Статус: **каноническая документация активного clean repository**.
 
 Это не новый бренд и не отдельный продукт «NEXT». Мы продолжаем делать **NekoFlash**, но начинаем его новую кодовую базу с чистой архитектуры.
@@ -31,9 +31,9 @@
 
 Architecture Decision Records — в `adr/`:
 
-- `0001_PROJECT_IDENTITY_AND_BUILD_BASELINE_RU.md` — identity, Android/toolchain baseline, начальные модули, авторитет CI.
-- `0002_LOCKED_BOOTLOADER_IS_ADVISORY_RU.md` — отмена product-level hard guard: подтверждённый `LOCKED` даёт предупреждение и typed confirmation, а не запрет.
-- `0003_PHASE2_TECHNICAL_BASELINE_RU.md` — `api()` вместо `implementation()`, конкурентная модель, DI, статический анализ.
+- `0001_PROJECT_IDENTITY_AND_BUILD_BASELINE_RU.md` — **ACCEPTED**: identity, Android/toolchain baseline, начальные модули, авторитет CI.
+- `0002_LOCKED_BOOTLOADER_IS_ADVISORY_RU.md` — **ACCEPTED**: отмена product-level hard guard: подтверждённый `LOCKED` даёт предупреждение и typed confirmation, а не запрет.
+- `0003_PHASE2_TECHNICAL_BASELINE_RU.md` — **ACCEPTED**: `api()` вместо `implementation()`, конкурентная модель, DI, статический анализ.
 - `0004_CONCURRENT_ADB_DISPATCHER_RU.md` — **ACCEPTED** 2026-09-09: постоянный читающий цикл на стороне соединения и почтовые ящики логических потоков вместо единственного потребителя. Принят по четырём прогонам `07` §6.40–§6.43.
 - `0005_LOCAL_SOCKET_FORWARDING_RU.md` — **ACCEPTED** 2026-09-11: проброс портов, обе половины доказаны на железе (`07` §6.59 для `forward`, §6.65–§6.66 для `reverse`). `forward` строится на существующем диспетчере и делается первым; `reverse` требует входящего `OPEN`, которого маршрутизатор не принимает, и формат его запроса выясняется наблюдением, а не по памяти.
 
@@ -60,7 +60,9 @@ Legacy и A2 заморожены как **reference/evidence**. Ни один �
 - Phase 1: **COMPLETE / PASS** — clean bootstrap, verified tracked wrapper, AGP `9.3.2`, bilingual resource foundation, launcher/adaptive/monochrome icon, explicit no-backup/D2D policy, executable hygiene checks, Lint `0 errors`, debug APK assembly.
 - Phase 2: **COMPLETE / PASS** — USB + Target/Session vertical slice закрыт аппаратным гейтом.
 - Phase 3: **COMPLETE** — ADB foundation, `shell,v2`, legacy fallback и interactive shell подтверждены аппаратными прогонами.
-- Current work: **Phase 4 — ADB professional services**. Read-only Sync (`STAT`/`RECV`) подключён к production UI и доказан на железе. `SEND` написан вместе с разбором границы мутации и подключён к экрану, но аппаратного прогона ещё не имеет — гейт `07` §6.34; install, reboot, raw services и concurrent service dispatcher не закрыты.
+- Phase 4: **COMPLETE** — ADB professional services; незапертых пунктов нет, остальное ждёт Phase 8 по решению (`07` §6.66).
+- Current work: **Phase 5 — Fastboot generic engine**.
+- Статус каждого пункта — только в чеклисте `09_IMPLEMENTATION_ROADMAP_RU.md`. Здесь называются фазы: пересказ пунктов уже расходился с действительностью и устаревал первым.
 - Termux: Git/worktree/edit/commit/push.
 - GitHub Actions: authoritative build/test/lint/CI environment.
 - UI languages: **English (default) + Русский (first-class)**.

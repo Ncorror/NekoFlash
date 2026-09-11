@@ -11,11 +11,14 @@ Recovery and vendor workflows.
 - Phase 1: complete; clean application/bootstrap foundation verified by CI.
 - Phase 2: complete; USB + Target/Session ownership verified on hardware.
 - Phase 3: complete; ADB transport, protocol engines and the terminal verified on hardware.
-- Phase 4: **current / in progress**; ADB professional services. Read-only Sync (`STAT`/`RECV`) is
-  wired into the production UI and proven on hardware. Sync `SEND` exists with its mutation-boundary
-  rules and is reachable from the screen, but has no hardware run yet; install, reboot, raw services
-  and the concurrent service dispatcher are still open.
+- Phase 4: complete; ADB professional services — concurrent stream dispatcher, Sync `STAT`/`RECV`/`SEND`,
+  reboot, raw services and port forwarding, each proven on hardware.
+- Phase 5: **current / in progress**; Fastboot generic engine.
 - Legacy and A2 are reference/evidence only.
+
+Per-item status lives in `docs/09_IMPLEMENTATION_ROADMAP_RU.md` and nowhere else; the hardware
+runs behind it are in `docs/07_TESTING_CI_HARDWARE_EVIDENCE_RU.md`. This list names phases only:
+retelling item status here is exactly what went stale before.
 
 ## Product rule
 

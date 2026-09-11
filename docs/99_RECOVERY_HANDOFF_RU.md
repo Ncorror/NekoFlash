@@ -30,8 +30,8 @@
 
 ## Текущий статус
 
-Phase 0, 1, 2 и 3 — **COMPLETE**. Текущая работа — **Phase 4: ADB professional
-services**. Legacy/A2 frozen.
+Phase 0, 1, 2, 3 и 4 — **COMPLETE**. Текущая работа — **Phase 5: Fastboot generic
+engine**. Legacy/A2 frozen.
 
 Модулей семь: `:app`, `:core:model`, `:core:diagnostics`, `:core:operation`,
 `:usb:api`, `:usb:android`, `:protocol:adb`. Тестов 537 (`@Test` в текущем дереве).
