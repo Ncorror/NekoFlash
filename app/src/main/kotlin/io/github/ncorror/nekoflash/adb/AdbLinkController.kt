@@ -110,6 +110,14 @@ public class AdbLinkController(
      * него есть собственные сокеты, которые переживают отдельную команду и
      * обязаны кончиться вместе с транспортом.
      */
+    /**
+     * Владелец обратных пробросов.
+     *
+     * Зеркало пробросов и их противоположность: там слушаем мы, здесь —
+     * устройство, и соединения приходят к нам входящими потоками.
+     */
+    private val reverseController = AdbReverseController(executor, diagnostics)
+
     private val forwardController = AdbForwardController(
         executor = executor,
         diagnostics = diagnostics,
@@ -155,6 +163,30 @@ public class AdbLinkController(
 
     /** Состояние пробросов портов. */
     public val forward: StateFlow<AdbForwardState> = forwardController.state
+
+    /** Состояние обратных пробросов. */
+    public val reverse: StateFlow<AdbReverseState> = reverseController.state
+
+    /** Что можно сделать с обратными пробросами. */
+    public val reverses: ReverseActions = ReverseActions()
+
+    /** Действия над обратными пробросами. Собраны так же и по той же причине. */
+    public inner class ReverseActions internal constructor() {
+        /** Просит устройство слушать [onDevice] и приводить соединения к [onHost]. */
+        public fun add(onDevice: String, onHost: String) {
+            reverseController.add(onDevice, onHost)
+        }
+
+        /** Спрашивает устройство, что оно слушает. */
+        public fun refresh() {
+            reverseController.refresh()
+        }
+
+        /** Снимает все обратные пробросы разом. */
+        public fun removeAll() {
+            reverseController.removeAll()
+        }
+    }
 
     /**
      * Действия над пробросами, собранные в один объект.
@@ -374,7 +406,11 @@ public class AdbLinkController(
         shellSessions.stop()
         // Слушатели переживают отдельную команду, но не транспорт: проброс
         // поверх мёртвого соединения принимал бы клиентов в никуда.
+        // Слушатели переживают отдельную команду, но не транспорт: проброс
+        // поверх мёртвого соединения принимал бы клиентов в никуда, а ожидание
+        // обратного — поток, идти по которому уже некуда.
         forwardController.stopAll("transport is gone")
+        reverseController.bind(null)
         // Цикл раскладки принадлежит соединению и обязан кончиться вместе с
         // ним: иначе он пережил бы SessionGeneration и продолжил читать
         // отпущенный интерфейс (ADR-0003 §2, ADR-0004 §4).
@@ -402,6 +438,12 @@ public class AdbLinkController(
         mutableState.value = when (val result = outcome.getOrNull()) {
             is AdbHandshakeOutcome.Connected -> {
                 this.connection = connection
+                // Право принимать потоки отдаётся сразу после рукопожатия, а не
+                // при первом запросе: устройство может слушать с прошлого раза —
+                // `reverse` переживает переподключение, — и тогда поток придёт
+                // раньше, чем оператор о чём-нибудь попросит.
+                reverseController.bind(connection.reverseSource(diagnostics))
+                connection.acceptInboundStreams(reverseController)
                 AdbLinkState.Connected(
                     generation = generation,
                     peerMode = result.banner.peerMode,

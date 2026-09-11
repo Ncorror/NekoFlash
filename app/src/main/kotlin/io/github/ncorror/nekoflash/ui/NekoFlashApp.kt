@@ -68,6 +68,7 @@ fun NekoFlashApp(
     reboot: RebootPanel = RebootPanel(),
     rawService: RawServicePanel = RawServicePanel(),
     forward: ForwardPanel = ForwardPanel(),
+    reverse: ReversePanel = ReversePanel(),
     terminalActions: TerminalActions = TerminalActions(),
     fileActions: FileActions = FileActions(),
     onExportDiagnostics: () -> Unit = {},
@@ -96,6 +97,7 @@ fun NekoFlashApp(
             reboot = reboot,
             rawService = rawService,
             forward = forward,
+            reverse = reverse,
             onExportDiagnostics = onExportDiagnostics,
             modifier = modifier,
         )
@@ -160,6 +162,7 @@ private fun Workspace(
     reboot: RebootPanel,
     rawService: RawServicePanel,
     forward: ForwardPanel,
+    reverse: ReversePanel,
     onExportDiagnostics: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -191,6 +194,7 @@ private fun Workspace(
             reboot = reboot,
             rawService = rawService,
             forward = forward,
+            reverse = reverse,
         )
         ActionsCard(
             exportStatus = exportStatus,
@@ -220,6 +224,7 @@ private fun SessionList(
     reboot: RebootPanel,
     rawService: RawServicePanel,
     forward: ForwardPanel,
+    reverse: ReversePanel,
 ) {
     if (sessions.isEmpty()) {
         Text(
@@ -252,6 +257,7 @@ private fun SessionList(
             reboot = reboot,
             rawService = rawService,
             forward = forward,
+            reverse = reverse,
         )
     }
     Text(
@@ -354,6 +360,7 @@ private fun SessionCard(
     reboot: RebootPanel,
     rawService: RawServicePanel,
     forward: ForwardPanel,
+    reverse: ReversePanel,
 ) {
     // Удерживается ли интерфейс, видно по самому состоянию сессии. Отдельный
     // список захваченных был бы вторым источником истины о том же самом.
@@ -388,6 +395,7 @@ private fun SessionCard(
                         reboot = reboot,
                         rawService = rawService,
                         forward = forward,
+                        reverse = reverse,
                     )
                 } else {
                     Button(onClick = if (claimed) onRelease else onClaim) {

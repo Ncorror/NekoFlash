@@ -22,6 +22,7 @@ import io.github.ncorror.nekoflash.ui.FileActions
 import io.github.ncorror.nekoflash.ui.ForwardPanel
 import io.github.ncorror.nekoflash.ui.RawServicePanel
 import io.github.ncorror.nekoflash.ui.RebootPanel
+import io.github.ncorror.nekoflash.ui.ReversePanel
 import io.github.ncorror.nekoflash.ui.TerminalActions
 import io.github.ncorror.nekoflash.ui.theme.NekoFlashTheme
 import io.github.ncorror.nekoflash.usb.api.UsbClaimResult
@@ -90,6 +91,7 @@ class MainActivity : ComponentActivity() {
                     reboot = rebootPanel(adbLink),
                     rawService = rawServicePanel(adbLink),
                     forward = forwardPanel(adbLink),
+                    reverse = reversePanel(adbLink),
                     onExportDiagnostics = { saveLauncher.launch(application.suggestedDiagnosticsFileName()) },
                 )
             }
@@ -117,6 +119,15 @@ private fun forwardPanel(adbLink: AdbLinkController): ForwardPanel = ForwardPane
     state = adbLink.forward.collectAsState().value,
     onAdd = adbLink.forwards::add,
     onRemove = adbLink.forwards::remove,
+)
+
+/** То же для обратных пробросов. */
+@Composable
+private fun reversePanel(adbLink: AdbLinkController): ReversePanel = ReversePanel(
+    state = adbLink.reverse.collectAsState().value,
+    onAdd = adbLink.reverses::add,
+    onRefresh = adbLink.reverses::refresh,
+    onRemoveAll = adbLink.reverses::removeAll,
 )
 
 private fun MainActivity.exportDiagnostics(

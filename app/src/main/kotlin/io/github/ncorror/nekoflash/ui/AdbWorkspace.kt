@@ -17,6 +17,8 @@ import io.github.ncorror.nekoflash.adb.AdbFileState
 import io.github.ncorror.nekoflash.adb.AdbForwardController
 import io.github.ncorror.nekoflash.adb.AdbForwardEntry
 import io.github.ncorror.nekoflash.adb.AdbForwardState
+import io.github.ncorror.nekoflash.adb.AdbReverseEntry
+import io.github.ncorror.nekoflash.adb.AdbReverseState
 import io.github.ncorror.nekoflash.adb.AdbLinkState
 import io.github.ncorror.nekoflash.adb.AdbRawServiceState
 import io.github.ncorror.nekoflash.adb.AdbRebootState
@@ -48,6 +50,7 @@ internal fun AdbLinkSection(
     reboot: RebootPanel,
     rawService: RawServicePanel,
     forward: ForwardPanel,
+    reverse: ReversePanel,
 ) {
     val linkForThisSession = adbLink.takeIf { it.generationOrNull() == session.generation }
     val connected = linkForThisSession is AdbLinkState.Connected
@@ -87,6 +90,7 @@ internal fun AdbLinkSection(
         RebootSection(panel = reboot)
         RawServiceSection(panel = rawService)
         ForwardSection(panel = forward)
+        ReverseSection(panel = reverse)
     }
 }
 
@@ -110,6 +114,15 @@ data class ForwardPanel(
     /** Завести проброс: локальный порт и адрес на устройстве. */
     val onAdd: (Int, String) -> Unit = { _, _ -> },
     val onRemove: (Int) -> Unit = {},
+)
+
+/** Обратный проброс: что слушает устройство и три действия над этим. */
+data class ReversePanel(
+    val state: AdbReverseState = AdbReverseState.None,
+    /** Попросить слушать: адрес на устройстве и адрес на этом телефоне. */
+    val onAdd: (String, String) -> Unit = { _, _ -> },
+    val onRefresh: () -> Unit = {},
+    val onRemoveAll: () -> Unit = {},
 )
 
 /**
@@ -426,6 +439,95 @@ private fun ForwardRow(entry: AdbForwardEntry, onRemove: (Int) -> Unit) {
     Button(onClick = { onRemove(entry.localPort) }) {
         Text(stringResource(R.string.forward_remove))
     }
+}
+
+/**
+ * Обратный проброс.
+ *
+ * Отдельной секцией, а не вкладкой к пробросу, хотя названия похожи: здесь
+ * слушает устройство и само приводит соединения, а там слушаем мы. Свести их в
+ * одну секцию значило бы намекнуть, что это две настройки одного, а это два
+ * разных механизма.
+ */
+@Composable
+private fun ReverseSection(panel: ReversePanel) {
+    val onDevice = remember { mutableStateOf("") }
+    val onHost = remember { mutableStateOf("") }
+
+    LabelledValue(
+        label = stringResource(R.string.reverse_label),
+        value = panel.state.reverses.size.takeIf { it > 0 }?.toString()
+            ?: stringResource(R.string.reverse_none),
+    )
+    OutlinedTextField(
+        value = onDevice.value,
+        onValueChange = { text -> onDevice.value = text },
+        label = { Text(stringResource(R.string.reverse_device_hint)) },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    OutlinedTextField(
+        value = onHost.value,
+        onValueChange = { text -> onHost.value = text },
+        label = { Text(stringResource(R.string.reverse_host_hint)) },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    Button(
+        onClick = { panel.onAdd(onDevice.value, onHost.value) },
+        enabled = onDevice.value.isNotBlank() && onHost.value.isNotBlank(),
+    ) {
+        Text(stringResource(R.string.reverse_add))
+    }
+    panel.state.reverses.forEach { entry -> ReverseRow(entry) }
+    ReverseFooter(panel)
+}
+
+@Composable
+private fun ReverseRow(entry: AdbReverseEntry) {
+    Text(
+        text = stringResource(
+            R.string.reverse_entry,
+            entry.onDevice,
+            entry.onHost,
+            entry.assigned,
+            entry.brought,
+        ),
+        style = MaterialTheme.typography.bodySmall,
+    )
+    entry.lastEnd?.let { end ->
+        Text(
+            text = stringResource(R.string.reverse_last_end, end),
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
+}
+
+/** Ответ устройства и две кнопки: вынесено, чтобы секция не разрослась. */
+@Composable
+private fun ReverseFooter(panel: ReversePanel) {
+    Button(onClick = panel.onRefresh) {
+        Text(stringResource(R.string.reverse_refresh))
+    }
+    panel.state.listing?.let { listing ->
+        Text(
+            text = stringResource(R.string.reverse_listing, listing),
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
+    Button(onClick = panel.onRemoveAll) {
+        Text(stringResource(R.string.reverse_remove_all))
+    }
+    panel.state.failure?.let { failure ->
+        Text(
+            text = stringResource(R.string.reverse_failed, failure),
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
+    Text(
+        text = stringResource(R.string.reverse_note),
+        style = MaterialTheme.typography.bodySmall,
+    )
 }
 
 /** Размер ответа называется всегда: он известен даже тогда, когда текст бессмыслен. */

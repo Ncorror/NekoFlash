@@ -149,4 +149,16 @@
     <string name="forward_last_end">Last connection: %1$s</string>
     <string name="forward_failed">Did not work: %1$s</string>
     <string name="forward_note">Connect to a forward at 127.0.0.1 and its port number, from this phone — the address on the device is never typed into a browser. The listener is bound to loopback and reachable only from this phone; there is no way to open it to the network. The address is passed through as typed — which addresses exist is known by the device. One forward carries up to %1$d connections at a time: behind each are two blocking loops, and the limit is about our threads, not about what may be asked for.</string>
+    <string name="reverse_label">Reverse forwarding</string>
+    <string name="reverse_device_hint">Address the device listens on, for example tcp:7777</string>
+    <string name="reverse_host_hint">Address on this phone, for example tcp:8888</string>
+    <string name="reverse_add">Ask the device to listen</string>
+    <string name="reverse_refresh">What is it listening to</string>
+    <string name="reverse_remove_all">Remove all</string>
+    <string name="reverse_none">Nothing asked for</string>
+    <string name="reverse_entry">%1$s to %2$s — device answered %3$s, %4$d brought</string>
+    <string name="reverse_last_end">Last connection: %1$s</string>
+    <string name="reverse_listing">The device is listening to: %1$s</string>
+    <string name="reverse_failed">Did not work: %1$s</string>
+    <string name="reverse_note">Here the device listens and brings the connections; forwarding above is the other way round. The address on this phone is reached as 127.0.0.1 and its port, so only tcp: works on our side — what to do with other kinds was never observed, and a stream to one of them is refused with a named reason rather than dropped silently. What may be asked of the device is not limited.</string>
 </resources>
