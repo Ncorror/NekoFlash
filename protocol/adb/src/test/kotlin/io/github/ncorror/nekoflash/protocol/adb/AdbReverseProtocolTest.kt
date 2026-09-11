@@ -35,6 +35,30 @@ class AdbReverseProtocolTest {
         assertEquals(AdbReverseReply.Accepted(""), reply)
     }
 
+    /**
+     * Наблюдено: непустой список приходит с завершающим переводом строки.
+     *
+     * Объявлено `0019` — двадцать пять символов, — а видимых двадцать четыре;
+     * двадцать пятый и есть перевод строки. Проверка стоит здесь затем, чтобы
+     * зафиксировать: разбирать надо сырой вывод. Срезав перевод строки, как
+     * делает `text()`, верный ответ устройства пришлось бы объявить непонятым
+     * (`07` §6.62).
+     */
+    @Test
+    fun theObservedNonEmptyListKeepsItsTrailingNewline() {
+        val reply = AdbReverseProtocol.parse("0019UsbFfs tcp:7777 tcp:8888\n")
+
+        assertEquals(AdbReverseReply.Accepted("UsbFfs tcp:7777 tcp:8888\n"), reply)
+    }
+
+    /** А без перевода строки та же строка уже не сходится — и объявляется непонятой. */
+    @Test
+    fun theSameListWithoutItsNewlineNoLongerAddsUp() {
+        val reply = AdbReverseProtocol.parse("0019UsbFfs tcp:7777 tcp:8888")
+
+        assertEquals(AdbReverseReply.Unreadable("0019UsbFfs tcp:7777 tcp:8888"), reply)
+    }
+
     /** Тело длиннее одной строки разбирается так же: длина решает, а не содержимое. */
     @Test
     fun aLongerBodyIsTakenByItsDeclaredLength() {
