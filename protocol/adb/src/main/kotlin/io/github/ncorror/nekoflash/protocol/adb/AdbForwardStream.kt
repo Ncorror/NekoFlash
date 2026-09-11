@@ -152,6 +152,23 @@ public class AdbForwardStream(
     }
 
     /**
+     * Берёт поток, который устройство завело **само**.
+     *
+     * Открывать нечего: при обратном пробросе поток уже открыт с обеих сторон —
+     * устройство его завело, диспетчер подтвердил. Поэтому [open] здесь не
+     * вызывается вовсе, а качать можно сразу.
+     *
+     * Отдельный вход, а не флаг в [open], потому что это другое начало жизни:
+     * там мы просим и ждём ответа, здесь нас поставили перед фактом.
+     */
+    public fun adopt(accepted: AdbStreamMailbox) {
+        check(mailbox == null) { "Forward stream is already bound to a mailbox" }
+        mailbox = accepted
+        localId = accepted.localId
+        emit("forward_adopted", mapOf("stream" to accepted.localId.toString()))
+    }
+
+    /**
      * Качает из устройства в канал клиента, пока соединение живо.
      *
      * Блокирует вызвавший поток и возвращает итог всего соединения — своего

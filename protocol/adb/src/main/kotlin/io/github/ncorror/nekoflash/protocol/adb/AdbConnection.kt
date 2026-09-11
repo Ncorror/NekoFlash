@@ -277,6 +277,30 @@ public class AdbConnection(
     }
 
     /**
+     * Запросы обратного проброса.
+     *
+     * Сами запросы — обычные сервисы, а вот соединения по ним приходят
+     * входящими потоками; кому они достаются, назначается через
+     * [acceptInboundStreams].
+     */
+    public fun reverse(diagnostics: DiagnosticSink = DiagnosticSink { }): AdbReverse {
+        ensureDispatching()
+        return AdbReverse(
+            AdbServiceCall(writer = writer, dispatcher = dispatcher, diagnostics = diagnostics),
+        )
+    }
+
+    /**
+     * Назначает получателя потоков, заведённых устройством.
+     *
+     * `null` — отказывать, и это поведение по умолчанию. Приёмник живёт до
+     * конца соединения: потоки приходят, пока устройство слушает.
+     */
+    public fun acceptInboundStreams(streams: AdbInboundStreams?) {
+        dispatcher.inboundStreams(streams)
+    }
+
+    /**
      * Заводит одно проброшенное соединение.
      *
      * [channel] — сторона клиента: сокет, который принял слушатель приложения.

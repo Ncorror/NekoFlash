@@ -6,6 +6,30 @@ import java.time.Clock
 import java.time.Instant
 
 /**
+ * Кому достаются потоки, заведённые **устройством**.
+ *
+ * Так приходит соединение при обратном пробросе: слушает устройство, а клиента
+ * оно приводит к нам входящим `OPEN`
+ * (`docs/adr/0005_LOCAL_SOCKET_FORWARDING_RU.md` §1).
+ *
+ * Два вызова, а не один, и порядок между ними существенный. Сперва [wants] —
+ * решение принимается **до** подтверждения, потому что подтвердить и передумать
+ * значило бы сказать устройству «принял», не приняв: на `OKAY` оно вправе сразу
+ * слать данные. Потом [accepted] — с готовым ящиком.
+ *
+ * Оба вызова идут **под замком диспетчера**, то есть из потока цикла раскладки.
+ * Значит оба обязаны возвращаться сразу: блокировать здесь — значит остановить
+ * приём для всех потоков разом. Владелец кладёт работу в очередь и уходит.
+ */
+public interface AdbInboundStreams {
+    /** Нужен ли поток с таким адресом. Отказ — не ошибка, а ответ. */
+    public fun wants(service: String): Boolean
+
+    /** Поток принят и открыт; вот его ящик. */
+    public fun accepted(service: String, mailbox: AdbStreamMailbox)
+}
+
+/**
  * Раскладывает принятые пакеты по ящикам логических потоков.
  *
  * Первый шаг плана `docs/adr/0004_CONCURRENT_ADB_DISPATCHER_RU.md`. Сегодня
@@ -40,9 +64,22 @@ public class AdbStreamDispatcher(
     private val lock = Any()
     private val mailboxes = LinkedHashMap<Int, AdbStreamMailbox>()
 
+    private var inbound: AdbInboundStreams? = null
+
     /** Ящики живых потоков в порядке открытия. */
     public val activeMailboxes: List<AdbStreamMailbox>
         get() = synchronized(lock) { mailboxes.values.toList() }
+
+    /**
+     * Назначает получателя потоков, заведённых устройством.
+     *
+     * `null` возвращает поведение по умолчанию: отказывать. Отказ здесь не
+     * заглушка — без обратного проброса устройство таких потоков не заводит, а
+     * если завело, оно должно узнать, что адресата нет, иначе будет ждать.
+     */
+    public fun inboundStreams(streams: AdbInboundStreams?): Unit = synchronized(lock) {
+        inbound = streams
+    }
 
     /**
      * Открывает поток и заводит ему ящик.
@@ -101,6 +138,34 @@ public class AdbStreamDispatcher(
         mailboxes.clear()
     }
 
+    /**
+     * Решает судьбу потока, заведённого устройством.
+     *
+     * Спрашивает получателя **до** подтверждения и только потом заводит ящик:
+     * иначе пришлось бы подтвердить, а затем закрыть — то есть пообещать и не
+     * сдержать.
+     */
+    private fun admit(event: AdbStreamEvent.Inbound, outbound: MutableList<AdbOutboundPacket>) {
+        val handler = inbound
+        if (handler == null || !handler.wants(event.service)) {
+            outbound += router.rejectInbound(event.remoteId)
+            emit(
+                "inbound_stream_refused",
+                mapOf("service" to event.service, "remote" to event.remoteId.toString()),
+            )
+            return
+        }
+        val (localId, reply) = router.acceptInbound(event.remoteId)
+        val mailbox = AdbStreamMailbox(localId, mailboxCapacity)
+        mailboxes[localId] = mailbox
+        outbound += reply
+        emit(
+            "inbound_stream_accepted",
+            mapOf("service" to event.service, "stream" to localId.toString()),
+        )
+        handler.accepted(event.service, mailbox)
+    }
+
     private fun emit(message: String, fields: Map<String, String>) {
         diagnostics.emit(
             DiagnosticEvent(
@@ -134,13 +199,7 @@ public class AdbStreamDispatcher(
              * `docs/adr/0005_LOCAL_SOCKET_FORWARDING_RU.md`; отказ переедет в
              * ветку «приёмника нет», а не исчезнет.
              */
-            is AdbStreamEvent.Inbound -> {
-                outbound += router.rejectInbound(event.remoteId)
-                emit(
-                    "inbound_stream_refused",
-                    mapOf("service" to event.service, "remote" to event.remoteId.toString()),
-                )
-            }
+            is AdbStreamEvent.Inbound -> admit(event, outbound)
 
             // Чужой и неожиданный пакет адресату не принадлежат: маршрутизатор уже
             // ответил на них тем, чем следовало, а ящику сообщать нечего.
