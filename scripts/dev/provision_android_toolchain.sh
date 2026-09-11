@@ -57,11 +57,19 @@ export ANDROID_HOME="$ANDROID_SDK_DIR"
 export ANDROID_SDK_ROOT="$ANDROID_SDK_DIR"
 export PATH="$ANDROID_SDK_DIR/cmdline-tools/latest/bin:$PATH"
 
-say 'принимаю лицензии SDK'
-yes 2>/dev/null | sdkmanager --licenses >/dev/null 2>&1 || true
+# Проверка до вызова, а не «пусть sdkmanager сам разберётся»: он и на готовом
+# наборе тратит секунды, а хук при старте сессии должен стоить около нуля.
+platform_dir="$ANDROID_SDK_DIR/platforms/${SDK_PLATFORM#*;}"
+build_tools_dir="$ANDROID_SDK_DIR/build-tools/${SDK_BUILD_TOOLS#*;}"
+if [[ -d "$platform_dir" && -d "$build_tools_dir" ]]; then
+  say 'платформа и build-tools уже на месте'
+else
+  say 'принимаю лицензии SDK'
+  yes 2>/dev/null | sdkmanager --licenses >/dev/null 2>&1 || true
 
-say 'ставлю платформу и build-tools'
-sdkmanager --install 'platform-tools' "$SDK_PLATFORM" "$SDK_BUILD_TOOLS" >/dev/null
+  say 'ставлю платформу и build-tools'
+  sdkmanager --install 'platform-tools' "$SDK_PLATFORM" "$SDK_BUILD_TOOLS" >/dev/null
+fi
 
 # Переменные окружения нужны каждой оболочке, а не только этой: снапшот
 # сохраняет файлы, но не экспорт.
