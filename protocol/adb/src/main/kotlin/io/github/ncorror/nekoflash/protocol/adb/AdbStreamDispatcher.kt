@@ -98,6 +98,18 @@ public class AdbStreamDispatcher(
                 mailboxes.remove(event.localId)?.end(event.reason.toEnd(), "device closed the stream")
             }
 
+            /*
+             * Поток, заведённый устройством. Принимать его пока некому, и
+             * отказ здесь — не заглушка, а правильный ответ: без обратного
+             * проброса устройство таких потоков и не заводит, а если завело —
+             * оно должно узнать, что адресата нет, иначе будет ждать.
+             *
+             * Приёмник появится шагом 7 плана
+             * `docs/adr/0005_LOCAL_SOCKET_FORWARDING_RU.md`; отказ переедет в
+             * ветку «приёмника нет», а не исчезнет.
+             */
+            is AdbStreamEvent.Inbound -> outbound += router.rejectInbound(event.remoteId)
+
             // Чужой и неожиданный пакет адресату не принадлежат: маршрутизатор уже
             // ответил на них тем, чем следовало, а ящику сообщать нечего.
             is AdbStreamEvent.Stale -> Unit

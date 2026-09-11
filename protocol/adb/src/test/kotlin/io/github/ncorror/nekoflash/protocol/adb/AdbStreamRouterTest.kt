@@ -126,6 +126,81 @@ class AdbStreamRouterTest {
         assertEquals(AdbCommand.CLSE, step.outbound.single().command)
     }
 
+    /**
+     * Поток, заведённый устройством, узнаётся, но сам собой не заводится.
+     *
+     * Так приходит соединение при обратном пробросе. Подтверждать его сразу
+     * нельзя: на основании `OKAY` устройство вправе слать данные, а принимать
+     * их, может быть, некому.
+     */
+    @Test
+    fun anOpenFromTheDeviceIsRecognisedButNotAnswered() {
+        val step = AdbStreamRouter().onPacket(
+            packet(AdbCommand.OPEN, arg0 = REMOTE_ID, arg1 = 0, payload = "tcp:8080\u0000".toByteArray()),
+        )
+
+        assertTrue("маршрутизатор не должен отвечать сам", step.outbound.isEmpty())
+        assertEquals(AdbStreamEvent.Inbound(REMOTE_ID, "tcp:8080"), step.events.single())
+    }
+
+    /** Имя сервиса передаётся как пришло, снимается только завершающий нуль. */
+    @Test
+    fun theInboundServiceNameIsPassedThroughUnchanged() {
+        val step = AdbStreamRouter().onPacket(
+            packet(AdbCommand.OPEN, arg0 = REMOTE_ID, payload = "что угодно\u0000".toByteArray()),
+        )
+
+        assertEquals("что угодно", (step.events.single() as AdbStreamEvent.Inbound).service)
+    }
+
+    /** Без своего идентификатора поток не адресуем: отвечать было бы нечем. */
+    @Test
+    fun anOpenWithoutARemoteIdIsUnexpected() {
+        val step = AdbStreamRouter().onPacket(packet(AdbCommand.OPEN, arg0 = 0))
+
+        assertTrue(step.events.single() is AdbStreamEvent.Unexpected)
+        assertTrue(step.outbound.isEmpty())
+    }
+
+    /** Принятый входящий поток открыт сразу: устройство свою сторону уже открыло. */
+    @Test
+    fun anAcceptedInboundStreamIsOpenImmediately() {
+        val router = AdbStreamRouter()
+
+        val (localId, reply) = router.acceptInbound(REMOTE_ID)
+
+        assertEquals(AdbCommand.OKAY, reply.command)
+        assertEquals(localId, reply.arg0)
+        assertEquals(REMOTE_ID, reply.arg1)
+        assertTrue(router.activeStreamIds.contains(localId))
+        // Открыт сразу — значит писать в него можно, не дожидаясь ничего.
+        assertEquals(AdbCommand.WRTE, router.writeRequest(localId, byteArrayOf(1))?.command)
+    }
+
+    /** Принятые входящие получают такие же несовпадающие идентификаторы, как и наши. */
+    @Test
+    fun inboundStreamsShareTheOutboundIdentifierSequence() {
+        val router = AdbStreamRouter()
+        val (ours, _) = router.openRequest("shell:id")
+
+        val (theirs, _) = router.acceptInbound(REMOTE_ID)
+
+        assertTrue("идентификаторы не должны совпадать", ours != theirs)
+    }
+
+    /** Отказ не оставляет за собой потока: его и не было. */
+    @Test
+    fun aRejectedInboundStreamLeavesNothingBehind() {
+        val router = AdbStreamRouter()
+
+        val reply = router.rejectInbound(REMOTE_ID)
+
+        assertEquals(AdbCommand.CLSE, reply.command)
+        assertEquals(0, reply.arg0)
+        assertEquals(REMOTE_ID, reply.arg1)
+        assertTrue(router.activeStreamIds.isEmpty())
+    }
+
     /** Закрытие без единого OKAY — это отказ сервиса, а не пустой ответ. */
     @Test
     fun closeBeforeOkayIsReportedAsRejection() {

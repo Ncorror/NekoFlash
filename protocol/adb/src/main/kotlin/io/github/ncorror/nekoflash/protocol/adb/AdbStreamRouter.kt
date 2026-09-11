@@ -41,6 +41,21 @@ public sealed interface AdbStreamEvent {
     public data class Closed(val localId: Int, val reason: AdbStreamClosure) : AdbStreamEvent
 
     /**
+     * Поток заводит **устройство**, а не мы.
+     *
+     * Так приходит соединение при обратном пробросе: `reverse` заставляет
+     * слушать устройство, и клиента оно приводит к нам входящим `OPEN`
+     * (`docs/adr/0005_LOCAL_SOCKET_FORWARDING_RU.md` §1).
+     *
+     * Маршрутизатор такой поток **не заводит сам и не подтверждает**. Ответить
+     * `OKAY`, а потом передумать, значило бы сказать устройству «принял», не
+     * приняв: на основании подтверждения оно вправе сразу слать данные, и они
+     * ушли бы в никуда. Решение принимает владелец — [acceptInbound] или
+     * [rejectInbound].
+     */
+    public data class Inbound(val remoteId: Int, val service: String) : AdbStreamEvent
+
+    /**
      * Пакет адресован потоку, которого у нас нет.
      *
      * Не ошибка: устройство могло не успеть узнать о закрытии. Ответ на него
@@ -134,8 +149,37 @@ public class AdbStreamRouter {
         return AdbOutboundPacket(AdbCommand.CLSE, localId, stream.remoteId)
     }
 
+    /**
+     * Принимает поток, заведённый устройством, и даёт ему наш идентификатор.
+     *
+     * Поток сразу считается открытым: устройство свою сторону уже открыло, и
+     * ждать подтверждения не от кого — подтверждение шлём мы.
+     */
+    public fun acceptInbound(remoteId: Int): Pair<Int, AdbOutboundPacket> {
+        require(remoteId > 0) { "Inbound stream must carry a remote id: $remoteId" }
+        val localId = nextLocalId++
+        streams[localId] = StreamState().apply {
+            opened = true
+            this.remoteId = remoteId
+        }
+        return localId to AdbOutboundPacket(AdbCommand.OKAY, localId, remoteId)
+    }
+
+    /**
+     * Отказывает потоку, заведённому устройством.
+     *
+     * Своего идентификатора у него не появляется: отказ означает, что потока не
+     * было. `CLSE` с нулём в нашем поле — так же, как отвечает `adbd` на
+     * сервис, которого у него нет.
+     */
+    public fun rejectInbound(remoteId: Int): AdbOutboundPacket {
+        require(remoteId > 0) { "Inbound stream must carry a remote id: $remoteId" }
+        return AdbOutboundPacket(AdbCommand.CLSE, 0, remoteId)
+    }
+
     /** Разбирает один принятый пакет. */
     public fun onPacket(packet: AdbPacket): AdbRouterStep = when (packet.command) {
+        AdbCommand.OPEN -> onOpen(packet)
         AdbCommand.OKAY -> onOkay(packet)
         AdbCommand.WRTE -> onWrite(packet)
         AdbCommand.CLSE -> onClose(packet)
@@ -158,6 +202,26 @@ public class AdbStreamRouter {
         }
         streams.clear()
         return AdbRouterStep(events = events)
+    }
+
+    /**
+     * Устройство просит открыть поток к нам.
+     *
+     * Имя сервиса приходит с завершающим нулём, как и в нашем `OPEN`; нуль
+     * снимается, остальное передаётся как есть — толковать имя не наше дело.
+     */
+    private fun onOpen(packet: AdbPacket): AdbRouterStep {
+        val event = if (packet.arg0 > 0) {
+            AdbStreamEvent.Inbound(
+                remoteId = packet.arg0,
+                service = packet.payload.toString(Charsets.UTF_8).trimEnd('\u0000'),
+            )
+        } else {
+            // Без своего идентификатора поток не адресуем: ответить нечем, и
+            // притворяться, что он есть, нельзя.
+            AdbStreamEvent.Unexpected("OPEN without a remote id: payload=${packet.payload.size} bytes")
+        }
+        return AdbRouterStep(events = listOf(event))
     }
 
     private fun onOkay(packet: AdbPacket): AdbRouterStep {

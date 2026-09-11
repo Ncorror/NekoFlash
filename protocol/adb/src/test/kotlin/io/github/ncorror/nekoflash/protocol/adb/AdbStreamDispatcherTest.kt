@@ -261,6 +261,26 @@ class AdbStreamDispatcherTest {
         assertTrue(second.localId != first.localId)
     }
 
+    /**
+     * Поток, заведённый устройством, получает отказ, а не тишину.
+     *
+     * Принимать его пока некому (шаг 7 плана `ADR-0005`), но молчание оставило
+     * бы устройство ждать: оно должно узнать, что адресата нет.
+     */
+    @Test
+    fun anInboundStreamIsRefusedRatherThanIgnored() {
+        val dispatcher = AdbStreamDispatcher()
+
+        val outbound = dispatcher.dispatch(
+            AdbPacket(AdbCommand.OPEN, 77, 0, "tcp:8080\u0000".toByteArray()),
+        )
+
+        val reply = outbound.single()
+        assertEquals(AdbCommand.CLSE, reply.command)
+        assertEquals(77, reply.arg1)
+        assertTrue("отказ не должен заводить ящик", dispatcher.activeMailboxes.isEmpty())
+    }
+
     private companion object {
         fun okay(remote: Int, local: Int) = AdbPacket(AdbCommand.OKAY, remote, local, ByteArray(0))
 
