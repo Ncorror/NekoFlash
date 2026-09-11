@@ -1,0 +1,114 @@
+package io.github.ncorror.nekoflash.protocol.fastboot
+
+import io.github.ncorror.nekoflash.usb.api.UsbDeviceDescriptor
+import io.github.ncorror.nekoflash.usb.api.UsbEndpointDescriptor
+import io.github.ncorror.nekoflash.usb.api.UsbEndpointDirection
+import io.github.ncorror.nekoflash.usb.api.UsbInterfaceCandidate
+import io.github.ncorror.nekoflash.usb.api.UsbInterfaceKind
+import io.github.ncorror.nekoflash.usb.api.UsbMatchConfidence
+import io.github.ncorror.nekoflash.usb.api.UsbTransferFailure
+import io.github.ncorror.nekoflash.usb.api.UsbTransferResult
+import io.github.ncorror.nekoflash.usb.api.UsbTransferType
+import io.github.ncorror.nekoflash.usb.api.UsbTransportHandle
+
+/** Что подставной транспорт отдаст на очередной приём. */
+internal sealed interface FakeInbound {
+    /** Кадр целиком. */
+    data class Frame(val text: String) : FakeInbound
+
+    /** Тишина: приём не состоялся. Так же выглядит обычный таймаут. */
+    data object Silence : FakeInbound
+
+    /** Успешный приём нулевой длины — устройство молчит, но передача прошла. */
+    data object Empty : FakeInbound
+}
+
+/**
+ * Транспорт, который отдаёт заранее назначенные ответы.
+ *
+ * Здесь проверяется поведение полосы, а не USB: настоящий обмен подтверждается
+ * только прогоном на устройстве, и подменять его подставным нельзя (`16` §5.1).
+ */
+internal class FakeFastbootTransport(
+    private val inbound: MutableList<FakeInbound> = mutableListOf(),
+) : UsbTransportHandle {
+    val sent: MutableList<String> = mutableListOf()
+    var shortWriteAfter: Int? = null
+    var failWrite: Boolean = false
+    var closed: Boolean = false
+
+    /** Сколько приёмов было запрошено — по нему видно, что ожидание дробится. */
+    var receiveCalls: Int = 0
+        private set
+
+    fun willReply(vararg frames: String): FakeFastbootTransport = apply {
+        frames.forEach { inbound += FakeInbound.Frame(it) }
+    }
+
+    fun willBeSilent(times: Int): FakeFastbootTransport = apply {
+        repeat(times) { inbound += FakeInbound.Silence }
+    }
+
+    fun willReceiveEmpty(): FakeFastbootTransport = apply { inbound += FakeInbound.Empty }
+
+    override val candidate: UsbInterfaceCandidate = CANDIDATE
+
+    override val held: Boolean get() = !closed
+
+    override fun receive(destination: ByteArray, offset: Int, length: Int, timeoutMillis: Int): UsbTransferResult {
+        receiveCalls += 1
+        val next = inbound.removeFirstOrNull() ?: FakeInbound.Silence
+        return when (next) {
+            is FakeInbound.Silence -> UsbTransferResult.Failed(UsbTransferFailure.NOT_COMPLETED)
+            is FakeInbound.Empty -> UsbTransferResult.Completed(0)
+            is FakeInbound.Frame -> {
+                val bytes = next.text.toByteArray(Charsets.US_ASCII)
+                bytes.copyInto(destination, offset, 0, bytes.size)
+                UsbTransferResult.Completed(bytes.size)
+            }
+        }
+    }
+
+    override fun send(source: ByteArray, offset: Int, length: Int, timeoutMillis: Int): UsbTransferResult {
+        sent += String(source, offset, length, Charsets.US_ASCII)
+        return when {
+            failWrite -> UsbTransferResult.Failed(UsbTransferFailure.NOT_COMPLETED)
+            shortWriteAfter != null -> UsbTransferResult.Completed(shortWriteAfter!!)
+            else -> UsbTransferResult.Completed(length)
+        }
+    }
+
+    override fun close() {
+        closed = true
+    }
+
+    private companion object {
+        val CANDIDATE = UsbInterfaceCandidate(
+            device = UsbDeviceDescriptor(
+                deviceId = 1,
+                deviceName = "/dev/bus/usb/001/002",
+                vendorId = 0x2717,
+                productId = 0xD00D,
+            ),
+            kind = UsbInterfaceKind.FASTBOOT,
+            confidence = UsbMatchConfidence.CANONICAL,
+            interfaceIndex = 0,
+            interfaceId = 0,
+            interfaceClass = 0xFF,
+            interfaceSubclass = 0x42,
+            interfaceProtocol = 0x03,
+            endpointIn = UsbEndpointDescriptor(
+                address = 0x81,
+                direction = UsbEndpointDirection.IN,
+                transferType = UsbTransferType.BULK,
+                maxPacketSize = 512,
+            ),
+            endpointOut = UsbEndpointDescriptor(
+                address = 0x01,
+                direction = UsbEndpointDirection.OUT,
+                transferType = UsbTransferType.BULK,
+                maxPacketSize = 512,
+            ),
+        )
+    }
+}

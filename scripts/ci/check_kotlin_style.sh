@@ -74,6 +74,7 @@ check_boundary "core" "core" "config/detekt/core-boundaries.yml"
 check_boundary "usb:api" "usb/api" "config/detekt/usb-api-boundaries.yml"
 check_boundary "usb:android" "usb/android" "config/detekt/usb-android-boundaries.yml"
 check_boundary "protocol:adb" "protocol/adb" "config/detekt/protocol-adb-boundaries.yml"
+check_boundary "protocol:fastboot" "protocol/fastboot" "config/detekt/protocol-fastboot-boundaries.yml"
 echo
 if [ "$failures" -gt 0 ]; then
     echo "kotlin style: FAIL ($failures)" >&2

@@ -9,6 +9,7 @@ import io.github.ncorror.nekoflash.core.diagnostics.DiagnosticBundleResult
 import io.github.ncorror.nekoflash.core.diagnostics.InMemoryDiagnosticSink
 import io.github.ncorror.nekoflash.core.model.SessionGeneration
 import io.github.ncorror.nekoflash.adb.AdbLinkController
+import io.github.ncorror.nekoflash.fastboot.FastbootLinkController
 import io.github.ncorror.nekoflash.diagnostics.HostFacts
 import io.github.ncorror.nekoflash.protocol.adb.AdbKeyStore
 import io.github.ncorror.nekoflash.usb.android.AndroidUsbHost
@@ -114,6 +115,20 @@ public class NekoFlashApplication : Application() {
             diagnostics = events,
             // Факт, а не догадка: спрашивается у платформы в момент отказа.
             networkPermission = { HostFacts.permissionState(this, Manifest.permission.INTERNET) },
+        )
+    }
+
+    /**
+     * Состояние Fastboot-соединения.
+     *
+     * Своё, а не общее с ADB: в загрузчике устройство перечисляется другим
+     * интерфейсом, и ADB там не отвечает вовсе (`07` §6.46).
+     */
+    public val fastbootLink: FastbootLinkController by lazy {
+        FastbootLinkController(
+            claim = usbSessions::claim,
+            executor = adbOperationThreads,
+            diagnostics = events,
         )
     }
 

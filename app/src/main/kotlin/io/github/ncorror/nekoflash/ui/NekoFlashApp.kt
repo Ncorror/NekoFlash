@@ -69,6 +69,7 @@ fun NekoFlashApp(
     rawService: RawServicePanel = RawServicePanel(),
     forward: ForwardPanel = ForwardPanel(),
     reverse: ReversePanel = ReversePanel(),
+    fastboot: FastbootPanel = FastbootPanel(),
     terminalActions: TerminalActions = TerminalActions(),
     fileActions: FileActions = FileActions(),
     onExportDiagnostics: () -> Unit = {},
@@ -98,6 +99,7 @@ fun NekoFlashApp(
             rawService = rawService,
             forward = forward,
             reverse = reverse,
+            fastboot = fastboot,
             onExportDiagnostics = onExportDiagnostics,
             modifier = modifier,
         )
@@ -163,6 +165,7 @@ private fun Workspace(
     rawService: RawServicePanel,
     forward: ForwardPanel,
     reverse: ReversePanel,
+    fastboot: FastbootPanel,
     onExportDiagnostics: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -195,6 +198,7 @@ private fun Workspace(
             rawService = rawService,
             forward = forward,
             reverse = reverse,
+            fastboot = fastboot,
         )
         ActionsCard(
             exportStatus = exportStatus,
@@ -225,6 +229,7 @@ private fun SessionList(
     rawService: RawServicePanel,
     forward: ForwardPanel,
     reverse: ReversePanel,
+    fastboot: FastbootPanel,
 ) {
     if (sessions.isEmpty()) {
         Text(
@@ -258,6 +263,7 @@ private fun SessionList(
             rawService = rawService,
             forward = forward,
             reverse = reverse,
+            fastboot = fastboot,
         )
     }
     Text(
@@ -361,6 +367,7 @@ private fun SessionCard(
     rawService: RawServicePanel,
     forward: ForwardPanel,
     reverse: ReversePanel,
+    fastboot: FastbootPanel,
 ) {
     // Удерживается ли интерфейс, видно по самому состоянию сессии. Отдельный
     // список захваченных был бы вторым источником истины о том же самом.
@@ -396,6 +403,12 @@ private fun SessionCard(
                         rawService = rawService,
                         forward = forward,
                         reverse = reverse,
+                    )
+                } else if (session.candidate.kind == UsbInterfaceKind.FASTBOOT) {
+                    FastbootLinkSection(fastboot = fastboot)
+                    Text(
+                        text = stringResource(R.string.fastboot_note),
+                        style = MaterialTheme.typography.bodySmall,
                     )
                 } else {
                     Button(onClick = if (claimed) onRelease else onClaim) {

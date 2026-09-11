@@ -87,6 +87,7 @@ dependencies {
     implementation(project(":usb:api"))
     implementation(project(":usb:android"))
     implementation(project(":protocol:adb"))
+    implementation(project(":protocol:fastboot"))
     implementation(libs.kotlinx.coroutines.core)
 
     implementation(libs.androidx.core.ktx)

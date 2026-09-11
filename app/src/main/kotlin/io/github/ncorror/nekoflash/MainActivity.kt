@@ -18,6 +18,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.lifecycleScope
 import io.github.ncorror.nekoflash.ui.NekoFlashApp
 import io.github.ncorror.nekoflash.adb.AdbLinkController
+import io.github.ncorror.nekoflash.fastboot.FastbootLinkController
+import io.github.ncorror.nekoflash.fastboot.FastbootLinkState
+import io.github.ncorror.nekoflash.ui.FastbootPanel
+import io.github.ncorror.nekoflash.usb.api.UsbInterfaceKind
+import io.github.ncorror.nekoflash.usb.api.UsbSession
 import io.github.ncorror.nekoflash.ui.FileActions
 import io.github.ncorror.nekoflash.ui.ForwardPanel
 import io.github.ncorror.nekoflash.ui.RawServicePanel
@@ -26,7 +31,6 @@ import io.github.ncorror.nekoflash.ui.ReversePanel
 import io.github.ncorror.nekoflash.ui.TerminalActions
 import io.github.ncorror.nekoflash.ui.theme.NekoFlashTheme
 import io.github.ncorror.nekoflash.usb.api.UsbClaimResult
-import io.github.ncorror.nekoflash.usb.api.UsbSession
 import io.github.ncorror.nekoflash.usb.api.UsbSessionCoordinator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -42,6 +46,7 @@ class MainActivity : ComponentActivity() {
         val application = application as NekoFlashApplication
         val coordinator = application.usbSessions
         val adbLink = application.adbLink
+        val fastbootLink = application.fastbootLink
 
         setContent {
             val sessions by coordinator.sessions.collectAsState()
@@ -50,6 +55,7 @@ class MainActivity : ComponentActivity() {
             val commandState by adbLink.command.collectAsState()
             val terminalState by adbLink.terminal.collectAsState()
             val fileState by adbLink.files.collectAsState()
+            val fastbootState by fastbootLink.state.collectAsState()
             var exportStatus by remember { mutableStateOf<String?>(null) }
 
             val savedTemplate = stringResource(R.string.diagnostics_export_done)
@@ -92,6 +98,7 @@ class MainActivity : ComponentActivity() {
                     rawService = rawServicePanel(adbLink),
                     forward = forwardPanel(adbLink),
                     reverse = reversePanel(adbLink),
+                    fastboot = fastbootPanel(fastbootLink, fastbootState, sessions),
                     onExportDiagnostics = { saveLauncher.launch(application.suggestedDiagnosticsFileName()) },
                 )
             }
@@ -154,6 +161,28 @@ private fun MainActivity.exportDiagnostics(
 }
 
 /** Действия терминала собраны отдельно: в теле экрана они только шумят. */
+/**
+ * Панель Fastboot: состояние опроса и два действия над ним.
+ *
+ * Вынесена из `onCreate` не ради красоты — иначе метод перерастает ориентир
+ * длины, а раздувать точку входа именно тем, что легко вынести, значит начинать
+ * тот путь, которым `MainActivity` Legacy дошла до 3880 строк.
+ */
+private fun fastbootPanel(
+    link: FastbootLinkController,
+    state: FastbootLinkState,
+    sessions: List<UsbSession>,
+): FastbootPanel = FastbootPanel(
+    state = state,
+    // Generation берётся из живой сессии: опрос принадлежит тому подключению,
+    // в котором он начат.
+    onProbe = {
+        sessions.firstOrNull { it.candidate.kind == UsbInterfaceKind.FASTBOOT }
+            ?.let { session -> link.connect(session.generation) }
+    },
+    onDisconnect = link::disconnect,
+)
+
 private fun terminalActions(link: AdbLinkController) = TerminalActions(
     onStart = link::startShell,
     onSend = link::sendShellInput,

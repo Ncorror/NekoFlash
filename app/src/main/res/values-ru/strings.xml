@@ -164,4 +164,14 @@
     <string name="reverse_listing">Устройство слушает: %1$s</string>
     <string name="reverse_failed">Не получилось: %1$s</string>
     <string name="reverse_note">Здесь слушает устройство и само приводит соединения; проброс выше — наоборот. Адрес на этом телефоне достигается по 127.0.0.1 и номеру порта, поэтому с нашей стороны работает только tcp: — что делать с другими, не наблюдалось, и поток к такому адресу получает отказ с названной причиной, а не тишину. Что просить у устройства, ничем не ограничено.</string>
+    <string name="fastboot_section_title">Fastboot</string>
+    <string name="fastboot_probe">Спросить устройство, кто оно</string>
+    <string name="fastboot_probe_again">Спросить ещё раз</string>
+    <string name="fastboot_probing">Спрашиваем устройство…</string>
+    <string name="fastboot_mode_bootloader">Загрузчик</string>
+    <string name="fastboot_mode_fastbootd">fastbootd (userspace)</string>
+    <string name="fastboot_mode_unknown">Роль не установлена</string>
+    <string name="fastboot_claim_failed">Интерфейс не захвачен: %1$s</string>
+    <string name="fastboot_disconnect">Отпустить интерфейс</string>
+    <string name="fastboot_note">Загрузчик и fastbootd перечисляются одним и тем же интерфейсом, поэтому дескриптор их не различает — различает только обмен. Роль читается по is-userspace. Если устройство на неё не отвечает, роль остаётся неустановленной и показывается именно так: операции с динамическими разделами есть в fastbootd и нет в загрузчике, и догадка здесь выйдет боком ровно тогда, когда на неё обопрутся.</string>
 </resources>

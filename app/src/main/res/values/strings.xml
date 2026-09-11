@@ -161,4 +161,14 @@
     <string name="reverse_listing">The device is listening to: %1$s</string>
     <string name="reverse_failed">Did not work: %1$s</string>
     <string name="reverse_note">Here the device listens and brings the connections; forwarding above is the other way round. The address on this phone is reached as 127.0.0.1 and its port, so only tcp: works on our side — what to do with other kinds was never observed, and a stream to one of them is refused with a named reason rather than dropped silently. What may be asked of the device is not limited.</string>
+    <string name="fastboot_section_title">Fastboot</string>
+    <string name="fastboot_probe">Ask the device who it is</string>
+    <string name="fastboot_probe_again">Ask again</string>
+    <string name="fastboot_probing">Asking the device…</string>
+    <string name="fastboot_mode_bootloader">Bootloader</string>
+    <string name="fastboot_mode_fastbootd">fastbootd (userspace)</string>
+    <string name="fastboot_mode_unknown">Role not established</string>
+    <string name="fastboot_claim_failed">The interface was not claimed: %1$s</string>
+    <string name="fastboot_disconnect">Release the interface</string>
+    <string name="fastboot_note">Bootloader and fastbootd enumerate through the same interface, so the descriptor cannot tell them apart — only the exchange can. The role is read from is-userspace. When the device does not answer it, the role stays unestablished and is shown as such: operations on dynamic partitions exist in fastbootd and not in the bootloader, and a guess here would break exactly when it is relied upon.</string>
 </resources>
