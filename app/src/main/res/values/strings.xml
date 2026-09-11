@@ -139,4 +139,14 @@
     <string name="raw_service_one_way">%1$s — accepted, the device left the bus (%2$s)</string>
     <string name="raw_service_failed">%1$s — failed: %2$s</string>
     <string name="raw_service_note">The service name is passed through as typed; there is no list, because the device knows which services exist. The response size is always named — a service may not answer with text at all, and then the byte count is the only thing known for certain. A reboot: typed here behaves like the reboot button.</string>
+    <string name="forward_label">Port forwarding</string>
+    <string name="forward_port_hint">Local port, 0 for any free one</string>
+    <string name="forward_address_hint">Address on the device, for example tcp:5555</string>
+    <string name="forward_add">Forward</string>
+    <string name="forward_remove">Remove</string>
+    <string name="forward_none">No forwards</string>
+    <string name="forward_entry">%1$d to %2$s — %3$d live, %4$d served</string>
+    <string name="forward_last_end">Last connection: %1$s</string>
+    <string name="forward_failed">Did not work: %1$s</string>
+    <string name="forward_note">The listener is bound to loopback and reachable only from this phone; there is no way to open it to the network. The address is passed through as typed — which addresses exist is known by the device. One forward carries up to %1$d connections at a time: behind each are two blocking loops, and the limit is about our threads, not about what may be asked for.</string>
 </resources>

@@ -142,4 +142,14 @@
     <string name="raw_service_one_way">%1$s — принят, устройство ушло с шины (%2$s)</string>
     <string name="raw_service_failed">%1$s — не получилось: %2$s</string>
     <string name="raw_service_note">Имя сервиса передаётся как есть, списка нет: какие сервисы существуют, знает устройство. Размер ответа называется всегда — сервис может отвечать не текстом, и тогда число байт единственное, что известно достоверно. Набранный здесь reboot: ведёт себя как кнопка перезагрузки.</string>
+    <string name="forward_label">Проброс портов</string>
+    <string name="forward_port_hint">Локальный порт, 0 — любой свободный</string>
+    <string name="forward_address_hint">Адрес на устройстве, например tcp:5555</string>
+    <string name="forward_add">Пробросить</string>
+    <string name="forward_remove">Снять</string>
+    <string name="forward_none">Пробросов нет</string>
+    <string name="forward_entry">%1$d на %2$s — %3$d живых, %4$d обслужено</string>
+    <string name="forward_last_end">Последнее соединение: %1$s</string>
+    <string name="forward_failed">Не получилось: %1$s</string>
+    <string name="forward_note">Слушатель привязан к loopback и доступен только с этого телефона; открыть его в сеть нельзя. Адрес передаётся как набран — какие адреса бывают, знает устройство. Один проброс держит до %1$d соединений сразу: за каждым стоят два блокирующих цикла, и предел относится к нашим потокам, а не к тому, что разрешено просить.</string>
 </resources>

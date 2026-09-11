@@ -15,6 +15,18 @@
         android:name="android.hardware.usb.host"
         android:required="false" />
 
+    <!--
+        Проброс портов слушает сокет на самом хосте, а любой AF_INET-сокет на
+        Android, включая loopback, без этого разрешения не создать. Это
+        требование платформы, а не сетевая работа: наружу приложение не ходит,
+        слушатель привязан к loopback, и других сокетов у него нет
+        (docs/adr/0005_LOCAL_SOCKET_FORWARDING_RU.md §5).
+
+        Альтернатива без разрешения — только абстрактный Unix-сокет, к которому
+        браузером не подключиться; возможность выродилась бы в декларацию.
+    -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <application
         android:name=".NekoFlashApplication"
         android:allowBackup="false"

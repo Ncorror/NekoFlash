@@ -67,6 +67,7 @@ fun NekoFlashApp(
     onRunCommand: (String) -> Unit = {},
     reboot: RebootPanel = RebootPanel(),
     rawService: RawServicePanel = RawServicePanel(),
+    forward: ForwardPanel = ForwardPanel(),
     terminalActions: TerminalActions = TerminalActions(),
     fileActions: FileActions = FileActions(),
     onExportDiagnostics: () -> Unit = {},
@@ -94,6 +95,7 @@ fun NekoFlashApp(
             onRunCommand = onRunCommand,
             reboot = reboot,
             rawService = rawService,
+            forward = forward,
             onExportDiagnostics = onExportDiagnostics,
             modifier = modifier,
         )
@@ -157,6 +159,7 @@ private fun Workspace(
     onRunCommand: (String) -> Unit,
     reboot: RebootPanel,
     rawService: RawServicePanel,
+    forward: ForwardPanel,
     onExportDiagnostics: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -187,6 +190,7 @@ private fun Workspace(
             onRunCommand = onRunCommand,
             reboot = reboot,
             rawService = rawService,
+            forward = forward,
         )
         ActionsCard(
             exportStatus = exportStatus,
@@ -215,6 +219,7 @@ private fun SessionList(
     onRunCommand: (String) -> Unit,
     reboot: RebootPanel,
     rawService: RawServicePanel,
+    forward: ForwardPanel,
 ) {
     if (sessions.isEmpty()) {
         Text(
@@ -246,6 +251,7 @@ private fun SessionList(
             onRunCommand = onRunCommand,
             reboot = reboot,
             rawService = rawService,
+            forward = forward,
         )
     }
     Text(
@@ -347,6 +353,7 @@ private fun SessionCard(
     onRunCommand: (String) -> Unit,
     reboot: RebootPanel,
     rawService: RawServicePanel,
+    forward: ForwardPanel,
 ) {
     // Удерживается ли интерфейс, видно по самому состоянию сессии. Отдельный
     // список захваченных был бы вторым источником истины о том же самом.
@@ -380,6 +387,7 @@ private fun SessionCard(
                         onRunCommand = onRunCommand,
                         reboot = reboot,
                         rawService = rawService,
+                        forward = forward,
                     )
                 } else {
                     Button(onClick = if (claimed) onRelease else onClaim) {

@@ -97,6 +97,15 @@ public class AdbLinkController(
     private val rawServices = AdbRawServiceController(executor)
 
     /**
+     * Владелец пробросов портов.
+     *
+     * Отдельный класс по той же причине, что и остальные, и ещё по одной: у
+     * него есть собственные сокеты, которые переживают отдельную команду и
+     * обязаны кончиться вместе с транспортом.
+     */
+    private val forwardController = AdbForwardController(executor, diagnostics)
+
+    /**
      * Живое соединение.
      *
      * Хранится, потому что после рукопожатия оно продолжает быть нужным: через
@@ -132,6 +141,45 @@ public class AdbLinkController(
 
     /** Состояние последнего вызова произвольного сервиса. */
     public val rawService: StateFlow<AdbRawServiceState> = rawServices.state
+
+    /** Состояние пробросов портов. */
+    public val forward: StateFlow<AdbForwardState> = forwardController.state
+
+    /**
+     * Действия над пробросами, собранные в один объект.
+     *
+     * Собраны не ради красоты. На этом контроллере метод на возможность копился
+     * с Phase 3, и счётчик detekt сказал об этом вслух первым: двадцать первая
+     * функция. Порог не поднят — он гонец, а не проблема, и контроллер
+     * действительно знает слишком много. Пробросы съезжают первыми, потому что
+     * их ровно два; следующая возможность съедет так же.
+     */
+    public val forwards: ForwardActions = ForwardActions()
+
+    /** Что можно сделать с пробросами. */
+    public inner class ForwardActions internal constructor() {
+        /**
+         * Заводит проброс с [localPort] на [address].
+         *
+         * Ни порт, ни адрес не проверяются: `0` означает «любой свободный», а
+         * что бывает на той стороне, знает устройство (`01` §3).
+         */
+        public fun add(localPort: Int, address: String) {
+            val live = connection ?: return
+            forwardController.add(
+                source = { channel ->
+                    AdbForwardConnection.over(live.forwardStream(channel, diagnostics))
+                },
+                localPort = localPort,
+                address = address,
+            )
+        }
+
+        /** Снимает проброс вместе с его живыми соединениями. */
+        public fun remove(localPort: Int) {
+            forwardController.remove(localPort)
+        }
+    }
 
     /**
      * Вызывает произвольный сервис ADB.
@@ -313,6 +361,9 @@ public class AdbLinkController(
      */
     private fun forgetConnection() {
         shellSessions.stop()
+        // Слушатели переживают отдельную команду, но не транспорт: проброс
+        // поверх мёртвого соединения принимал бы клиентов в никуда.
+        forwardController.stopAll("transport is gone")
         // Цикл раскладки принадлежит соединению и обязан кончиться вместе с
         // ним: иначе он пережил бы SessionGeneration и продолжил читать
         // отпущенный интерфейс (ADR-0003 §2, ADR-0004 §4).

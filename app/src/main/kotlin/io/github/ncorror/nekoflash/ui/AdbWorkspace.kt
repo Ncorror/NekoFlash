@@ -14,6 +14,9 @@ import androidx.compose.ui.res.stringResource
 import io.github.ncorror.nekoflash.R
 import io.github.ncorror.nekoflash.adb.AdbCommandState
 import io.github.ncorror.nekoflash.adb.AdbFileState
+import io.github.ncorror.nekoflash.adb.AdbForwardController
+import io.github.ncorror.nekoflash.adb.AdbForwardEntry
+import io.github.ncorror.nekoflash.adb.AdbForwardState
 import io.github.ncorror.nekoflash.adb.AdbLinkState
 import io.github.ncorror.nekoflash.adb.AdbRawServiceState
 import io.github.ncorror.nekoflash.adb.AdbRebootState
@@ -44,6 +47,7 @@ internal fun AdbLinkSection(
     onRunCommand: (String) -> Unit,
     reboot: RebootPanel,
     rawService: RawServicePanel,
+    forward: ForwardPanel,
 ) {
     val linkForThisSession = adbLink.takeIf { it.generationOrNull() == session.generation }
     val connected = linkForThisSession is AdbLinkState.Connected
@@ -82,6 +86,7 @@ internal fun AdbLinkSection(
         FilesSection(files = files, actions = fileActions)
         RebootSection(panel = reboot)
         RawServiceSection(panel = rawService)
+        ForwardSection(panel = forward)
     }
 }
 
@@ -93,6 +98,18 @@ internal fun AdbLinkSection(
 data class RawServicePanel(
     val state: AdbRawServiceState = AdbRawServiceState.None,
     val onCall: (String) -> Unit = {},
+)
+
+/**
+ * Проброс портов: список живых пробросов и два действия над ними.
+ *
+ * Собраны в один объект по той же причине, что и [RebootPanel].
+ */
+data class ForwardPanel(
+    val state: AdbForwardState = AdbForwardState.None,
+    /** Завести проброс: локальный порт и адрес на устройстве. */
+    val onAdd: (Int, String) -> Unit = { _, _ -> },
+    val onRemove: (Int) -> Unit = {},
 )
 
 /**
@@ -337,6 +354,79 @@ private fun RawServiceSection(panel: RawServicePanel) {
 
 /** Размер ответа называется всегда: он известен даже тогда, когда текст бессмыслен. */
 @Composable
+/**
+ * Проброс портов.
+ *
+ * Порт разбирается здесь, а не в контроллере: пустое или нечисловое поле — это
+ * ещё не набранное значение, а не отказ, и заводить ради него состояние ошибки
+ * значило бы ругаться на человека, который ещё печатает.
+ */
+@Composable
+private fun ForwardSection(panel: ForwardPanel) {
+    val port = remember { mutableStateOf("") }
+    val address = remember { mutableStateOf("") }
+
+    LabelledValue(
+        label = stringResource(R.string.forward_label),
+        value = panel.state.forwards.size.takeIf { it > 0 }?.toString()
+            ?: stringResource(R.string.forward_none),
+    )
+    OutlinedTextField(
+        value = port.value,
+        onValueChange = { text -> port.value = text },
+        label = { Text(stringResource(R.string.forward_port_hint)) },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    OutlinedTextField(
+        value = address.value,
+        onValueChange = { text -> address.value = text },
+        label = { Text(stringResource(R.string.forward_address_hint)) },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    Button(
+        onClick = { panel.onAdd(port.value.trim().toIntOrNull() ?: 0, address.value) },
+        enabled = address.value.isNotBlank(),
+    ) {
+        Text(stringResource(R.string.forward_add))
+    }
+    panel.state.forwards.forEach { entry -> ForwardRow(entry = entry, onRemove = panel.onRemove) }
+    panel.state.failure?.let { failure ->
+        Text(
+            text = stringResource(R.string.forward_failed, failure),
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
+    Text(
+        text = stringResource(R.string.forward_note, AdbForwardController.MAX_CONNECTIONS),
+        style = MaterialTheme.typography.bodySmall,
+    )
+}
+
+@Composable
+private fun ForwardRow(entry: AdbForwardEntry, onRemove: (Int) -> Unit) {
+    Text(
+        text = stringResource(
+            R.string.forward_entry,
+            entry.localPort,
+            entry.address,
+            entry.live,
+            entry.served,
+        ),
+        style = MaterialTheme.typography.bodySmall,
+    )
+    entry.lastEnd?.let { end ->
+        Text(
+            text = stringResource(R.string.forward_last_end, end),
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
+    Button(onClick = { onRemove(entry.localPort) }) {
+        Text(stringResource(R.string.forward_remove))
+    }
+}
+
 private fun rawServiceText(state: AdbRawServiceState): String = when (state) {
     AdbRawServiceState.None -> stringResource(R.string.raw_service_none)
     is AdbRawServiceState.Running -> stringResource(R.string.raw_service_running, state.service)

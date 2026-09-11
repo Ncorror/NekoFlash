@@ -242,11 +242,13 @@ public class AdbConnection(
     /**
      * Открывает живую оболочку.
      *
-     * Пока сессия открыта, [shell] и [call] по этому соединению вызывать
-     * нельзя: физический читатель один, и одноразовая команда разобрала бы
-     * пакеты сессии. Запрет держит владелец соединения — здесь он не
-     * проверяется, потому что проверять пришлось бы состояние чужого потока
-     * исполнения.
+     * **Соседей она больше не вытесняет.** Здесь стояло, что при живой сессии
+     * ни [shell], ни [call] вызывать нельзя: физический читатель был один, и
+     * одноразовая команда разобрала бы пакеты сессии. С ADR-0004 читатель
+     * по-прежнему один, но принадлежит соединению, а каждый логический поток
+     * получил свой ящик. Запрет снят вместе с `busy()` и опровергнут на
+     * железе: `07` §6.41 — одноразовые команды при живой оболочке, §6.43 —
+     * чтение файла во время трёхминутного `logcat`.
      */
     public fun interactiveShell(diagnostics: DiagnosticSink = DiagnosticSink { }): AdbInteractiveShell {
         ensureDispatching()
@@ -261,15 +263,45 @@ public class AdbConnection(
     /**
      * Открывает сессию сервиса `sync:`.
      *
-     * Как и интерактивная оболочка, занимает единственного читателя на всё
-     * время работы. Владелец соединения обязан не допускать одновременных
-     * вызовов.
+     * Как и интерактивная оболочка, соседям не мешает: это и было целью
+     * ADR-0004. Прогон `07` §6.40 держал оболочку девять минут, пока рядом шли
+     * три файловые операции, и отпечаток прочитанного совпал с §6.29.
      */
     public fun syncSession(diagnostics: DiagnosticSink = DiagnosticSink { }): AdbSyncSession {
         ensureDispatching()
         return AdbSyncSession(
             writer = writer,
             dispatcher = dispatcher,
+            diagnostics = diagnostics,
+        )
+    }
+
+    /**
+     * Заводит одно проброшенное соединение.
+     *
+     * [channel] — сторона клиента: сокет, который принял слушатель приложения.
+     * Протокольный модуль про сокеты не знает, и это не случайность
+     * (`docs/adr/0005_LOCAL_SOCKET_FORWARDING_RU.md` §3).
+     *
+     * Возвращается объект, а не исход: у проброса две стороны, и качать их
+     * обязаны два разных потока исполнения. Порядок вызовов описан в
+     * [AdbForwardStream].
+     *
+     * Одновременных пробросов может быть сколько угодно — ровно за этим
+     * делался ADR-0004.
+     */
+    public fun forwardStream(
+        channel: AdbByteChannel,
+        diagnostics: DiagnosticSink = DiagnosticSink { },
+    ): AdbForwardStream {
+        ensureDispatching()
+        return AdbForwardStream(
+            writer = writer,
+            dispatcher = dispatcher,
+            channel = channel,
+            // Кадр крупнее объявленного нами peer отбросит целиком; свой предел
+            // мы знаем точно, а чужой — только со слов рукопожатия.
+            maxPayload = advertisedMaxPayload.coerceAtMost(AdbForwardStream.MAX_CHUNK_BYTES),
             diagnostics = diagnostics,
         )
     }

@@ -19,6 +19,7 @@ import androidx.lifecycle.lifecycleScope
 import io.github.ncorror.nekoflash.ui.NekoFlashApp
 import io.github.ncorror.nekoflash.adb.AdbLinkController
 import io.github.ncorror.nekoflash.ui.FileActions
+import io.github.ncorror.nekoflash.ui.ForwardPanel
 import io.github.ncorror.nekoflash.ui.RawServicePanel
 import io.github.ncorror.nekoflash.ui.RebootPanel
 import io.github.ncorror.nekoflash.ui.TerminalActions
@@ -88,6 +89,7 @@ class MainActivity : ComponentActivity() {
                     onRunCommand = adbLink::runCommand,
                     reboot = rebootPanel(adbLink),
                     rawService = rawServicePanel(adbLink),
+                    forward = forwardPanel(adbLink),
                     onExportDiagnostics = { saveLauncher.launch(application.suggestedDiagnosticsFileName()) },
                 )
             }
@@ -107,6 +109,14 @@ private fun rebootPanel(adbLink: AdbLinkController): RebootPanel = RebootPanel(
 private fun rawServicePanel(adbLink: AdbLinkController): RawServicePanel = RawServicePanel(
     state = adbLink.rawService.collectAsState().value,
     onCall = adbLink::callRawService,
+)
+
+/** То же для пробросов портов. */
+@Composable
+private fun forwardPanel(adbLink: AdbLinkController): ForwardPanel = ForwardPanel(
+    state = adbLink.forward.collectAsState().value,
+    onAdd = adbLink.forwards::add,
+    onRemove = adbLink.forwards::remove,
 )
 
 private fun MainActivity.exportDiagnostics(
