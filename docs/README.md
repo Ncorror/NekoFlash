@@ -34,7 +34,8 @@ Architecture Decision Records — в `adr/`:
 - `0001_PROJECT_IDENTITY_AND_BUILD_BASELINE_RU.md` — identity, Android/toolchain baseline, начальные модули, авторитет CI.
 - `0002_LOCKED_BOOTLOADER_IS_ADVISORY_RU.md` — отмена product-level hard guard: подтверждённый `LOCKED` даёт предупреждение и typed confirmation, а не запрет.
 - `0003_PHASE2_TECHNICAL_BASELINE_RU.md` — `api()` вместо `implementation()`, конкурентная модель, DI, статический анализ.
-- `0004_CONCURRENT_ADB_DISPATCHER_RU.md` — **PROPOSED**: постоянный читающий цикл на стороне соединения и почтовые ящики логических потоков вместо единственного потребителя. Принимается только после аппаратного прогона.
+- `0004_CONCURRENT_ADB_DISPATCHER_RU.md` — **ACCEPTED** 2026-09-09: постоянный читающий цикл на стороне соединения и почтовые ящики логических потоков вместо единственного потребителя. Принят по четырём прогонам `07` §6.40–§6.43.
+- `0005_LOCAL_SOCKET_FORWARDING_RU.md` — **PROPOSED**: проброс портов. `forward` строится на существующем диспетчере и делается первым; `reverse` требует входящего `OPEN`, которого маршрутизатор не принимает, и формат его запроса выясняется наблюдением, а не по памяти.
 
 `brand-reference/` содержит реальные Legacy-ресурсы Welcome и иконки как **визуальный reference**, а не готовый контракт пиксель-в-пиксель.
 
