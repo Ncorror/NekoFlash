@@ -410,6 +410,9 @@ private fun ForwardRow(entry: AdbForwardEntry, onRemove: (Int) -> Unit) {
             entry.localPort,
             entry.address,
             entry.live,
+            // Принятое отдельно от обслуженного: «ноль обслужено» одинаково
+            // читается и как «клиент не приходил», и как «пришёл и не дошёл».
+            entry.accepted,
             entry.served,
         ),
         style = MaterialTheme.typography.bodySmall,

@@ -145,7 +145,7 @@
     <string name="forward_add">Forward</string>
     <string name="forward_remove">Remove</string>
     <string name="forward_none">No forwards</string>
-    <string name="forward_entry">%1$d to %2$s — %3$d live, %4$d served</string>
+    <string name="forward_entry">%1$d to %2$s — %3$d live, %4$d accepted, %5$d served</string>
     <string name="forward_last_end">Last connection: %1$s</string>
     <string name="forward_failed">Did not work: %1$s</string>
     <string name="forward_note">The listener is bound to loopback and reachable only from this phone; there is no way to open it to the network. The address is passed through as typed — which addresses exist is known by the device. One forward carries up to %1$d connections at a time: behind each are two blocking loops, and the limit is about our threads, not about what may be asked for.</string>

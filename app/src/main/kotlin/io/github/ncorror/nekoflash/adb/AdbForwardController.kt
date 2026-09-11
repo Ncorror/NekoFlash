@@ -25,7 +25,17 @@ public data class AdbForwardEntry(
     val address: String,
     /** Сколько соединений идёт прямо сейчас. */
     val live: Int,
-    /** Сколько соединений обслужено за жизнь проброса. */
+    /**
+     * Сколько соединений **принял слушатель** за жизнь проброса.
+     *
+     * Отдельно от [served] намеренно. Прогон `07` §6.55 упёрся в то, что
+     * «0 обслужено» одинаково читается и как «клиент не приходил», и как
+     * «пришёл, а до устройства не дошёл». Это разные беды: первая — на стороне
+     * клиента, вторая — наша. Принятое соединение считается **до** попытки
+     * открыть поток, и потому их различает.
+     */
+    val accepted: Int,
+    /** Сколько соединений доведено до конца, с итогом. */
     val served: Int,
     /** Чем кончилось последнее соединение; `null` — ещё ни одного. */
     val lastEnd: String?,
@@ -148,7 +158,8 @@ public class AdbForwardController(
     /** Снимает проброс: слушатель закрывается, живые соединения обрываются. */
     public fun remove(localPort: Int) {
         forwards.remove(localPort)?.let { forward ->
-            forward.shutdown("removed by operator")
+            forward.shutdown(REMOVED_BY_OPERATOR)
+            emit("forward_removed", mapOf("localPort" to localPort.toString()))
             publish()
         }
     }
@@ -163,7 +174,11 @@ public class AdbForwardController(
         val live = forwards.values.toList()
         forwards.clear()
         live.forEach { forward -> forward.shutdown(reason) }
-        if (live.isNotEmpty()) publish()
+        if (live.isEmpty()) return
+        // Снятие обязано быть видно так же, как заведение: иначе «пробросов в
+        // списке нет» нельзя отличить от «их и не заводили» (`07` §6.55).
+        emit("forward_stopped", mapOf("count" to live.size.toString(), "reason" to reason))
+        publish()
     }
 
     private fun bind(source: AdbForwardSource, requestedPort: Int, address: String) {
@@ -197,6 +212,12 @@ public class AdbForwardController(
     }
 
     private fun admit(source: AdbForwardSource, forward: Forward, socket: Socket) {
+        forward.accepted()
+        emit(
+            "forward_accepted",
+            mapOf("localPort" to forward.port().toString(), "live" to forward.live().toString()),
+        )
+        publish()
         if (forward.live() >= MAX_CONNECTIONS) {
             // Отказ наблюдаемый: клиент узнаёт о нём закрытым соединением, а
             // оператор — журналом. Молча держать сокет было бы хуже.
@@ -270,6 +291,9 @@ public class AdbForwardController(
         private val streams = ConcurrentHashMap.newKeySet<AdbForwardConnection>()
 
         @Volatile
+        private var taken = 0
+
+        @Volatile
         private var served = 0
 
         @Volatile
@@ -278,6 +302,11 @@ public class AdbForwardController(
         fun port(): Int = server.localPort
 
         fun live(): Int = streams.size
+
+        @Synchronized
+        fun accepted() {
+            taken += 1
+        }
 
         fun opened(stream: AdbForwardConnection) {
             streams += stream
@@ -301,6 +330,7 @@ public class AdbForwardController(
             localPort = port(),
             address = address,
             live = live(),
+            accepted = taken,
             served = served,
             lastEnd = lastEnd,
         )
@@ -323,6 +353,8 @@ public class AdbForwardController(
 
         /** Владелец не сказал — значит не знаем, и так и записываем. */
         private const val UNKNOWN_PERMISSION = "unknown"
+
+        private const val REMOVED_BY_OPERATOR = "removed by operator"
 
         private fun closeQuietly(closeable: java.io.Closeable) {
             try {

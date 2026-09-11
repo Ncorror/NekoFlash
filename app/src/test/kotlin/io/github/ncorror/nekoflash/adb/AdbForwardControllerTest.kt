@@ -203,6 +203,70 @@ class AdbForwardControllerTest {
         )
     }
 
+    /**
+     * Принятое соединение считается отдельно от доведённого.
+     *
+     * «0 обслужено» одинаково читается и как «клиент не приходил», и как
+     * «пришёл, а до устройства не дошёл» — а это разные беды, и лечатся они в
+     * разных местах. Прогон `07` §6.55 упёрся ровно в это.
+     */
+    @Test
+    fun anAcceptedConnectionIsCountedBeforeTheStreamIsOpened() {
+        val source = HeldSource()
+        val sink = RecordingSink()
+        val controller = controller(sink)
+        controller.add(source, localPort = 0, address = ADDRESS)
+        val port = awaitSingleForward(controller).localPort
+
+        connect(port)
+
+        assertTrue(await { controller.state.value.forwards.single().accepted == 1 })
+        assertEquals(0, controller.state.value.forwards.single().served)
+        assertTrue(sink.messages().contains("forward_accepted"))
+    }
+
+    /** Снятие видно в журнале так же, как заведение. */
+    @Test
+    fun removingAForwardIsNamedInTheJournal() {
+        val sink = RecordingSink()
+        val controller = controller(sink)
+        controller.add(HeldSource(), localPort = 0, address = ADDRESS)
+        val port = awaitSingleForward(controller).localPort
+
+        controller.remove(port)
+
+        assertTrue(sink.messages().contains("forward_removed"))
+    }
+
+    /**
+     * Снятие по смерти транспорта — тоже.
+     *
+     * Без записи «пробросов в списке нет» нельзя отличить от «их и не
+     * заводили», и шаг гейта про выдернутый кабель проверить нечем.
+     */
+    @Test
+    fun aDeadTransportSaysSoInTheJournal() {
+        val sink = RecordingSink()
+        val controller = controller(sink)
+        controller.add(HeldSource(), localPort = 0, address = ADDRESS)
+        awaitSingleForward(controller)
+
+        controller.stopAll("transport is gone")
+
+        assertTrue(await { sink.messages().contains("forward_stopped") })
+    }
+
+    /** Снимать нечего — и записывать нечего: пустое снятие в журнал не лезет. */
+    @Test
+    fun stoppingNothingSaysNothing() {
+        val sink = RecordingSink()
+        val controller = controller(sink)
+
+        controller.stopAll("transport is gone")
+
+        assertFalse(sink.messages().contains("forward_stopped"))
+    }
+
     @Test
     fun removingAForwardClosesTheListener() {
         val controller = controller()
