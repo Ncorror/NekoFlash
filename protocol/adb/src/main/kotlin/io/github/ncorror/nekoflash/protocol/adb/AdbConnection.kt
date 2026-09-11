@@ -48,7 +48,7 @@ public class AdbConnection(
      * плана `docs/adr/0004_CONCURRENT_ADB_DISPATCHER_RU.md` напрямую к нему не
      * обращается никто.
      */
-    private val dispatcher = AdbStreamDispatcher()
+    private val dispatcher = AdbStreamDispatcher(diagnostics = diagnostics)
 
     private val dispatchLoop = AdbDispatchLoop(reader, writer, dispatcher)
 

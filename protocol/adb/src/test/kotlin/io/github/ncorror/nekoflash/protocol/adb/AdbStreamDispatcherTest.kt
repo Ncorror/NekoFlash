@@ -1,5 +1,6 @@
 package io.github.ncorror.nekoflash.protocol.adb
 
+import io.github.ncorror.nekoflash.core.diagnostics.InMemoryDiagnosticSink
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -269,7 +270,8 @@ class AdbStreamDispatcherTest {
      */
     @Test
     fun anInboundStreamIsRefusedRatherThanIgnored() {
-        val dispatcher = AdbStreamDispatcher()
+        val sink = InMemoryDiagnosticSink()
+        val dispatcher = AdbStreamDispatcher(diagnostics = sink)
 
         val outbound = dispatcher.dispatch(
             AdbPacket(AdbCommand.OPEN, 77, 0, "tcp:8080\u0000".toByteArray()),
@@ -279,6 +281,10 @@ class AdbStreamDispatcherTest {
         assertEquals(AdbCommand.CLSE, reply.command)
         assertEquals(77, reply.arg1)
         assertTrue("отказ не должен заводить ящик", dispatcher.activeMailboxes.isEmpty())
+        // Отказ обязан быть виден: иначе на прогоне не отличить «поток пришёл и
+        // мы отказали» от «поток не приходил вовсе».
+        assertEquals("inbound_stream_refused", sink.snapshot().single().message)
+        assertEquals("tcp:8080", sink.snapshot().single().fields["service"])
     }
 
     private companion object {

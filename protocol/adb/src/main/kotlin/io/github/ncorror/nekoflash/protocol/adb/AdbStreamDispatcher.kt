@@ -1,5 +1,10 @@
 package io.github.ncorror.nekoflash.protocol.adb
 
+import io.github.ncorror.nekoflash.core.diagnostics.DiagnosticEvent
+import io.github.ncorror.nekoflash.core.diagnostics.DiagnosticSink
+import java.time.Clock
+import java.time.Instant
+
 /**
  * Раскладывает принятые пакеты по ящикам логических потоков.
  *
@@ -21,6 +26,16 @@ package io.github.ncorror.nekoflash.protocol.adb
 public class AdbStreamDispatcher(
     private val router: AdbStreamRouter = AdbStreamRouter(),
     private val mailboxCapacity: Int = AdbStreamMailbox.DEFAULT_CAPACITY,
+    /**
+     * Журнал для того, что происходит **не по просьбе потребителя**.
+     *
+     * Своё диспетчер не пишет: у каждого потребителя есть собственный журнал, и
+     * дублировать его здесь значило бы писать одно и то же дважды. Но поток,
+     * заведённый устройством, не принадлежит никакому потребителю, и кроме
+     * диспетчера рассказать о нём некому.
+     */
+    private val diagnostics: DiagnosticSink = DiagnosticSink { },
+    private val clock: () -> Instant = { Clock.systemUTC().instant() },
 ) {
     private val lock = Any()
     private val mailboxes = LinkedHashMap<Int, AdbStreamMailbox>()
@@ -86,6 +101,17 @@ public class AdbStreamDispatcher(
         mailboxes.clear()
     }
 
+    private fun emit(message: String, fields: Map<String, String>) {
+        diagnostics.emit(
+            DiagnosticEvent(
+                timestamp = clock(),
+                category = AdbHandshake.DIAGNOSTIC_CATEGORY,
+                message = message,
+                fields = fields,
+            ),
+        )
+    }
+
     private fun deliver(event: AdbStreamEvent, outbound: MutableList<AdbOutboundPacket>) {
         when (event) {
             is AdbStreamEvent.Opened ->
@@ -108,7 +134,13 @@ public class AdbStreamDispatcher(
              * `docs/adr/0005_LOCAL_SOCKET_FORWARDING_RU.md`; отказ переедет в
              * ветку «приёмника нет», а не исчезнет.
              */
-            is AdbStreamEvent.Inbound -> outbound += router.rejectInbound(event.remoteId)
+            is AdbStreamEvent.Inbound -> {
+                outbound += router.rejectInbound(event.remoteId)
+                emit(
+                    "inbound_stream_refused",
+                    mapOf("service" to event.service, "remote" to event.remoteId.toString()),
+                )
+            }
 
             // Чужой и неожиданный пакет адресату не принадлежат: маршрутизатор уже
             // ответил на них тем, чем следовало, а ящику сообщать нечего.
