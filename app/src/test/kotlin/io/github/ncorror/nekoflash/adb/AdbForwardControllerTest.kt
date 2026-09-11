@@ -225,6 +225,43 @@ class AdbForwardControllerTest {
         assertTrue(sink.messages().contains("forward_accepted"))
     }
 
+    /**
+     * Настоящий слушатель слушает там, куда стучится клиент.
+     *
+     * Проверка идёт через **не подменённый** `listen` и подключается по
+     * литеральному `127.0.0.1` — именно его набирает оператор в браузере.
+     * Остальные проверки берут адрес одной и той же функцией для обеих сторон
+     * и потому расхождение между `127.0.0.1` и `::1` поймать не могут.
+     *
+     * **Доказательством гипотезы §6.57 этот тест не является, и выдавать его
+     * за доказательство нельзя.** На JVM ассистента `getLoopbackAddress()`
+     * возвращает `127.0.0.1` при любой настройке `preferIPv6Addresses` —
+     * проверено, — и потому здесь он не упал бы и до исправления. Он
+     * закрепляет намерение: слушать там, куда стучится клиент, и называть
+     * адрес в журнале. Подтвердить или опровергнуть догадку может только
+     * прогон на устройстве.
+     */
+    @Test
+    fun theRealListenerAnswersOnTheAddressAClientTypes() {
+        val source = HeldSource()
+        val sink = RecordingSink()
+        val controller = controller(sink)
+        controller.add(source, localPort = 0, address = ADDRESS)
+        val port = awaitSingleForward(controller).localPort
+
+        val client = Socket(InetAddress.getByAddress(byteArrayOf(127, 0, 0, 1)), port)
+        opened += AutoCloseable { client.close() }
+
+        assertTrue(
+            "слушатель не принял соединение на 127.0.0.1",
+            await { controller.state.value.forwards.single().accepted == 1 },
+        )
+        assertTrue(
+            "журнал должен называть адрес привязки",
+            sink.snapshot().any { event -> event.fields["bindAddress"] == "127.0.0.1" },
+        )
+    }
+
     /** Снятие видно в журнале так же, как заведение. */
     @Test
     fun removingAForwardIsNamedInTheJournal() {
@@ -448,6 +485,8 @@ class AdbForwardControllerTest {
         }
 
         fun messages(): List<String> = events.map { event -> event.message }
+
+        fun snapshot(): List<DiagnosticEvent> = events.toList()
     }
 
     private companion object {

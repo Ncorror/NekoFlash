@@ -119,7 +119,7 @@ public class AdbForwardController(
     private val clock: () -> Instant = { Clock.systemUTC().instant() },
     /** Как завести слушатель. Подменяется в тестах — настоящий сокет там не нужен. */
     private val listen: (Int) -> ServerSocket = { port ->
-        ServerSocket(port, BACKLOG, InetAddress.getLoopbackAddress())
+        ServerSocket(port, BACKLOG, LOOPBACK_V4)
     },
     /**
      * Что платформа говорит о праве открыть сокет.
@@ -193,7 +193,14 @@ public class AdbForwardController(
         forwards[server.localPort] = forward
         emit(
             "forward_listening",
-            mapOf("localPort" to server.localPort.toString(), "address" to address),
+            mapOf(
+                "localPort" to server.localPort.toString(),
+                // Адрес привязки записывается, а не подразумевается: прогон
+                // `07` §6.57 не мог ответить, слушаем ли мы там, куда стучится
+                // клиент, — а порт об этом не говорит ничего.
+                "bindAddress" to server.inetAddress.hostAddress.orEmpty().ifEmpty { "unknown" },
+                "address" to address,
+            ),
         )
         mutableState.value = snapshot(failure = null)
         executor.execute { accept(source, forward) }
@@ -348,6 +355,21 @@ public class AdbForwardController(
 
         /** Очередь непринятых соединений у слушателя. */
         private const val BACKLOG = 8
+
+        /**
+         * Тот самый `127.0.0.1`, который оператор набирает в браузере.
+         *
+         * Раньше здесь был `InetAddress.getLoopbackAddress()`, и это была
+         * неопределённость: он отдаёт то `127.0.0.1`, то `::1` — в зависимости
+         * от настройки JVM, а не от того, куда придёт клиент. Слушать на `::1`,
+         * когда стучатся на `127.0.0.1`, значит не слушать вовсе, и снаружи это
+         * неотличимо от «приложению запретили сеть».
+         *
+         * Адрес собирается из байт, а не разбирается из строки: имя `127.0.0.1`
+         * пришлось бы резолвить, а резолвить тут нечего.
+         */
+        private val LOOPBACK_V4: InetAddress =
+            InetAddress.getByAddress(byteArrayOf(127, 0, 0, 1))
 
         private const val DIAGNOSTIC_CATEGORY = "adb"
 
