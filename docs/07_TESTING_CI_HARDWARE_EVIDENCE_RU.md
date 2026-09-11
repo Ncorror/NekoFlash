@@ -96,6 +96,7 @@ English и Russian являются first-class UI locales. Для каждог�
 - formatting;
 - repository hygiene scan;
 - Kotlin style/complexity/module-boundary scan;
+- Compose wiring scan — единственный модуль, который локально не собирается ничем;
 - no generated binary drift where relevant;
 - test report artifact;
 - build identity embedded/exportable in diagnostics;

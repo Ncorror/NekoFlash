@@ -352,8 +352,6 @@ private fun RawServiceSection(panel: RawServicePanel) {
     )
 }
 
-/** Размер ответа называется всегда: он известен даже тогда, когда текст бессмыслен. */
-@Composable
 /**
  * Проброс портов.
  *
@@ -427,6 +425,8 @@ private fun ForwardRow(entry: AdbForwardEntry, onRemove: (Int) -> Unit) {
     }
 }
 
+/** Размер ответа называется всегда: он известен даже тогда, когда текст бессмыслен. */
+@Composable
 private fun rawServiceText(state: AdbRawServiceState): String = when (state) {
     AdbRawServiceState.None -> stringResource(R.string.raw_service_none)
     is AdbRawServiceState.Running -> stringResource(R.string.raw_service_running, state.service)
