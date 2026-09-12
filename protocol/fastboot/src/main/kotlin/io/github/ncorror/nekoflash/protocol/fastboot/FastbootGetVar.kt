@@ -61,6 +61,53 @@ public class FastbootGetVar(private val lane: FastbootLane) {
             }
         }
 
+    /**
+     * Спрашивает всё, что устройство готово рассказать.
+     *
+     * Ответ приходит не так, как у одиночной переменной: десятки кадров `INFO`,
+     * каждый с одной или несколькими строками, и терминальный кадр в конце.
+     * Поэтому разбирается он [FastbootVariables], а не [FastbootVariableValue].
+     *
+     * Бюджет по умолчанию больше: вывод длинный, и устройство шлёт его не
+     * мгновенно. Ожидание при этом считается по бездействию, поэтому длинный
+     * ответ мёртвым не выглядит.
+     */
+    public fun readAll(inactivityMillis: Long = ALL_INACTIVITY_MS): FastbootVariableSnapshot =
+        when (val exchange = lane.run(ALL, inactivityMillis)) {
+            is FastbootExchange.Completed -> FastbootVariables.parse(
+                lines = exchange.info,
+                complete = true,
+                finalReply = exchange.reply,
+                finalPayload = exchange.payload,
+            )
+
+            // Оборвалось на середине — прочитанное отдаётся, но помечается
+            // неполным. Выдать частичный список за полный значило бы соврать
+            // о том, чего у устройства нет.
+            is FastbootExchange.TimedOut -> FastbootVariables.parse(
+                lines = exchange.info,
+                complete = false,
+                finalReply = FastbootReply.UNKNOWN,
+                finalPayload = "ответа не было ${exchange.waitedMillis} мс",
+            )
+
+            is FastbootExchange.DataPhase -> {
+                lane.stall()
+                unreadable(exchange.info, "устройство открыло фазу данных на $ALL")
+            }
+
+            is FastbootExchange.NotReady -> unreadable(emptyList(), "полоса занята: ${exchange.state}")
+            is FastbootExchange.NotSent -> unreadable(emptyList(), exchange.reason)
+        }
+
+    private fun unreadable(lines: List<String>, detail: String): FastbootVariableSnapshot =
+        FastbootVariables.parse(
+            lines = lines,
+            complete = false,
+            finalReply = FastbootReply.UNKNOWN,
+            finalPayload = detail,
+        )
+
     private fun valueOf(name: String, exchange: FastbootExchange.Completed): FastbootVariable = when {
         exchange.reply == FastbootReply.FAIL ->
             FastbootVariable.Unsupported(name, exchange.payload.ifBlank { "без объяснения" })
@@ -81,6 +128,18 @@ public class FastbootGetVar(private val lane: FastbootLane) {
 
     private companion object {
         const val PREFIX = "getvar:"
+
+        /** Имя сервиса целиком: `all` — не переменная, а особый запрос. */
+        const val ALL = "getvar:all"
+
+        /**
+         * Бюджет бездействия для `getvar:all`.
+         *
+         * Больше обычного, потому что вывод длинный. Взято у A2, где для этого
+         * запроса заведена своя константа
+         * (`FastbootGetVarAllRequest.INACTIVITY_TIMEOUT_MS`).
+         */
+        const val ALL_INACTIVITY_MS = 30_000L
     }
 }
 

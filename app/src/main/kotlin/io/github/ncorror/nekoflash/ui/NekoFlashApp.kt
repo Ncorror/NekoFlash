@@ -28,6 +28,7 @@ import io.github.ncorror.nekoflash.adb.AdbFileState
 import io.github.ncorror.nekoflash.adb.AdbTerminalState
 import io.github.ncorror.nekoflash.adb.AdbLinkState
 import io.github.ncorror.nekoflash.usb.api.UsbScanSummary
+import io.github.ncorror.nekoflash.fastboot.FastbootLinkState
 import io.github.ncorror.nekoflash.usb.api.UsbInterfaceKind
 import io.github.ncorror.nekoflash.usb.api.UsbSession
 import io.github.ncorror.nekoflash.usb.api.UsbSessionState
@@ -70,6 +71,7 @@ fun NekoFlashApp(
     forward: ForwardPanel = ForwardPanel(),
     reverse: ReversePanel = ReversePanel(),
     fastboot: FastbootPanel = FastbootPanel(),
+    fastbootConsole: FastbootConsolePanel = FastbootConsolePanel(),
     terminalActions: TerminalActions = TerminalActions(),
     fileActions: FileActions = FileActions(),
     onExportDiagnostics: () -> Unit = {},
@@ -100,6 +102,7 @@ fun NekoFlashApp(
             forward = forward,
             reverse = reverse,
             fastboot = fastboot,
+            fastbootConsole = fastbootConsole,
             onExportDiagnostics = onExportDiagnostics,
             modifier = modifier,
         )
@@ -166,6 +169,7 @@ private fun Workspace(
     forward: ForwardPanel,
     reverse: ReversePanel,
     fastboot: FastbootPanel,
+    fastbootConsole: FastbootConsolePanel,
     onExportDiagnostics: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -199,6 +203,7 @@ private fun Workspace(
             forward = forward,
             reverse = reverse,
             fastboot = fastboot,
+            fastbootConsole = fastbootConsole,
         )
         ActionsCard(
             exportStatus = exportStatus,
@@ -230,6 +235,7 @@ private fun SessionList(
     forward: ForwardPanel,
     reverse: ReversePanel,
     fastboot: FastbootPanel,
+    fastbootConsole: FastbootConsolePanel,
 ) {
     if (sessions.isEmpty()) {
         Text(
@@ -264,6 +270,7 @@ private fun SessionList(
             forward = forward,
             reverse = reverse,
             fastboot = fastboot,
+            fastbootConsole = fastbootConsole,
         )
     }
     Text(
@@ -368,6 +375,7 @@ private fun SessionCard(
     forward: ForwardPanel,
     reverse: ReversePanel,
     fastboot: FastbootPanel,
+    fastbootConsole: FastbootConsolePanel,
 ) {
     // Удерживается ли интерфейс, видно по самому состоянию сессии. Отдельный
     // список захваченных был бы вторым источником истины о том же самом.
@@ -406,6 +414,9 @@ private fun SessionCard(
                     )
                 } else if (session.candidate.kind == UsbInterfaceKind.FASTBOOT) {
                     FastbootLinkSection(fastboot = fastboot)
+                    if (fastboot.state is FastbootLinkState.Connected) {
+                        FastbootConsoleSection(console = fastbootConsole)
+                    }
                     Text(
                         text = stringResource(R.string.fastboot_note),
                         style = MaterialTheme.typography.bodySmall,

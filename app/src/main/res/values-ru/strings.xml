@@ -174,4 +174,22 @@
     <string name="fastboot_claim_failed">Интерфейс не захвачен: %1$s</string>
     <string name="fastboot_disconnect">Отпустить интерфейс</string>
     <string name="fastboot_note">Загрузчик и fastbootd перечисляются одним и тем же интерфейсом, поэтому дескриптор их не различает — различает только обмен. Роль читается по is-userspace. Если устройство на неё не отвечает, роль остаётся неустановленной и показывается именно так: операции с динамическими разделами есть в fastbootd и нет в загрузчике, и догадка здесь выйдет боком ровно тогда, когда на неё обопрутся.</string>
+    <string name="fastboot_console_title">Произвольный обмен по Fastboot</string>
+    <string name="fastboot_command_label">Команда, как её знает устройство</string>
+    <string name="fastboot_command_send">Отправить команду</string>
+    <string name="fastboot_variable_label">Имя переменной</string>
+    <string name="fastboot_variable_read">Прочитать переменную</string>
+    <string name="fastboot_variable_read_all">Прочитать всё</string>
+    <string name="fastboot_console_running">Отправлено, ждём ответа: %1$s</string>
+    <string name="fastboot_console_okay">%1$s → OKAY: %2$s</string>
+    <string name="fastboot_console_fail">%1$s → устройство отказало: %2$s</string>
+    <string name="fastboot_console_info">  %1$s</string>
+    <string name="fastboot_console_no_answer">%1$s → ответа нет: %2$s</string>
+    <string name="fastboot_console_lane">Полоса: %1$s</string>
+    <string name="fastboot_variables_all">Устройство назвало переменных: %1$d</string>
+    <string name="fastboot_variables_partial">Список неполон: прочитано переменных %1$d, обмен оборвался</string>
+    <string name="fastboot_variables_conflict">%1$s названа больше одного раза с разными значениями: %2$s</string>
+    <string name="fastboot_variables_ignored">Строк, которые не удалось разобрать: %1$d — сохранены в диагностике</string>
+    <string name="fastboot_console_note">Списка команд здесь нет намеренно: что бывает у Fastboot, знает устройство, и его отказ — это ответ, а не наша ошибка. Две вещи, которые не несёт сам провод, называются, а не отправляются молча подменёнными: команда не в ASCII и команда длиннее 64 байт. Полоса показана потому, что у Fastboot она одна, а потеря рамки липкая — вторая команда после этого уйдёт в никуда.</string>
+    <string name="fastboot_variable_entry">%1$s = %2$s</string>
 </resources>

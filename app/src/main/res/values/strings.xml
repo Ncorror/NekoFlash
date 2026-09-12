@@ -171,4 +171,22 @@
     <string name="fastboot_claim_failed">The interface was not claimed: %1$s</string>
     <string name="fastboot_disconnect">Release the interface</string>
     <string name="fastboot_note">Bootloader and fastbootd enumerate through the same interface, so the descriptor cannot tell them apart — only the exchange can. The role is read from is-userspace. When the device does not answer it, the role stays unestablished and is shown as such: operations on dynamic partitions exist in fastbootd and not in the bootloader, and a guess here would break exactly when it is relied upon.</string>
+    <string name="fastboot_console_title">Arbitrary Fastboot exchange</string>
+    <string name="fastboot_command_label">Command, as the device knows it</string>
+    <string name="fastboot_command_send">Send the command</string>
+    <string name="fastboot_variable_label">Variable name</string>
+    <string name="fastboot_variable_read">Read the variable</string>
+    <string name="fastboot_variable_read_all">Read everything</string>
+    <string name="fastboot_console_running">Sent, waiting for an answer: %1$s</string>
+    <string name="fastboot_console_okay">%1$s → OKAY: %2$s</string>
+    <string name="fastboot_console_fail">%1$s → the device refused: %2$s</string>
+    <string name="fastboot_console_info">  %1$s</string>
+    <string name="fastboot_console_no_answer">%1$s → no answer: %2$s</string>
+    <string name="fastboot_console_lane">Lane: %1$s</string>
+    <string name="fastboot_variables_all">The device named %1$d variables</string>
+    <string name="fastboot_variables_partial">The list is incomplete: %1$d variables read before the exchange broke off</string>
+    <string name="fastboot_variables_conflict">%1$s was named more than once with different values: %2$s</string>
+    <string name="fastboot_variables_ignored">Lines that could not be parsed: %1$d — kept in the diagnostics</string>
+    <string name="fastboot_console_note">There is no command list here on purpose: what Fastboot offers is known to the device, and a refusal is its answer, not our error. Two things the wire itself cannot carry are named rather than sent silently altered: a command outside ASCII, and one longer than 64 bytes. The lane is shown because Fastboot has exactly one and losing its framing is sticky — a second command would then go nowhere.</string>
+    <string name="fastboot_variable_entry">%1$s = %2$s</string>
 </resources>

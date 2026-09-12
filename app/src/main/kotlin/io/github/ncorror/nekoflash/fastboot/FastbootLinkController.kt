@@ -6,8 +6,12 @@ import io.github.ncorror.nekoflash.core.model.SessionGeneration
 import io.github.ncorror.nekoflash.protocol.fastboot.FastbootGetVar
 import io.github.ncorror.nekoflash.protocol.fastboot.FastbootIdentity
 import io.github.ncorror.nekoflash.protocol.fastboot.FastbootLane
+import io.github.ncorror.nekoflash.protocol.fastboot.FastbootLaneState
+import io.github.ncorror.nekoflash.protocol.fastboot.FastbootReply
 import io.github.ncorror.nekoflash.protocol.fastboot.FastbootMode
+import io.github.ncorror.nekoflash.protocol.fastboot.FastbootExchange
 import io.github.ncorror.nekoflash.protocol.fastboot.FastbootModeProbe
+import io.github.ncorror.nekoflash.protocol.fastboot.FastbootVariable
 import io.github.ncorror.nekoflash.usb.api.UsbClaimResult
 import io.github.ncorror.nekoflash.usb.api.UsbTransportHandle
 import java.time.Instant
@@ -74,6 +78,11 @@ public class FastbootLinkController(
     private var lane: FastbootLane? = null
     private var handle: UsbTransportHandle? = null
 
+    private val mutableConsole = MutableStateFlow<FastbootConsoleState>(FastbootConsoleState.Idle)
+
+    /** Исход последнего обмена. */
+    public val console: StateFlow<FastbootConsoleState> = mutableConsole.asStateFlow()
+
     /**
      * Захватывает интерфейс и спрашивает устройство, кто оно.
      *
@@ -100,7 +109,153 @@ public class FastbootLinkController(
         lane = null
         handle?.close()
         handle = null
+        mutableConsole.value = FastbootConsoleState.Idle
         mutableState.value = FastbootLinkState.Idle
+    }
+
+    /**
+     * Отправляет команду как набрана.
+     *
+     * Ни имя, ни форма не проверяются и не ограничиваются списком: что бывает у
+     * Fastboot, знает устройство, и его `FAIL` — это ответ, а не наша ошибка
+     * (`01` §3). Отказать полоса может только по двум причинам провода, и обе
+     * она называет: команда не передаётся в ASCII либо не помещается в кадр.
+     */
+    public fun runCommand(command: String) {
+        busy("fastboot_command", command) { lane, trimmed -> report(trimmed, lane.run(trimmed), lane) }
+    }
+
+    /** Спрашивает одну переменную по имени. */
+    public fun readVariable(name: String) {
+        busy("fastboot_getvar", name) { lane, trimmed ->
+            val variable = FastbootGetVar(lane).read(trimmed)
+            when (variable) {
+                is FastbootVariable.Present -> FastbootConsoleState.Answered(
+                    command = "getvar:$trimmed",
+                    reply = FastbootReply.OKAY,
+                    payload = variable.value,
+                    info = emptyList(),
+                    lane = lane.state,
+                )
+
+                is FastbootVariable.Unsupported -> FastbootConsoleState.Answered(
+                    command = "getvar:$trimmed",
+                    reply = FastbootReply.FAIL,
+                    payload = variable.detail,
+                    info = emptyList(),
+                    lane = lane.state,
+                )
+
+                is FastbootVariable.Unavailable ->
+                    FastbootConsoleState.NotAnswered("getvar:$trimmed", variable.detail, lane.state)
+            }
+        }
+    }
+
+    /** Спрашивает всё, что устройство готово рассказать. */
+    public fun readAllVariables() {
+        busy("fastboot_getvar_all", "all") { lane, _ ->
+            FastbootConsoleState.Variables(FastbootGetVar(lane).readAll(), lane.state)
+        }
+    }
+
+    /**
+     * Выполняет обмен, если полоса свободна.
+     *
+     * Второй обмен поверх идущего не ставится в очередь и не отбрасывается
+     * молча: у Fastboot полоса одна, и очередь здесь означала бы, что оператор
+     * не знает, когда его команда уйдёт. Отказ виден сразу.
+     */
+    private fun busy(
+        event: String,
+        raw: String,
+        action: (FastbootLane, String) -> FastbootConsoleState,
+    ) {
+        val live = lane
+        val trimmed = raw.trim()
+        when {
+            live == null -> mutableConsole.value =
+                FastbootConsoleState.NotAnswered(trimmed, "соединения нет", FastbootLaneState.CLOSED)
+
+            mutableConsole.value is FastbootConsoleState.Running -> Unit
+
+            else -> {
+                mutableConsole.value = FastbootConsoleState.Running(trimmed)
+                executor.execute {
+                    emit(event, mapOf("command" to trimmed))
+                    val outcome = runCatching { action(live, trimmed) }
+                    mutableConsole.value = outcome.getOrElse { failure ->
+                        FastbootConsoleState.NotAnswered(
+                            command = trimmed,
+                            detail = failure.message ?: failure.javaClass.simpleName,
+                            lane = live.state,
+                        )
+                    }
+                    record(event, mutableConsole.value)
+                }
+            }
+        }
+    }
+
+    private fun report(command: String, exchange: FastbootExchange, live: FastbootLane): FastbootConsoleState =
+        when (exchange) {
+            is FastbootExchange.Completed ->
+                FastbootConsoleState.Answered(command, exchange.reply, exchange.payload, exchange.info, live.state)
+
+            is FastbootExchange.TimedOut -> FastbootConsoleState.NotAnswered(
+                command = command,
+                detail = "ответа не было ${exchange.waitedMillis} мс",
+                lane = live.state,
+            )
+
+            // Фаза данных открыта, а передавать нечего: рамка потеряна, и
+            // сказать об этом обязательно. Передача данных — пункт Phase 5,
+            // который ещё не начат.
+            is FastbootExchange.DataPhase -> {
+                live.stall()
+                FastbootConsoleState.NotAnswered(
+                    command = command,
+                    detail = "устройство ждёт ${exchange.declaredSize ?: "?"} байт, передавать их пока нечем",
+                    lane = live.state,
+                )
+            }
+
+            is FastbootExchange.NotReady ->
+                FastbootConsoleState.NotAnswered(command, "полоса занята: ${exchange.state}", live.state)
+
+            is FastbootExchange.NotSent ->
+                FastbootConsoleState.NotAnswered(command, exchange.reason, live.state)
+        }
+
+    private fun record(event: String, state: FastbootConsoleState) {
+        val fields = when (state) {
+            is FastbootConsoleState.Answered -> mapOf(
+                "command" to state.command,
+                "reply" to state.reply.name,
+                "payload" to state.payload,
+                "infoLines" to state.info.size.toString(),
+                "lane" to state.lane.name,
+            )
+
+            is FastbootConsoleState.NotAnswered -> mapOf(
+                "command" to state.command,
+                "reply" to "none",
+                "detail" to state.detail,
+                "lane" to state.lane.name,
+            )
+
+            is FastbootConsoleState.Variables -> mapOf(
+                "variables" to state.snapshot.variables.size.toString(),
+                "duplicates" to state.snapshot.duplicates.size.toString(),
+                "ignored" to state.snapshot.ignored.size.toString(),
+                "complete" to state.snapshot.complete.toString(),
+                "reply" to state.snapshot.finalReply.name,
+                "lane" to state.lane.name,
+            )
+
+            else -> mapOf("state" to state.javaClass.simpleName)
+        }
+        emit(event + "_finished", fields)
     }
 
     private fun probe(generation: SessionGeneration, claimed: UsbTransportHandle) {

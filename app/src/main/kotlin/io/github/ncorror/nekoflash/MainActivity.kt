@@ -18,8 +18,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.lifecycleScope
 import io.github.ncorror.nekoflash.ui.NekoFlashApp
 import io.github.ncorror.nekoflash.adb.AdbLinkController
+import io.github.ncorror.nekoflash.fastboot.FastbootConsoleState
 import io.github.ncorror.nekoflash.fastboot.FastbootLinkController
 import io.github.ncorror.nekoflash.fastboot.FastbootLinkState
+import io.github.ncorror.nekoflash.ui.FastbootConsolePanel
 import io.github.ncorror.nekoflash.ui.FastbootPanel
 import io.github.ncorror.nekoflash.usb.api.UsbInterfaceKind
 import io.github.ncorror.nekoflash.usb.api.UsbSession
@@ -56,6 +58,7 @@ class MainActivity : ComponentActivity() {
             val terminalState by adbLink.terminal.collectAsState()
             val fileState by adbLink.files.collectAsState()
             val fastbootState by fastbootLink.state.collectAsState()
+            val fastbootConsole by fastbootLink.console.collectAsState()
             var exportStatus by remember { mutableStateOf<String?>(null) }
 
             val savedTemplate = stringResource(R.string.diagnostics_export_done)
@@ -83,11 +86,7 @@ class MainActivity : ComponentActivity() {
                     terminal = terminalState,
                     terminalActions = terminalActions(adbLink),
                     files = fileState,
-                    fileActions = FileActions(
-                        onDescribe = adbLink::describeFile,
-                        onRead = adbLink::readFile,
-                        onWrite = adbLink::writeFile,
-                    ),
+                    fileActions = fileActions(adbLink),
                     onRescanUsb = { coordinator.scanAttachedDevices() },
                     onClaim = claimAction(coordinator, claimFailedTemplate) { exportStatus = it },
                     onRelease = { session -> coordinator.release(session.generation) },
@@ -99,6 +98,7 @@ class MainActivity : ComponentActivity() {
                     forward = forwardPanel(adbLink),
                     reverse = reversePanel(adbLink),
                     fastboot = fastbootPanel(fastbootLink, fastbootState, sessions),
+                    fastbootConsole = fastbootConsolePanel(fastbootLink, fastbootConsole),
                     onExportDiagnostics = { saveLauncher.launch(application.suggestedDiagnosticsFileName()) },
                 )
             }
@@ -181,6 +181,22 @@ private fun fastbootPanel(
             ?.let { session -> link.connect(session.generation) }
     },
     onDisconnect = link::disconnect,
+)
+
+private fun fastbootConsolePanel(
+    link: FastbootLinkController,
+    state: FastbootConsoleState,
+): FastbootConsolePanel = FastbootConsolePanel(
+    state = state,
+    onCommand = link::runCommand,
+    onVariable = link::readVariable,
+    onAllVariables = link::readAllVariables,
+)
+
+private fun fileActions(link: AdbLinkController) = FileActions(
+    onDescribe = link::describeFile,
+    onRead = link::readFile,
+    onWrite = link::writeFile,
 )
 
 private fun terminalActions(link: AdbLinkController) = TerminalActions(
