@@ -150,4 +150,41 @@ class FastbootConsoleTest {
         controller.connect(SessionGeneration(1))
         return controller
     }
+
+    /**
+     * Расхождения и неразобранные строки называются в журнале, а значения — нет.
+     *
+     * Прогон §6.72 дал `duplicates=2 ignored=2`, и по журналу нельзя было
+     * узнать какие: видно, что что-то есть, и не видно что. А значения не
+     * записываются намеренно — среди них `token` разблокировки, и выгружать
+     * весь ответ устройства в отчёт незачем.
+     */
+    @Test
+    fun theJournalNamesDuplicatesAndIgnoredLinesButNotValues() {
+        val sink = InMemoryDiagnosticSink()
+        val controller = connected(
+            ClaimingCoordinator(
+                listOf(
+                    "OKAYno",
+                    "INFOcurrent-slot: a",
+                    "INFOcurrent-slot: b",
+                    "INFOtoken: s3cret-value",
+                    "INFOline without a colon",
+                    "OKAY",
+                ),
+            ),
+            sink,
+        )
+
+        controller.readAllVariables()
+
+        val fields = sink.snapshot().last().fields
+        assertEquals("current-slot", fields["duplicateNames"])
+        assertEquals("1", fields["conflicting"])
+        assertEquals("line without a colon", fields["ignoredLines"])
+        assertTrue(
+            "значения переменных в журнал не попадают",
+            sink.snapshot().none { event -> event.fields.values.any { it.contains("s3cret-value") } },
+        )
+    }
 }

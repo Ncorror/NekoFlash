@@ -244,10 +244,23 @@ public class FastbootLinkController(
                 "lane" to state.lane.name,
             )
 
+            // Имена расхождений и неразобранные строки записываются, а числа
+            // одни — нет. Прогон §6.72 дал `duplicates=2 ignored=2` на живом
+            // устройстве, и по журналу нельзя было узнать, какие именно: видно,
+            // что что-то есть, и не видно что. Тот же дефект наблюдаемости
+            // стоил прогона в §6.55.
+            //
+            // Значения переменных при этом **не** записываются, и это
+            // намеренно: среди них `token` разблокировки. Имя расхождения и
+            // строка, которую не удалось разобрать, для разбора достаточны, а
+            // выгружать весь ответ устройства в отчёт — нет.
             is FastbootConsoleState.Variables -> mapOf(
                 "variables" to state.snapshot.variables.size.toString(),
                 "duplicates" to state.snapshot.duplicates.size.toString(),
+                "duplicateNames" to state.snapshot.duplicates.joinToString(",") { it.name },
+                "conflicting" to state.snapshot.duplicates.count { it.conflicting }.toString(),
                 "ignored" to state.snapshot.ignored.size.toString(),
+                "ignoredLines" to state.snapshot.ignored.joinToString(" | "),
                 "complete" to state.snapshot.complete.toString(),
                 "reply" to state.snapshot.finalReply.name,
                 "lane" to state.lane.name,
