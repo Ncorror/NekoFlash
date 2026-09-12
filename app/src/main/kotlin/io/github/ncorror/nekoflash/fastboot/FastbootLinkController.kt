@@ -9,6 +9,10 @@ import io.github.ncorror.nekoflash.protocol.fastboot.FastbootLane
 import io.github.ncorror.nekoflash.protocol.fastboot.FastbootLaneState
 import io.github.ncorror.nekoflash.protocol.fastboot.FastbootReply
 import io.github.ncorror.nekoflash.protocol.fastboot.FastbootMode
+import io.github.ncorror.nekoflash.payload.GeneratedPayload
+import io.github.ncorror.nekoflash.payload.GeneratedPayloadStream
+import io.github.ncorror.nekoflash.protocol.fastboot.FastbootDownload
+import io.github.ncorror.nekoflash.protocol.fastboot.FastbootDownloadOutcome
 import io.github.ncorror.nekoflash.protocol.fastboot.FastbootExchange
 import io.github.ncorror.nekoflash.protocol.fastboot.FastbootModeProbe
 import io.github.ncorror.nekoflash.protocol.fastboot.FastbootVariable
@@ -160,6 +164,73 @@ public class FastbootLinkController(
     }
 
     /**
+     * Загружает в буфер устройства [sizeBytes] порождённых приложением байт.
+     *
+     * Содержимое своё, а не выбранный файл: выбор файла — это artifact source
+     * из Phase 8. Для протокольного пути этого достаточно, и тот же приём уже
+     * принят для sync `SEND` (`07` §6.36).
+     *
+     * **Ничего не прошивает.** `download:` наполняет буфер загрузки; раздел
+     * меняет `flash:`, которого в этой фазе нет вовсе.
+     */
+    public fun downloadGenerated(sizeBytes: Long) {
+        busy("fastboot_download", sizeBytes.toString()) { lane, _ ->
+            val outcome = FastbootDownload(lane).send(
+                source = GeneratedPayloadStream(GeneratedPayload(sizeBytes)),
+                sizeBytes = sizeBytes,
+            )
+            downloaded(sizeBytes, outcome, lane.state)
+        }
+    }
+
+    private fun downloaded(
+        declared: Long,
+        outcome: FastbootDownloadOutcome,
+        lane: FastbootLaneState,
+    ): FastbootConsoleState = when (outcome) {
+        is FastbootDownloadOutcome.Answered -> FastbootConsoleState.Downloaded(
+            declaredBytes = declared,
+            sentBytes = outcome.bytesSent,
+            reply = outcome.reply,
+            detail = outcome.payload,
+            // Байты дошли все, но принял ли их приёмник — сказало устройство.
+            // Про «не изменилось» речи нет: буфер наполнен.
+            untouched = false,
+            lane = lane,
+        )
+
+        // Единственный исход, про который можно честно сказать, что состояние
+        // устройства не тронуто: ни одного байта не ушло.
+        is FastbootDownloadOutcome.Refused -> FastbootConsoleState.Downloaded(
+            declaredBytes = declared,
+            sentBytes = 0L,
+            reply = FastbootReply.FAIL,
+            detail = outcome.detail,
+            untouched = true,
+            lane = lane,
+        )
+
+        is FastbootDownloadOutcome.Unknown -> FastbootConsoleState.Downloaded(
+            declaredBytes = outcome.expectedBytes,
+            sentBytes = outcome.bytesSent,
+            reply = null,
+            detail = outcome.detail,
+            untouched = false,
+            lane = lane,
+        )
+
+        // Обмен не начался: команда не ушла, устройство её не видело.
+        is FastbootDownloadOutcome.NotStarted -> FastbootConsoleState.Downloaded(
+            declaredBytes = declared,
+            sentBytes = 0L,
+            reply = null,
+            detail = outcome.detail,
+            untouched = true,
+            lane = lane,
+        )
+    }
+
+    /**
      * Выполняет обмен, если полоса свободна.
      *
      * Второй обмен поверх идущего не ставится в очередь и не отбрасывается
@@ -254,6 +325,17 @@ public class FastbootLinkController(
             // намеренно: среди них `token` разблокировки. Имя расхождения и
             // строка, которую не удалось разобрать, для разбора достаточны, а
             // выгружать весь ответ устройства в отчёт — нет.
+            is FastbootConsoleState.Downloaded -> mapOf(
+                "declaredBytes" to state.declaredBytes.toString(),
+                "sentBytes" to state.sentBytes.toString(),
+                "reply" to (state.reply?.name ?: "none"),
+                "detail" to state.detail,
+                // Ключевое поле для разбора прогона: можно ли утверждать, что
+                // состояние устройства не изменилось.
+                "untouched" to state.untouched.toString(),
+                "lane" to state.lane.name,
+            )
+
             is FastbootConsoleState.Variables -> mapOf(
                 "variables" to state.snapshot.variables.size.toString(),
                 "duplicates" to state.snapshot.duplicates.size.toString(),

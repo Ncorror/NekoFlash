@@ -192,4 +192,12 @@
     <string name="fastboot_variables_ignored">Строк, которые не удалось разобрать: %1$d — сохранены в диагностике</string>
     <string name="fastboot_console_note">Списка команд здесь нет намеренно: что бывает у Fastboot, знает устройство, и его отказ — это ответ, а не наша ошибка. Две вещи, которые не несёт сам провод, называются, а не отправляются молча подменёнными: команда не в ASCII и команда длиннее 64 байт. Полоса показана потому, что у Fastboot она одна, а потеря рамки липкая — вторая команда после этого уйдёт в никуда.</string>
     <string name="fastboot_variable_entry">%1$s = %2$s</string>
+    <string name="fastboot_download_title">Загрузить нагрузку в буфер устройства</string>
+    <string name="fastboot_download_small">4 КиБ</string>
+    <string name="fastboot_download_large">2 МиБ</string>
+    <string name="fastboot_download_result">Передано %1$d из %2$d байт; устройство ответило %3$s</string>
+    <string name="fastboot_download_no_reply">ничего</string>
+    <string name="fastboot_download_untouched">Буфер устройства не тронут: ни одного байта не отправлено.</string>
+    <string name="fastboot_download_buffer_unknown">В буфере загрузки теперь что-то лежит; прошивать из него нельзя, пока устройство не подтвердило нагрузку целиком.</string>
+    <string name="fastboot_download_note">download: наполняет буфер загрузки и ничего не прошивает — раздел меняет flash:, которого в этой фазе нет. Нагрузку порождает приложение: выбор файла требует artifact source из Phase 8. Сколько устройство готово принять — его дело: max-download-size это диагностика, а не наша авторизация, поэтому слишком большой объём отклоняет устройство, а не мы.</string>
 </resources>

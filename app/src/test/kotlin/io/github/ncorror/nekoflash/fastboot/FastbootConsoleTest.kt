@@ -187,4 +187,62 @@ class FastbootConsoleTest {
             sink.snapshot().none { event -> event.fields.values.any { it.contains("s3cret-value") } },
         )
     }
+
+    /**
+     * Загрузка доходит до устройства и её исход не приукрашивается.
+     *
+     * Проверяется главное поле — `untouched`: утверждать «ничего не
+     * изменилось» можно только при отказе до фазы данных.
+     */
+    @Test
+    fun aDownloadReportsHowManyBytesWentAndWhetherAnythingChanged() {
+        val coordinator = ClaimingCoordinator(listOf("OKAYno", "DATA00001000", "OKAY"))
+        val sink = InMemoryDiagnosticSink()
+        val controller = connected(coordinator, sink)
+        coordinator.lastHandle?.dataAfterCommands = 2
+
+        controller.downloadGenerated(4096)
+
+        val state = controller.console.value as FastbootConsoleState.Downloaded
+        assertEquals(4096L, state.sentBytes)
+        assertEquals(4096L, state.declaredBytes)
+        assertEquals(FastbootReply.OKAY, state.reply)
+        assertEquals("байты ушли — «не изменилось» уже неверно", false, state.untouched)
+        assertEquals("4096", sink.snapshot().last().fields["sentBytes"])
+        assertEquals("false", sink.snapshot().last().fields["untouched"])
+    }
+
+    /**
+     * Отказ до фазы данных — единственный случай, когда «не изменилось» правда.
+     *
+     * Ни одного байта не отправлено, буфер устройства не тронут.
+     */
+    @Test
+    fun aRefusalBeforeTheDataPhaseIsTheOnlyUntouchedOutcome() {
+        val sink = InMemoryDiagnosticSink()
+        val controller = connected(ClaimingCoordinator(listOf("OKAYno", "FAILtoo large")), sink)
+
+        controller.downloadGenerated(4096)
+
+        val state = controller.console.value as FastbootConsoleState.Downloaded
+        assertEquals(0L, state.sentBytes)
+        assertEquals("до данных не дошло — состояние известно", true, state.untouched)
+        assertEquals("true", sink.snapshot().last().fields["untouched"])
+    }
+
+    /** Оборванная передача — неизвестность, и «не изменилось» про неё сказать нельзя. */
+    @Test
+    fun anInterruptedDownloadNeverClaimsNothingChanged() {
+        val coordinator = ClaimingCoordinator(listOf("OKAYno", "DATA00001000", "OKAY"))
+        val controller = connected(coordinator)
+        coordinator.lastHandle?.dataAfterCommands = 2
+        coordinator.lastHandle?.failDataWrite = true
+
+        controller.downloadGenerated(4096)
+
+        val state = controller.console.value as FastbootConsoleState.Downloaded
+        assertEquals("ответа устройства не было", null, state.reply)
+        assertEquals("буфер неизвестен", false, state.untouched)
+        assertEquals(FastbootLaneState.STALLED, state.lane)
+    }
 }

@@ -37,6 +37,30 @@ internal class FakeFastbootTransport(
     var failWrite: Boolean = false
     var closed: Boolean = false
 
+    /** Сколько байт получено в фазе данных — считается отдельно от команд. */
+    var dataBytes: Long = 0L
+        private set
+
+    /**
+     * Отдавать по столько байт за запись, а не всё разом.
+     *
+     * Короткая запись хост → устройство законна, и передача обязана дописывать
+     * остаток. Без такой возможности проверить это нечем.
+     */
+    var writeAtMost: Int? = null
+
+    /** Считать команды и данные вместе перестаёт после этого числа команд. */
+    private var commandsSeen: Int = 0
+
+    /** С какой команды считать записи данными, а не командами. */
+    var dataAfterCommands: Int? = null
+
+    /** Отдать неоднозначный ответ на записи данных: больше запрошенного. */
+    var overlongWrite: Boolean = false
+
+    /** Ронять только записи данных, оставив команду проходящей. */
+    var failDataWrite: Boolean = false
+
     /** Сколько приёмов было запрошено — по нему видно, что ожидание дробится. */
     var receiveCalls: Int = 0
         private set
@@ -70,9 +94,19 @@ internal class FakeFastbootTransport(
     }
 
     override fun send(source: ByteArray, offset: Int, length: Int, timeoutMillis: Int): UsbTransferResult {
-        sent += String(source, offset, length, Charsets.US_ASCII)
+        val boundary = dataAfterCommands
+        val isData = boundary != null && commandsSeen >= boundary
+        if (isData) {
+            dataBytes += length.toLong()
+        } else {
+            sent += String(source, offset, length, Charsets.US_ASCII)
+            commandsSeen += 1
+        }
         return when {
             failWrite -> UsbTransferResult.Failed(UsbTransferFailure.NOT_COMPLETED)
+            isData && failDataWrite -> UsbTransferResult.Failed(UsbTransferFailure.NOT_COMPLETED)
+            isData && overlongWrite -> UsbTransferResult.Completed(length + 1)
+            isData && writeAtMost != null -> UsbTransferResult.Completed(minOf(length, writeAtMost!!))
             shortWriteAfter != null -> UsbTransferResult.Completed(shortWriteAfter!!)
             else -> UsbTransferResult.Completed(length)
         }

@@ -1,4 +1,4 @@
-package io.github.ncorror.nekoflash.adb
+package io.github.ncorror.nekoflash.payload
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals

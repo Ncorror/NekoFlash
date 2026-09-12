@@ -26,6 +26,18 @@ internal class FakeFastbootHandle(replies: List<String>) : UsbTransportHandle {
     var closed: Boolean = false
         private set
 
+    /** С какой команды считать записи данными, а не командами. */
+    var dataAfterCommands: Int? = null
+
+    /** Ронять только записи данных, оставив команды проходящими. */
+    var failDataWrite: Boolean = false
+
+    /** Сколько байт получено в фазе данных. */
+    var dataBytes: Long = 0L
+        private set
+
+    private var commandsSeen: Int = 0
+
     override val candidate: UsbInterfaceCandidate = CANDIDATE
 
     override val held: Boolean get() = !closed
@@ -39,8 +51,20 @@ internal class FakeFastbootHandle(replies: List<String>) : UsbTransportHandle {
     }
 
     override fun send(source: ByteArray, offset: Int, length: Int, timeoutMillis: Int): UsbTransferResult {
-        sent += String(source, offset, length, Charsets.US_ASCII)
-        return UsbTransferResult.Completed(length)
+        val boundary = dataAfterCommands
+        val isData = boundary != null && commandsSeen >= boundary
+        return if (isData) {
+            dataBytes += length.toLong()
+            if (failDataWrite) {
+                UsbTransferResult.Failed(UsbTransferFailure.NOT_COMPLETED)
+            } else {
+                UsbTransferResult.Completed(length)
+            }
+        } else {
+            sent += String(source, offset, length, Charsets.US_ASCII)
+            commandsSeen += 1
+            UsbTransferResult.Completed(length)
+        }
     }
 
     override fun close() {

@@ -27,6 +27,8 @@ data class FastbootConsolePanel(
     val onCommand: (String) -> Unit = {},
     val onVariable: (String) -> Unit = {},
     val onAllVariables: () -> Unit = {},
+    /** Загрузить в буфер устройства столько порождённых приложением байт. */
+    val onDownload: (Long) -> Unit = {},
 )
 
 /**
@@ -81,6 +83,19 @@ fun FastbootConsoleSection(
             }
         }
 
+        Text(
+            text = stringResource(R.string.fastboot_download_title),
+            style = MaterialTheme.typography.titleSmall,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = { console.onDownload(SMALL_DOWNLOAD_BYTES) }) {
+                Text(stringResource(R.string.fastboot_download_small))
+            }
+            Button(onClick = { console.onDownload(LARGE_DOWNLOAD_BYTES) }) {
+                Text(stringResource(R.string.fastboot_download_large))
+            }
+        }
+
         FastbootConsoleOutcome(console.state)
 
         Text(
@@ -111,7 +126,43 @@ private fun FastbootConsoleOutcome(state: FastbootConsoleState) {
         }
 
         is FastbootConsoleState.Variables -> FastbootVariableList(state)
+
+        is FastbootConsoleState.Downloaded -> FastbootDownloadOutcomeLines(state)
     }
+}
+
+/**
+ * Исход загрузки.
+ *
+ * Главная строка здесь — про состояние устройства, а не про успех. «Ничего не
+ * изменилось» говорится **только** когда это правда: при отказе до фазы данных.
+ * Во всех прочих случаях в буфере неизвестно что, и прошивать из него нельзя.
+ */
+@Composable
+private fun FastbootDownloadOutcomeLines(state: FastbootConsoleState.Downloaded) {
+    Text(
+        text = stringResource(
+            R.string.fastboot_download_result,
+            state.sentBytes,
+            state.declaredBytes,
+            state.reply?.name ?: stringResource(R.string.fastboot_download_no_reply),
+        ),
+        style = MaterialTheme.typography.bodyMedium,
+    )
+    Text(
+        text = stringResource(
+            if (state.untouched) {
+                R.string.fastboot_download_untouched
+            } else {
+                R.string.fastboot_download_buffer_unknown
+            },
+        ),
+        style = MaterialTheme.typography.bodySmall,
+    )
+    if (state.detail.isNotBlank()) {
+        Text(text = state.detail, style = MaterialTheme.typography.bodySmall)
+    }
+    FastbootLaneLine(state.lane.name)
 }
 
 @Composable
@@ -192,3 +243,14 @@ private fun FastbootLaneLine(lane: String) {
         style = MaterialTheme.typography.bodySmall,
     )
 }
+
+/** Маленькая загрузка: доказывает путь, ничего не занимая. */
+private const val SMALL_DOWNLOAD_BYTES = 4L * 1024
+
+/**
+ * Большая загрузка: несколько блоков по 16 КиБ.
+ *
+ * Нужна затем, что путь в один блок не проверяет дописывание короткой записи и
+ * счёт байтов через границу блока — а именно там ломалось у Legacy и A2.
+ */
+private const val LARGE_DOWNLOAD_BYTES = 2L * 1024 * 1024

@@ -46,6 +46,24 @@ public sealed interface FastbootConsoleState {
         val lane: FastbootLaneState,
     ) : FastbootConsoleState
 
+    /**
+     * Исход загрузки полезной нагрузки в буфер устройства.
+     *
+     * [untouched] отвечает на единственный вопрос, который здесь важен: можно
+     * ли утверждать, что состояние устройства не изменилось. Утверждать это
+     * можно **только** при отказе до фазы данных; во всех остальных случаях
+     * буфер загрузки содержит неизвестно что, и прошивать из него нельзя
+     * (`03` §3).
+     */
+    public data class Downloaded(
+        val declaredBytes: Long,
+        val sentBytes: Long,
+        val reply: FastbootReply?,
+        val detail: String,
+        val untouched: Boolean,
+        val lane: FastbootLaneState,
+    ) : FastbootConsoleState
+
     /** Ответ на `getvar:all` — разобранный список переменных. */
     public data class Variables(
         val snapshot: FastbootVariableSnapshot,

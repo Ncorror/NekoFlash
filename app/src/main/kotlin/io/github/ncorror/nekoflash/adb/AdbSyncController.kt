@@ -1,6 +1,7 @@
 package io.github.ncorror.nekoflash.adb
 
 import io.github.ncorror.nekoflash.core.diagnostics.DiagnosticSink
+import io.github.ncorror.nekoflash.payload.GeneratedPayload
 import io.github.ncorror.nekoflash.protocol.adb.AdbConnection
 import io.github.ncorror.nekoflash.protocol.adb.AdbSyncDestination
 import io.github.ncorror.nekoflash.protocol.adb.AdbSyncFailure
@@ -58,41 +59,6 @@ public sealed interface AdbFileState {
 
     /** Не получилось. */
     public data class Failed(val path: String, val reason: String) : AdbFileState
-}
-
-/**
- * Содержимое, которое приложение порождает само.
- *
- * Существует потому, что записать на устройство нечего: выбор пользовательского
- * файла требует artifact source из Phase 8. Для аппаратного гейта `07` §6.34
- * этого достаточно — он проверяет протокольный путь, а не пользовательский
- * сценарий push.
- *
- * Содержимое детерминировано, поэтому прогон воспроизводим, и нигде не
- * собирается целиком: генератор заполняет чужой буфер порциями.
- *
- * Период узора — простое число, а не степень двойки, намеренно: узор с периодом
- * 256 совпал бы с границей блока в 64 КиБ, и перепутанные местами блоки дали бы
- * тот же отпечаток. С простым периодом такая ошибка видна.
- */
-internal class GeneratedPayload(private val totalBytes: Long) {
-    private var produced = 0L
-
-    /** Заполняет буфер очередной порцией. Возвращает `0`, когда содержимое кончилось. */
-    fun fill(buffer: ByteArray): Int {
-        val remaining = totalBytes - produced
-        if (remaining <= 0L) return 0
-        val count = minOf(remaining, buffer.size.toLong()).toInt()
-        for (index in 0 until count) {
-            buffer[index] = ((produced + index) % PATTERN_PERIOD).toByte()
-        }
-        produced += count
-        return count
-    }
-
-    private companion object {
-        const val PATTERN_PERIOD = 251L
-    }
 }
 
 /**

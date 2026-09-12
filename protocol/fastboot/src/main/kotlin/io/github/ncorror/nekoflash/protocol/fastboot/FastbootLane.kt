@@ -69,6 +69,39 @@ public sealed interface FastbootExchange {
     public data class NotSent(val reason: String) : FastbootExchange
 }
 
+/** Чем кончилась передача байтов в открытой фазе данных. */
+public sealed interface FastbootDataOutcome {
+    /**
+     * Байты переданы целиком, и устройство ответило.
+     *
+     * [reply] — `OKAY` или `FAIL`: отказ после полной передачи это ответ
+     * устройства, а не наша ошибка.
+     */
+    public data class Completed(
+        val reply: FastbootReply,
+        val payload: String,
+        val info: List<String>,
+        val bytesSent: Long,
+    ) : FastbootDataOutcome
+
+    /**
+     * Передача не дошла до конца, и **состояние приёмника неизвестно**.
+     *
+     * Это `Unknown`, а не отказ (`03` §3). Устройство получило часть байтов и
+     * осталось ждать остальные; что лежит в его буфере загрузки — мы не знаем,
+     * и прошивать из него нельзя. Повторять ту же передачу по той же полосе
+     * тоже нельзя: рамка потеряна.
+     */
+    public data class Interrupted(
+        val bytesSent: Long,
+        val expectedBytes: Long,
+        val detail: String,
+    ) : FastbootDataOutcome
+
+    /** Фаза данных не открыта: передавать некуда. */
+    public data class NotReady(val state: FastbootLaneState) : FastbootDataOutcome
+}
+
 /**
  * Единственная синхронная полоса обмена Fastboot.
  *
@@ -136,6 +169,138 @@ public class FastbootLane(
     public fun stall() {
         currentState = FastbootLaneState.STALLED
     }
+
+    /**
+     * Передаёт [expectedBytes] байт из [source] в открытую фазу данных.
+     *
+     * **Правила счёта байтов взяты из архива, а не выведены.** A2
+     * `FastbootDataTransfer.transferSyncBulk` и Legacy
+     * `FastbootProtocol.transferDownloadPayload` сходятся в трёх вещах:
+     *
+     * 1. **Короткая запись здесь законна и дописывается.** Хост → устройство
+     *    дробится и повторяется, пока не отправлено всё; это прямо разрешено
+     *    контрактом [UsbTransportHandle.send] и не путается с приёмом, где
+     *    дробление объявленного payload разрушало рамку.
+     * 2. **Запись «больше запрошенного» или «ноль и меньше» — неоднозначна.**
+     *    A2 называет её `Ambiguous` и не повторяет. Мы тоже: повторить те же
+     *    байты после неоднозначной записи запрещено (`03` §3), потому что
+     *    доказать, что предыдущая попытка не дошла, нечем.
+     * 3. **Ранний конец источника — провал, а не успех.** Передать меньше
+     *     объявленного и получить `OKAY` невозможно: устройство ждёт ровно
+     *     столько, сколько назвало.
+     *
+     * Во всех неполных случаях полоса переходит в [FastbootLaneState.STALLED]:
+     * устройство осталось ждать байты, и следующая команда попадёт не туда.
+     */
+    public fun sendData(
+        source: java.io.InputStream,
+        expectedBytes: Long,
+        inactivityMillis: Long = DEFAULT_INACTIVITY_MS,
+        writeTimeoutMillis: Int = DATA_WRITE_TIMEOUT_MS,
+    ): FastbootDataOutcome {
+        require(expectedBytes >= 0L) { "объявленный размер не может быть отрицательным" }
+        return if (currentState != FastbootLaneState.AWAITING_DATA) {
+            FastbootDataOutcome.NotReady(currentState)
+        } else {
+            pump(source, expectedBytes, inactivityMillis, writeTimeoutMillis)
+        }
+    }
+
+    private fun pump(
+        source: java.io.InputStream,
+        expectedBytes: Long,
+        inactivityMillis: Long,
+        writeTimeoutMillis: Int,
+    ): FastbootDataOutcome {
+        val block = ByteArray(DATA_BLOCK_BYTES)
+        var sent = 0L
+        var failure: String? = null
+
+        while (failure == null && sent < expectedBytes) {
+            val wanted = minOf(block.size.toLong(), expectedBytes - sent).toInt()
+            val read = runCatching { source.read(block, 0, wanted) }.getOrElse { error ->
+                failure = "чтение источника не удалось: ${error.javaClass.simpleName}"
+                0
+            }
+            failure = failure
+                ?: if (read <= 0) "источник кончился на $sent из $expectedBytes" else null
+            if (failure == null) {
+                val written = writeBlock(block, read, sent, writeTimeoutMillis)
+                failure = written.second
+                sent += written.first
+            }
+        }
+
+        return finish(sent, expectedBytes, failure, inactivityMillis)
+    }
+
+    /** Сколько байт блока ушло и что помешало. Короткая запись дописывается здесь. */
+    private fun writeBlock(
+        block: ByteArray,
+        length: Int,
+        alreadySent: Long,
+        writeTimeoutMillis: Int,
+    ): Pair<Long, String?> {
+        var offset = 0
+        var problem: String? = null
+        while (problem == null && offset < length) {
+            val requested = length - offset
+            val result = transport.send(block, offset, requested, writeTimeoutMillis)
+            problem = when {
+                result is UsbTransferResult.Failed ->
+                    "запись не состоялась на ${alreadySent + offset}: ${result.reason}"
+
+                result is UsbTransferResult.Completed && (result.bytes <= 0 || result.bytes > requested) ->
+                    "неоднозначная запись на ${alreadySent + offset}: " +
+                        "отправлено ${result.bytes} из $requested"
+
+                else -> null
+            }
+            if (problem == null) offset += (result as UsbTransferResult.Completed).bytes
+        }
+        return offset.toLong() to problem
+    }
+
+    private fun finish(
+        sent: Long,
+        expectedBytes: Long,
+        failure: String?,
+        inactivityMillis: Long,
+    ): FastbootDataOutcome = when {
+        failure != null -> {
+            currentState = FastbootLaneState.STALLED
+            FastbootDataOutcome.Interrupted(sent, expectedBytes, failure)
+        }
+
+        sent != expectedBytes -> {
+            currentState = FastbootLaneState.STALLED
+            FastbootDataOutcome.Interrupted(sent, expectedBytes, "передано $sent из $expectedBytes")
+        }
+
+        else -> {
+            currentState = FastbootLaneState.AWAITING_FINAL
+            terminal(sent, expectedBytes, inactivityMillis)
+        }
+    }
+
+    private fun terminal(sent: Long, expectedBytes: Long, inactivityMillis: Long): FastbootDataOutcome =
+        when (val exchange = readUntilTerminal(inactivityMillis)) {
+            is FastbootExchange.Completed ->
+                FastbootDataOutcome.Completed(exchange.reply, exchange.payload, exchange.info, sent)
+
+            is FastbootExchange.TimedOut -> FastbootDataOutcome.Interrupted(
+                bytesSent = sent,
+                expectedBytes = expectedBytes,
+                detail = "байты переданы, ответа не было ${exchange.waitedMillis} мс",
+            )
+
+            // Вторая фаза данных подряд не предусмотрена протоколом, и что
+            // устройство при этом делает — неизвестно. Рамку считаем потерянной.
+            else -> {
+                currentState = FastbootLaneState.STALLED
+                FastbootDataOutcome.Interrupted(sent, expectedBytes, "непредусмотренный ответ после данных")
+            }
+        }
 
     private fun send(command: String, writeTimeoutMillis: Int, inactivityMillis: Long): FastbootExchange {
         val bytes = command.toByteArray(Charsets.US_ASCII)
@@ -252,6 +417,18 @@ public class FastbootLane(
 
         /** Столько ждём **без единого кадра**, прежде чем считать обмен мёртвым. */
         public const val DEFAULT_INACTIVITY_MS: Long = 7_000
+
+        /**
+         * Размер блока передачи данных.
+         *
+         * 16 КиБ — то же, что у A2 в `SYNC_BULK` и у Legacy в
+         * `bulkWriteFully`. Больший блок принадлежит нативному пути
+         * (`usb:native`, 256 КиБ с конвейером), которого здесь нет.
+         */
+        public const val DATA_BLOCK_BYTES: Int = 16 * 1024
+
+        /** Таймаут одной записи блока. Взят у A2: `SYNC_BULK_TIMEOUT_MS`. */
+        internal const val DATA_WRITE_TIMEOUT_MS: Int = 10_000
 
         internal const val DEFAULT_WRITE_TIMEOUT_MS: Int = 7_000
 
