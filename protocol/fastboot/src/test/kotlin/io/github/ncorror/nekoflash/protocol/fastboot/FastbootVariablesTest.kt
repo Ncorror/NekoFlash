@@ -163,6 +163,26 @@ class FastbootVariablesTest {
         assertEquals(listOf("product:"), snapshot.ignored)
     }
 
+    /**
+     * Тот же случай, но именами, которые действительно назвало устройство.
+     *
+     * Пример выше придуман; эти две строки vayu шлёт на `getvar:all` в каждом
+     * прогоне (`07` §6.74, `ignoredLines=version-baseband: | version-bootloader:`).
+     * Сказать, что у `version-baseband` значение `""`, значило бы объявить
+     * пустую строку версией baseband, а выбросить строку — потерять факт, что
+     * переменную назвали. Она сохраняется целиком.
+     */
+    @Test
+    fun theEmptyValuedVersionLinesOfARealBootloaderAreKeptVerbatim() {
+        val snapshot = FastbootVariables.parse(
+            listOf("(bootloader) version-baseband:", "(bootloader) version-bootloader:", "(bootloader) product: vayu"),
+        )
+
+        assertEquals(listOf("version-baseband:", "version-bootloader:"), snapshot.ignored)
+        assertNull(snapshot.value("version-baseband"))
+        assertEquals("vayu", snapshot.value("product"))
+    }
+
     @Test
     fun blankLinesAreNeitherVariablesNorIgnored() {
         val snapshot = FastbootVariables.parse(listOf("", "   ", "product: vayu"))

@@ -34,7 +34,7 @@ Phase 0, 1, 2, 3 и 4 — **COMPLETE**. Текущая работа — **Phase 
 engine**. Legacy/A2 frozen.
 
 Модулей восемь: `:app`, `:core:model`, `:core:diagnostics`, `:core:operation`,
-`:usb:api`, `:usb:android`, `:protocol:adb`, `:protocol:fastboot`. Тестов 645 (`@Test` в текущем дереве).
+`:usb:api`, `:usb:android`, `:protocol:adb`, `:protocol:fastboot`. Тестов 646 (`@Test` в текущем дереве).
 
 **Что готово, а что нет — только в чеклисте `09_IMPLEMENTATION_ROADMAP_RU.md`.**
 Пересказа здесь намеренно нет: он уже расходился с действительностью и устаревал
