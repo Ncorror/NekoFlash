@@ -14,6 +14,16 @@ import io.github.ncorror.nekoflash.protocol.fastboot.FastbootVariableSnapshot
  * оператора значило бы дать ему нажимать кнопку, которая заведомо не сработает.
  */
 public sealed interface FastbootConsoleState {
+    /**
+     * Полоса на момент исхода, либо `null`, пока обмена не было.
+     *
+     * Объявлена здесь, а не только в каждом исходе, чтобы экран мог сказать про
+     * потерянную рамку **один раз** и в одном месте, не перебирая исходы. До
+     * `07` §6.89 перебирать было незачем: слово `STALLED` печаталось, а что с
+     * ним делать — нет.
+     */
+    public val lane: FastbootLaneState? get() = null
+
     /** Ничего не отправлялось. */
     public data object Idle : FastbootConsoleState
 
@@ -32,7 +42,7 @@ public sealed interface FastbootConsoleState {
         val reply: FastbootReply,
         val payload: String,
         val info: List<String>,
-        val lane: FastbootLaneState,
+        override val lane: FastbootLaneState,
     ) : FastbootConsoleState
 
     /**
@@ -44,7 +54,7 @@ public sealed interface FastbootConsoleState {
     public data class NotAnswered(
         val command: String,
         val detail: String,
-        val lane: FastbootLaneState,
+        override val lane: FastbootLaneState,
     ) : FastbootConsoleState
 
     /**
@@ -62,7 +72,7 @@ public sealed interface FastbootConsoleState {
         val reply: FastbootReply?,
         val detail: String,
         val untouched: Boolean,
-        val lane: FastbootLaneState,
+        override val lane: FastbootLaneState,
     ) : FastbootConsoleState
 
     /**
@@ -80,7 +90,7 @@ public sealed interface FastbootConsoleState {
      */
     public data class Mutated(
         val outcome: FastbootMutationOutcome,
-        val lane: FastbootLaneState,
+        override val lane: FastbootLaneState,
     ) : FastbootConsoleState
 
     /**
@@ -101,7 +111,7 @@ public sealed interface FastbootConsoleState {
         val sha256: String,
         val complete: Boolean,
         val detail: String,
-        val lane: FastbootLaneState,
+        override val lane: FastbootLaneState,
     ) : FastbootConsoleState
 
     /**
@@ -116,12 +126,12 @@ public sealed interface FastbootConsoleState {
         val applied: Int,
         val stoppedAt: Int?,
         val detail: String,
-        val lane: FastbootLaneState,
+        override val lane: FastbootLaneState,
     ) : FastbootConsoleState
 
     /** Ответ на `getvar:all` — разобранный список переменных. */
     public data class Variables(
         val snapshot: FastbootVariableSnapshot,
-        val lane: FastbootLaneState,
+        override val lane: FastbootLaneState,
     ) : FastbootConsoleState
 }

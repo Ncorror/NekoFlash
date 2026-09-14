@@ -352,7 +352,7 @@ public class FastbootLane(
         while (failure == null && received < expectedBytes) {
             val wanted = minOf(block.size.toLong(), expectedBytes - received).toInt()
             val result = transport.receive(block, 0, wanted, readTimeoutMillis)
-            failure = receiveProblem(result, wanted, received)
+            failure = receiveProblem(result, wanted, received, expectedBytes)
             if (failure == null) {
                 val count = (result as UsbTransferResult.Completed).bytes
                 failure = runCatching { sink.write(block, 0, count) }
@@ -371,15 +371,26 @@ public class FastbootLane(
      * Приём нулевой длины отделён от отказа намеренно: устройство, замолчавшее
      * посреди раздела, и отказ на уровне транспорта — разные наблюдения, и по
      * журналу их надо различать.
+     *
+     * **Объявленный объём называется в каждой из причин.** Без него «не
+     * состоялся на 0» не отличить от «устройство назвало бессмысленный объём»,
+     * а по выгрузке `07` §6.89 пришлось именно это и гадать. Смещение без того,
+     * от чего оно отсчитано, — половина наблюдения.
      */
-    private fun receiveProblem(result: UsbTransferResult, wanted: Int, received: Long): String? = when {
-        result is UsbTransferResult.Failed -> "приём не состоялся на $received: ${result.reason}"
+    private fun receiveProblem(
+        result: UsbTransferResult,
+        wanted: Int,
+        received: Long,
+        expectedBytes: Long,
+    ): String? = when {
+        result is UsbTransferResult.Failed ->
+            "приём не состоялся на $received из $expectedBytes: ${result.reason}"
 
         result is UsbTransferResult.Completed && result.bytes <= 0 ->
-            "устройство перестало слать на $received"
+            "устройство перестало слать на $received из $expectedBytes"
 
         result is UsbTransferResult.Completed && result.bytes > wanted ->
-            "неоднозначный приём на $received: принято ${result.bytes} из $wanted"
+            "неоднозначный приём на $received из $expectedBytes: принято ${result.bytes} из $wanted"
 
         else -> null
     }

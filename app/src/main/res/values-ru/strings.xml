@@ -186,6 +186,8 @@
     <string name="fastboot_console_info">  %1$s</string>
     <string name="fastboot_console_no_answer">%1$s → ответа нет: %2$s</string>
     <string name="fastboot_console_lane">Полоса: %1$s</string>
+    <string name="fastboot_console_lane_stalled">Рамка обмена потеряна. Устройство осталось ждать байты прошлой команды, и следующая ушла бы не туда — поэтому полоса и не пускает. Снимается это только новым захватом интерфейса. Само устройство при этом не трогается и ничего не теряет.</string>
+    <string name="fastboot_console_lane_reclaim">Захватить интерфейс заново</string>
     <string name="fastboot_variables_all">Устройство назвало переменных: %1$d</string>
     <string name="fastboot_variables_partial">Список неполон: прочитано переменных %1$d, обмен оборвался</string>
     <string name="fastboot_variables_conflict">%1$s названа больше одного раза с разными значениями: %2$s</string>

@@ -19,6 +19,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.github.ncorror.nekoflash.R
 import io.github.ncorror.nekoflash.fastboot.FastbootConsoleState
+import io.github.ncorror.nekoflash.protocol.fastboot.FastbootLaneState
 import io.github.ncorror.nekoflash.protocol.fastboot.FastbootMode
 import io.github.ncorror.nekoflash.protocol.fastboot.FastbootMutationClass
 import io.github.ncorror.nekoflash.protocol.fastboot.FastbootPartitionIndex
@@ -39,6 +40,15 @@ data class FastbootConsolePanel(
     val onFetchToFile: (String) -> Unit = {},
     /** Загрузить в буфер устройства файл, который выберет пользователь. */
     val onDownloadFile: () -> Unit = {},
+    /**
+     * Перезахват интерфейса — выход из потерянной рамки.
+     *
+     * Не «повтор» и не «сброс устройства»: интерфейс отпускается и берётся
+     * заново, аппарат при этом не трогается. Кнопка нужна затем, что до `07`
+     * §6.89 выхода из `STALLED` на экране не было вовсе — слово печаталось,
+     * а делать с ним было нечего.
+     */
+    val onReclaim: () -> Unit = {},
     /**
      * Роль устройства — **здесь**, а не только в шапке связи.
      *
@@ -94,6 +104,8 @@ fun FastbootConsoleSection(
         // ничего не произошло. Текст, стоящий между действием и результатом,
         // стоит дороже, чем то, что он объясняет.
         FastbootConsoleOutcome(console.state)
+
+        FastbootStalledNotice(console.state.lane, console.onReclaim)
 
         Text(
             text = stringResource(R.string.fastboot_console_note),
@@ -160,6 +172,27 @@ private fun FastbootReadControls(console: FastbootConsolePanel) {
     }
     Button(onClick = console.onDownloadFile) {
         Text(stringResource(R.string.fastboot_download_file))
+    }
+}
+
+/**
+ * Потерянная рамка — с объяснением и выходом, а не одним словом.
+ *
+ * `STALLED` печаталось и раньше, но только как слово в строке полосы: после
+ * него каждая следующая команда отвечала «полоса занята», и что делать, экран
+ * не говорил (`07` §6.89). Это не защита от оператора и не запрет: полоса
+ * действительно не может нести вторую команду, пока устройство ждёт байты
+ * первой, — и единственный выход показан здесь же кнопкой.
+ */
+@Composable
+private fun FastbootStalledNotice(lane: FastbootLaneState?, onReclaim: () -> Unit) {
+    if (lane != FastbootLaneState.STALLED) return
+    Text(
+        text = stringResource(R.string.fastboot_console_lane_stalled),
+        style = MaterialTheme.typography.bodySmall,
+    )
+    Button(onClick = onReclaim) {
+        Text(stringResource(R.string.fastboot_console_lane_reclaim))
     }
 }
 

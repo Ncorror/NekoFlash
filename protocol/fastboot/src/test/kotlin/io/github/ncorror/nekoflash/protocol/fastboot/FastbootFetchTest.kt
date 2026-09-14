@@ -217,6 +217,27 @@ class FastbootFetchTest {
         assertTrue(partial.detail.contains("перестало слать"))
     }
 
+    /**
+     * Причина обрыва называет и место, и объявленный объём.
+     *
+     * «Не состоялся на 0» без второго числа не отличает отказ транспорта от
+     * бессмысленного объёма, названного устройством. По выгрузке `07` §6.89
+     * пришлось гадать ровно об этом.
+     */
+    @Test
+    fun theBreakNamesBothTheOffsetAndTheDeclaredSize() {
+        val transport = FakeFastbootTransport()
+            .willReply("FAILnot found")
+            .willReply("FAILnot found")
+            .willReply("DATA00000010")
+            .willReceiveEmpty()
+
+        val outcome = fetch(transport).fetch("boot", ByteArrayOutputStream())
+
+        val partial = outcome as FastbootFetchOutcome.Partial
+        assertTrue(partial.detail, partial.detail.contains("на 0 из 16"))
+    }
+
     /** Принимать в неоткрытую фазу данных нельзя, и приёмник об этом говорит. */
     @Test
     fun receivingWithoutADataPhaseIsRefused() {

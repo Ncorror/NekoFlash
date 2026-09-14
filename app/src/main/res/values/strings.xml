@@ -183,6 +183,8 @@
     <string name="fastboot_console_info">  %1$s</string>
     <string name="fastboot_console_no_answer">%1$s → no answer: %2$s</string>
     <string name="fastboot_console_lane">Lane: %1$s</string>
+    <string name="fastboot_console_lane_stalled">The exchange frame is lost. The device is still waiting for the bytes of the previous command, so the next one would go nowhere — that is why the lane refuses. Only a fresh claim of the interface clears it. The device itself is not touched and loses nothing.</string>
+    <string name="fastboot_console_lane_reclaim">Claim the interface again</string>
     <string name="fastboot_variables_all">The device named %1$d variables</string>
     <string name="fastboot_variables_partial">The list is incomplete: %1$d variables read before the exchange broke off</string>
     <string name="fastboot_variables_conflict">%1$s was named more than once with different values: %2$s</string>

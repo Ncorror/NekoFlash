@@ -168,7 +168,7 @@ class MainActivity : ComponentActivity() {
             ),
             recentEvents = RecentEvents { application.recentDiagnostics() },
             fastboot = fastbootPanel(fastbootLink, fastbootState, sessions),
-            fastbootConsole = fastbootConsolePanel(fastbootLink, fastbootConsole, fastbootState),
+            fastbootConsole = fastbootConsolePanel(fastbootLink, fastbootConsole, fastbootState, sessions),
             onExportDiagnostics = { saveLauncher.launch(application.suggestedDiagnosticsFileName()) },
         )
     }
@@ -382,6 +382,7 @@ private fun fastbootConsolePanel(
     link: FastbootLinkController,
     state: FastbootConsoleState,
     linkState: FastbootLinkState,
+    sessions: List<UsbSession>,
 ): FastbootConsolePanel {
     val resolver = LocalContext.current.contentResolver
     val pendingFetch = remember { mutableStateOf<String?>(null) }
@@ -414,6 +415,14 @@ private fun fastbootConsolePanel(
             saveLauncher.launch(partition.ifBlank { "partition" } + ".img")
         },
         onDownloadFile = { openLauncher.launch(arrayOf("*/*")) },
+        // Отпустить и взять заново — тем же входом, что и кнопки шапки.
+        // Generation берётся из живой сессии, а не из прошлой связи: захват
+        // принадлежит тому подключению, которое есть сейчас.
+        onReclaim = {
+            link.disconnect()
+            sessions.firstOrNull { it.candidate.kind == UsbInterfaceKind.FASTBOOT }
+                ?.let { session -> link.connect(session.generation) }
+        },
         // Роль берётся из той же связи, что и в шапке, а не из отдельной
         // догадки: две строки о роли, способные разойтись, хуже одной.
         mode = (linkState as? FastbootLinkState.Connected)?.identity?.mode ?: FastbootMode.UNKNOWN,
