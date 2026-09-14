@@ -543,6 +543,7 @@ private fun fileActions(link: AdbLinkController): FileActions {
         // устройство, и отсеять «не тот» файл своим списком значило бы отказать
         // за него (`01` §3). Второй тип — `*/*` — оставляет выбор оператору.
         onInstallApk = { apkLauncher.launch(arrayOf(APK_MIME, "*/*")) },
+        onCancelTransfer = link.storage::cancelTransfer,
     )
 }
 

@@ -267,6 +267,9 @@
     <string name="sideload_verify">Прочитайте вердикт Recovery: сказать, установилось ли, может только оно.</string>
     <string name="sideload_note">Содержимое порождает приложение — выбор своего пакета появится вместе с artifact source. Остальное настоящее: тот же поток, те же запросы блоков, те же подтверждения. Отмена возможна только до ухода первого блока; после него Recovery уже может менять устройство.</string>
     <string name="files_read_to_file">Прочитать в файл…</string>
+    <string name="files_busy_bytes">%1$s — прошло %2$d байт</string>
+    <string name="files_cancel">Остановить передачу</string>
+    <string name="files_cancelled_unknown">Передачу остановили. Часть уже ушла на устройство, поэтому состояние файла назначения неизвестно: проверьте его, прежде чем на него полагаться.</string>
     <string name="install_apk">Установить APK с этого телефона…</string>
     <string name="install_running">Ставим %1$s — стадия %2$s</string>
     <string name="install_done">%1$s: пакетный менеджер сообщает об установке. Его слова: %2$s</string>

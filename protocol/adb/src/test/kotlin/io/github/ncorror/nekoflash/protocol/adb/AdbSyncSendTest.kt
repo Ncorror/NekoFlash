@@ -32,6 +32,54 @@ class AdbSyncSendTest {
         assertEquals("/sdcard/a.bin,420", spec.payload.toString(Charsets.UTF_8))
     }
 
+    /**
+     * Отмена до первого блока оставляет назначение нетронутым.
+     *
+     * Запрос `SEND` уже ушёл, но данных не было, и говорить про файл «может
+     * быть, он изменился» значило бы пугать оператора тем, чего не случилось.
+     */
+    @Test
+    fun cancellingBeforeTheFirstBlockLeavesTheDestinationUntouched() {
+        val device = Device(okay(), verdict(AdbSyncProtocol.ID_OKAY))
+
+        val outcome = device.opened().send(
+            path = "/sdcard/a.bin",
+            modifiedAtSeconds = 7,
+            cancelRequested = { true },
+        ) { 16 }
+
+        val failed = outcome as AdbSyncSendOutcome.Failed
+        assertEquals(AdbSyncFailure.CANCELLED, failed.reason)
+        assertEquals(AdbSyncDestination.UNTOUCHED, failed.destination)
+    }
+
+    /**
+     * Отмена после ушедшего блока делает назначение **неизвестным**.
+     *
+     * Отменённая запись не становится несделанной: часть файла уже на
+     * устройстве, и сказать «не записано» значило бы соврать о его содержимом
+     * (`03` §3).
+     */
+    @Test
+    fun cancellingAfterABlockLeavesTheDestinationUnknown() {
+        val device = Device(okay(), verdict(AdbSyncProtocol.ID_OKAY))
+        var blocks = 0
+
+        val outcome = device.opened().send(
+            path = "/sdcard/a.bin",
+            modifiedAtSeconds = 7,
+            cancelRequested = { blocks > 0 },
+        ) { buffer ->
+            blocks += 1
+            buffer.size
+        }
+
+        val failed = outcome as AdbSyncSendOutcome.Failed
+        assertEquals(AdbSyncFailure.CANCELLED, failed.reason)
+        assertEquals(AdbSyncDestination.UNKNOWN, failed.destination)
+        assertEquals("байты считаются только ушедшие", 1, blocks)
+    }
+
     /** Имена файлов бывают любые, поэтому путь идёт в UTF-8. */
     @Test
     fun requestPathIsEncodedAsUtf8() {

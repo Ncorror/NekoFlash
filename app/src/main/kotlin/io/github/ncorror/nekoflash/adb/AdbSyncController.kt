@@ -33,8 +33,22 @@ public sealed interface AdbFileState {
     /** Ничего не спрашивали. */
     public data object None : AdbFileState
 
-    /** Идёт запрос. */
-    public data class Busy(val path: String) : AdbFileState
+    /**
+     * Идёт запрос.
+     *
+     * [bytes] — сколько уже прошло, либо `null`, если у запроса хода нет
+     * (`STAT` отвечает сразу, и показывать у него ноль байт значило бы
+     * изображать передачу). Ноль и «нечего показывать» — разные вещи.
+     *
+     * [cancellable] — можно ли ещё остановить. Не то же, что «идёт»: у `STAT`
+     * останавливать нечего, а у записи после первого ушедшего блока отмена
+     * остаётся возможной, но назначение после неё **неизвестно**.
+     */
+    public data class Busy(
+        val path: String,
+        val bytes: Long? = null,
+        val cancellable: Boolean = false,
+    ) : AdbFileState
 
     /** Устройство ответило про путь. */
     public data class Described(val path: String, val stat: AdbSyncStat) : AdbFileState
@@ -147,6 +161,13 @@ public class AdbSyncController(
     @Volatile
     private var running = false
 
+    @Volatile
+    private var cancelRequested = false
+
+    /** Когда в последний раз показывали ход: строка тикает, а не мигает. */
+    @Volatile
+    private var shownAtMillis = 0L
+
     /**
      * База журнала Recovery этой сессии.
      *
@@ -162,6 +183,33 @@ public class AdbSyncController(
     /** Идёт ли операция прямо сейчас. */
     public val active: Boolean
         get() = running
+
+    /**
+     * Просит остановить передачу.
+     *
+     * Останавливает **между блоками**: посреди кадра остановиться нельзя, иначе
+     * в потоке останется его половина. У записи после первого ушедшего блока
+     * отмена оставляет назначение в неизвестном состоянии — и исход это скажет,
+     * а не промолчит (`03` §3).
+     */
+    public fun cancel() {
+        cancelRequested = true
+    }
+
+    /**
+     * Показывает ход, но не чаще, чем раз в [PROGRESS_INTERVAL_MS].
+     *
+     * Без ограничения передача в сто мегабайт дала бы шесть тысяч обновлений
+     * состояния — экран перерисовывался бы чаще, чем его успевают читать, и
+     * тратил бы на это то самое время, за которое идёт передача.
+     */
+    private fun showProgress(path: String, bytes: Long, cancellable: Boolean) {
+        val now = System.currentTimeMillis()
+        if (now - shownAtMillis >= PROGRESS_INTERVAL_MS) {
+            shownAtMillis = now
+            mutableState.value = AdbFileState.Busy(path, bytes, cancellable)
+        }
+    }
 
     /** Спрашивает сведения о пути. */
     public fun describe(connection: AdbConnection, path: String) {
@@ -184,7 +232,13 @@ public class AdbSyncController(
     public fun read(connection: AdbConnection, path: String) {
         start(connection, path) { session, target ->
             val digest = ArtifactDigest()
-            when (val outcome = session.receive(target) { chunk -> digest.update(chunk) }) {
+            var received = 0L
+            val outcome = session.receive(target, cancelRequested = { cancelRequested }) { chunk ->
+                digest.update(chunk)
+                received += chunk.size
+                showProgress(target, received, cancellable = true)
+            }
+            when (outcome) {
                 is AdbSyncOutcome.Done -> AdbFileState.Read(
                     path = target,
                     bytes = outcome.value,
@@ -213,7 +267,13 @@ public class AdbSyncController(
             // и делать его на главном потоке значит подвесить экран.
             val sink = destination()
             val writer = ArtifactWriter(sink)
-            when (val outcome = session.receive(target) { chunk -> writer.accept(chunk) }) {
+            var saved = 0L
+            val outcome = session.receive(target, cancelRequested = { cancelRequested }) { chunk ->
+                writer.accept(chunk)
+                saved += chunk.size
+                showProgress(target, saved, cancellable = true)
+            }
+            when (outcome) {
                 is AdbSyncOutcome.Done -> saved(target, writer.finish(), sink)
                 is AdbSyncOutcome.Failed ->
                     saveFailed(target, writer, sink, "${outcome.reason.name}: ${outcome.detail}")
@@ -298,10 +358,21 @@ public class AdbSyncController(
 
     private fun sendFrom(session: AdbSyncSession, path: String, source: ArtifactSource): AdbFileState =
         source.open().use { input ->
+            var sent = 0L
             val outcome = session.send(
                 path = path,
                 modifiedAtSeconds = (System.currentTimeMillis() / MILLIS_PER_SECOND).toInt(),
-            ) { buffer -> input.read(buffer).coerceAtLeast(0) }
+                cancelRequested = { cancelRequested },
+            ) { buffer ->
+                input.read(buffer).coerceAtLeast(0).also { read ->
+                    // Показывается **прочитанное из источника**, а не
+                    // подтверждённое устройством: подтверждения у `sync:` нет до
+                    // самого конца, и ждать его, чтобы двинуть счётчик, значило
+                    // бы держать строку неподвижной всю передачу.
+                    sent += read
+                    showProgress(path, sent, cancellable = true)
+                }
+            }
             when (outcome) {
                 is AdbSyncSendOutcome.Committed -> AdbFileState.Written(path, outcome.bytesSent, outcome.sha256)
                 is AdbSyncSendOutcome.Failed -> AdbFileState.WriteFailed(
@@ -394,10 +465,17 @@ public class AdbSyncController(
     public fun write(connection: AdbConnection, path: String, sizeBytes: Long) {
         start(connection, path) { session, target ->
             val payload = GeneratedPayload(sizeBytes)
+            var sent = 0L
             val outcome = session.send(
                 path = target,
                 modifiedAtSeconds = (System.currentTimeMillis() / MILLIS_PER_SECOND).toInt(),
-            ) { buffer -> payload.fill(buffer) }
+                cancelRequested = { cancelRequested },
+            ) { buffer ->
+                payload.fill(buffer).also { filled ->
+                    sent += filled
+                    showProgress(target, sent, cancellable = true)
+                }
+            }
             when (outcome) {
                 is AdbSyncSendOutcome.Committed -> AdbFileState.Written(
                     path = target,
@@ -427,6 +505,8 @@ public class AdbSyncController(
         if (trimmed.isEmpty() || running) return
 
         running = true
+        cancelRequested = false
+        shownAtMillis = 0L
         mutableState.value = AdbFileState.Busy(trimmed)
         executor.execute {
             val session = connection.syncSession(diagnostics)
@@ -450,5 +530,15 @@ public class AdbSyncController(
 
     private companion object {
         const val MILLIS_PER_SECOND = 1_000L
+
+        /**
+         * Как часто двигать строку хода.
+         *
+         * Пять раз в секунду — читаемо для человека и дёшево для экрана.
+         * Показывать каждый блок значило бы перерисовывать экран шесть тысяч
+         * раз на стомегабайтной передаче и тратить на это то самое время, за
+         * которое она идёт.
+         */
+        const val PROGRESS_INTERVAL_MS = 200L
     }
 }

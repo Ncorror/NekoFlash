@@ -54,6 +54,17 @@ public enum class AdbSyncFailure {
      * решением D031.
      */
     UNREPRESENTABLE_PATH,
+
+    /**
+     * Операцию остановил оператор.
+     *
+     * Отдельно от всех остальных причин, потому что это **не** сбой: ничего не
+     * сломалось, и объяснять оператору его же решение как ошибку значило бы
+     * сказать ему неправду. На состоянии назначения отмена при этом
+     * сказывается так же, как обрыв: после первого ушедшего блока запись
+     * нельзя ни считать сделанной, ни считать несделанной (`03` §3).
+     */
+    CANCELLED,
 }
 
 /** Исход обмена по `sync:`. */
@@ -146,6 +157,7 @@ public class AdbSyncSession(
     public fun receive(
         path: String,
         timeoutMillis: Int = TRANSFER_TIMEOUT_MS,
+        cancelRequested: () -> Boolean = { false },
         sink: (ByteArray) -> Unit,
     ): AdbSyncOutcome<Long> {
         return if (!exchange.active) {
@@ -154,7 +166,7 @@ public class AdbSyncSession(
             val deadline = exchange.deadlineFrom(timeoutMillis)
             val digest = MessageDigest.getInstance("SHA-256")
             val outcome = exchange.request(AdbSyncProtocol.ID_RECV, path)
-                ?: receiveLoop(path, deadline) { chunk ->
+                ?: receiveLoop(path, deadline, cancelRequested) { chunk ->
                     digest.update(chunk)
                     sink(chunk)
                 }
@@ -198,8 +210,9 @@ public class AdbSyncSession(
         modifiedAtSeconds: Int,
         mode: Int = AdbSyncProtocol.DEFAULT_FILE_MODE,
         timeoutMillis: Int = TRANSFER_TIMEOUT_MS,
+        cancelRequested: () -> Boolean = { false },
         source: (ByteArray) -> Int,
-    ): AdbSyncSendOutcome = upload.send(path, modifiedAtSeconds, mode, timeoutMillis, source)
+    ): AdbSyncSendOutcome = upload.send(path, modifiedAtSeconds, mode, timeoutMillis, cancelRequested, source)
 
     private fun readStatResponse(
         path: String,
@@ -220,16 +233,33 @@ public class AdbSyncSession(
         }
     }
 
+    /**
+     * Цикл приёма.
+     *
+     * Отмена проверяется **между кадрами**, а не посреди одного: остановиться
+     * внутри кадра значило бы оставить в потоке половину его тела, и следующая
+     * операция прочитала бы её как заголовок. Отменённый приём сессию всё равно
+     * ломает — устройство продолжает слать, — и это сказано состоянием обмена, а
+     * не тем, что мы сделаем вид, будто ничего не начиналось.
+     */
     private fun receiveLoop(
         path: String,
         deadline: Long,
+        cancelRequested: () -> Boolean,
         sink: (ByteArray) -> Unit,
     ): AdbSyncOutcome<Long> {
         var progress = ReceiveProgress()
         while (progress.outcome == null) {
-            progress = when (val read = exchange.readHeader(deadline)) {
-                is AdbSyncOutcome.Failed -> progress.copy(outcome = read)
-                is AdbSyncOutcome.Done -> receiveHeader(path, deadline, sink, read.value, progress.received)
+            progress = if (cancelRequested()) {
+                ReceiveProgress(
+                    progress.received,
+                    exchange.failure(AdbSyncFailure.CANCELLED, "recv $path остановлен на ${progress.received}"),
+                )
+            } else {
+                when (val read = exchange.readHeader(deadline)) {
+                    is AdbSyncOutcome.Failed -> progress.copy(outcome = read)
+                    is AdbSyncOutcome.Done -> receiveHeader(path, deadline, sink, read.value, progress.received)
+                }
             }
         }
         return checkNotNull(progress.outcome)

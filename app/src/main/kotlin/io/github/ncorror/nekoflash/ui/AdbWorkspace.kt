@@ -164,6 +164,8 @@ data class FileActions(
     val onRecoveryVerdict: () -> Unit = {},
     /** Поставить APK, который выберет пользователь. Путь на устройстве не нужен. */
     val onInstallApk: () -> Unit = {},
+    /** Остановить идущую передачу. */
+    val onCancelTransfer: () -> Unit = {},
 )
 
 /**
@@ -201,23 +203,20 @@ private fun FilesSection(files: AdbFileState, install: AdbInstallState, actions:
         enabled = idle,
         modifier = Modifier.fillMaxWidth(),
     )
-    Button(onClick = { actions.onDescribe(path.value) }, enabled = idle && path.value.isNotBlank()) {
-        Text(stringResource(R.string.files_describe))
-    }
-    Button(onClick = { actions.onRead(path.value) }, enabled = idle && path.value.isNotBlank()) {
-        Text(stringResource(R.string.files_read))
-    }
-    Button(onClick = { actions.onReadToFile(path.value) }, enabled = idle && path.value.isNotBlank()) {
-        Text(stringResource(R.string.files_read_to_file))
-    }
-    Button(onClick = { actions.onWriteFromFile(path.value) }, enabled = idle && path.value.isNotBlank()) {
-        Text(stringResource(R.string.files_write_from_file))
-    }
+    FilePathButtons(path = path.value, idle = idle, actions = actions)
     // Установка поля пути не берёт: временный путь на устройстве выбирает
     // протокол, и дать его выбрать оператору значило бы предложить решение,
     // которое ни на что не влияет и может всё сломать.
     Button(onClick = actions.onInstallApk, enabled = idle) {
         Text(stringResource(R.string.install_apk))
+    }
+    // Кнопка отмены появляется только когда отменять есть что: у `STAT`
+    // останавливать нечего, и кнопка, которая ничего не делает, хуже её
+    // отсутствия.
+    if (files is AdbFileState.Busy && files.cancellable) {
+        Button(onClick = actions.onCancelTransfer) {
+            Text(stringResource(R.string.files_cancel))
+        }
     }
     Button(
         onClick = { actions.onWrite(path.value, SMALL_WRITE_BYTES) },
@@ -251,6 +250,24 @@ private fun FilesSection(files: AdbFileState, install: AdbInstallState, actions:
     )
 }
 
+/** Четыре действия, которым нужен путь на устройстве. */
+@Composable
+private fun FilePathButtons(path: String, idle: Boolean, actions: FileActions) {
+    val ready = idle && path.isNotBlank()
+    Button(onClick = { actions.onDescribe(path) }, enabled = ready) {
+        Text(stringResource(R.string.files_describe))
+    }
+    Button(onClick = { actions.onRead(path) }, enabled = ready) {
+        Text(stringResource(R.string.files_read))
+    }
+    Button(onClick = { actions.onReadToFile(path) }, enabled = ready) {
+        Text(stringResource(R.string.files_read_to_file))
+    }
+    Button(onClick = { actions.onWriteFromFile(path) }, enabled = ready) {
+        Text(stringResource(R.string.files_write_from_file))
+    }
+}
+
 /**
  * Исход установки словами.
  *
@@ -276,7 +293,9 @@ private fun installStateText(install: AdbInstallState): String = when (install) 
 @Composable
 private fun fileStateText(files: AdbFileState): String = when (files) {
     AdbFileState.None -> ""
-    is AdbFileState.Busy -> stringResource(R.string.files_busy, files.path)
+    is AdbFileState.Busy -> files.bytes
+        ?.let { bytes -> stringResource(R.string.files_busy_bytes, files.path, bytes) }
+        ?: stringResource(R.string.files_busy, files.path)
     is AdbFileState.Read ->
         pluralStringResource(R.plurals.files_read_done, files.bytes.toQuantity(), files.bytes, files.sha256)
 

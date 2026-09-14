@@ -347,6 +347,11 @@ public class AdbLinkController(
             installs.install(live, name, options, origin)
         }
 
+        /** Останавливает идущую передачу. Состояние назначения скажет исход. */
+        public fun cancelTransfer() {
+            fileOperations.cancel()
+        }
+
         /** Пишет на устройство файл, выбранный пользователем. */
         public fun writeFrom(path: String, origin: () -> ArtifactSource) {
             val live = connection ?: return

@@ -26,6 +26,7 @@ internal class AdbSyncUpload(private val exchange: AdbSyncExchange) {
         modifiedAtSeconds: Int,
         mode: Int,
         timeoutMillis: Int,
+        cancelRequested: () -> Boolean,
         source: (ByteArray) -> Int,
     ): AdbSyncSendOutcome {
         if (!exchange.active) {
@@ -49,7 +50,7 @@ internal class AdbSyncUpload(private val exchange: AdbSyncExchange) {
         }
         val deadline = exchange.deadlineFrom(timeoutMillis)
         exchange.emit("sync_send_started", mapOf("path" to path, "mode" to mode.toString()))
-        return openDestination(path, mode) ?: transferBody(path, modifiedAtSeconds, deadline, source)
+        return openDestination(path, mode) ?: transferBody(path, modifiedAtSeconds, deadline, cancelRequested, source)
     }
 
     /**
@@ -93,6 +94,7 @@ internal class AdbSyncUpload(private val exchange: AdbSyncExchange) {
         path: String,
         modifiedAtSeconds: Int,
         deadline: Long,
+        cancelRequested: () -> Boolean,
         source: (ByteArray) -> Int,
     ): AdbSyncSendOutcome {
         val buffer = ByteArray(AdbSyncProtocol.DATA_CHUNK_BYTES)
@@ -101,6 +103,19 @@ internal class AdbSyncUpload(private val exchange: AdbSyncExchange) {
         var failure: AdbSyncSendOutcome.Failed? = null
         var finished = false
         while (failure == null && !finished) {
+            // Отмена проверяется перед блоком, а не после: остановиться между
+            // кадрами можно, посреди кадра — нет. Назначение при этом
+            // **неизвестно**, если хоть один блок ушёл: отменённая запись не
+            // делается несделанной (`03` §3).
+            if (cancelRequested()) {
+                failure = failed(
+                    AdbSyncFailure.CANCELLED,
+                    "send $path остановлен на $sent",
+                    if (sent == 0L) AdbSyncDestination.UNTOUCHED else AdbSyncDestination.UNKNOWN,
+                    sent,
+                )
+                continue
+            }
             val read = source(buffer)
             if (read <= 0) {
                 finished = true
