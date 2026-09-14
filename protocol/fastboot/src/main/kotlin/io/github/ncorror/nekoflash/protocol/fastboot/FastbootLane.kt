@@ -126,10 +126,37 @@ public sealed interface FastbootDataOutcome {
  * Различает слой выше, и различает по своему состоянию: ожидание, в котором не
  * пришло ни кадра, — обычный таймаут, и его надо продолжать в пределах бюджета.
  * Legacy делает так же: `readPacket(2000) == null` не кончает цикл.
+ *
+ * **Время ожидания измеряется часами, а не складывается из запрошенных
+ * ломтей.** Пустое чтение на этом хосте возвращается **мгновенно**, и сумма
+ * запрошенных таймаутов к потраченному времени отношения не имеет: бюджет в
+ * 7000 мс «истекал» за 15 мс реального времени, а в журнал уходило «ответа не
+ * было 7000 мс» — утверждение о наблюдении, которого не было (`03` §3, `07`
+ * §6.91). Legacy считает то же самое по `System.currentTimeMillis()`
+ * (`readGetVarResponse`, строки 2097–2111) и прямо описывает эту ловушку в
+ * комментарии «V5.8.10 onyx handshake fix»: «пустые чтения возвращаются
+ * мгновенно, поэтому счётчик из трёх набегал за ~200 мс». Хост прогона — тот
+ * самый `onyx`.
  */
 public class FastbootLane(
     private val transport: UsbTransportHandle,
     private val readBufferBytes: Int = DEFAULT_READ_BUFFER,
+    /**
+     * Часы ожидания — монотонные и подменяемые.
+     *
+     * Подменяются не ради удобства тестов, а потому, что измеряемая величина
+     * обязана быть проверяемой: «сколько ждали» без возможности задать время в
+     * тесте снова стало бы числом, которое никто не сверял.
+     */
+    private val elapsedMillis: () -> Long = System::currentTimeMillis,
+    /**
+     * Пауза между пустыми чтениями.
+     *
+     * Без неё мгновенно возвращающееся чтение крутит цикл вхолостую весь
+     * бюджет. Legacy держит её по той же причине
+     * (`GETVAR_READ_RETRY_DELAY_MS = 100`).
+     */
+    private val pauseMillis: (Long) -> Unit = { Thread.sleep(it) },
 ) {
     private var currentState: FastbootLaneState = FastbootLaneState.IDLE
 
@@ -495,22 +522,26 @@ public class FastbootLane(
     private fun readUntilTerminal(inactivityMillis: Long): FastbootExchange {
         val buffer = ByteArray(readBufferBytes)
         val info = mutableListOf<String>()
-        var idleMillis = 0L
+        var quietSince = elapsedMillis()
         var outcome: FastbootExchange? = null
 
         while (outcome == null) {
-            val slice = minOf(READ_SLICE_MS.toLong(), inactivityMillis - idleMillis).toInt().coerceAtLeast(1)
-            val received = transport.receive(buffer, 0, buffer.size, slice)
-            val packet = packetOf(received, buffer)
-            if (packet == null) {
-                idleMillis += slice
-                if (idleMillis >= inactivityMillis) {
-                    currentState = FastbootLaneState.STALLED
-                    outcome = FastbootExchange.TimedOut(idleMillis, info.toList())
-                }
+            val idleMillis = (elapsedMillis() - quietSince).coerceAtLeast(0L)
+            val remaining = inactivityMillis - idleMillis
+            if (remaining <= 0L) {
+                currentState = FastbootLaneState.STALLED
+                // Сообщается измеренное, а не бюджет: разница между ними и была
+                // дефектом (`07` §6.91).
+                outcome = FastbootExchange.TimedOut(idleMillis, info.toList())
             } else {
-                idleMillis = 0L
-                outcome = classify(packet, info)
+                val slice = minOf(READ_SLICE_MS.toLong(), remaining).toInt().coerceAtLeast(1)
+                val packet = packetOf(transport.receive(buffer, 0, buffer.size, slice), buffer)
+                if (packet == null) {
+                    pauseMillis(minOf(EMPTY_READ_PAUSE_MS, remaining))
+                } else {
+                    quietSince = elapsedMillis()
+                    outcome = classify(packet, info)
+                }
             }
         }
         return outcome
@@ -608,5 +639,14 @@ public class FastbootLane(
          * в конце.
          */
         internal const val READ_SLICE_MS: Int = 900
+
+        /**
+         * Пауза после пустого чтения.
+         *
+         * Взята у Legacy (`GETVAR_READ_RETRY_DELAY_MS`) вместе с причиной:
+         * пустое чтение возвращается мгновенно, и без паузы цикл крутится
+         * вхолостую, изображая ожидание.
+         */
+        internal const val EMPTY_READ_PAUSE_MS: Long = 100L
     }
 }

@@ -92,6 +92,48 @@ class FastbootLaneTest {
         assertEquals(FastbootLaneState.STALLED, lane.state)
     }
 
+    /**
+     * В `TimedOut` попадает **измеренное** ожидание, а не объявленный бюджет.
+     *
+     * Пустое чтение возвращается мгновенно, и складывать запрошенные ломти
+     * значило бы писать в журнал «ждали 7000 мс» через 15 мс реального времени.
+     * Так и было до `07` §6.91: цикл считал не потраченное, а желаемое.
+     */
+    @Test
+    fun theReportedWaitIsMeasuredAndNotTheBudget() {
+        var now = 0L
+        val lane = FastbootLane(
+            FakeFastbootTransport().willBeSilent(10),
+            elapsedMillis = { now },
+            pauseMillis = { now += 400L },
+        )
+
+        val exchange = lane.run("getvar:product", inactivityMillis = 250)
+
+        assertEquals(400L, (exchange as FastbootExchange.TimedOut).waitedMillis)
+    }
+
+    /**
+     * Мгновенно пустеющее чтение не съедает бюджет в ноль реального времени.
+     *
+     * Пауза между пустыми чтениями взята у Legacy вместе с причиной: без неё
+     * цикл крутится вхолостую и изображает ожидание, которого не было.
+     */
+    @Test
+    fun anInstantEmptyReadDoesNotBurnTheBudgetForFree() {
+        var now = 0L
+        var pauses = 0
+        val lane = FastbootLane(
+            FakeFastbootTransport().willBeSilent(10),
+            elapsedMillis = { now },
+            pauseMillis = { paused -> pauses += 1; now += paused },
+        )
+
+        lane.run("getvar:product", inactivityMillis = 250)
+
+        assertEquals("100 + 100 + 50 — три паузы до конца бюджета", 3, pauses)
+    }
+
     /** Потерявшая рамку полоса не принимает вторую команду, а называет своё состояние. */
     @Test
     fun aStalledLaneRefusesFurtherCommands() {

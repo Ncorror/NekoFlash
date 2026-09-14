@@ -146,7 +146,7 @@ public class FastbootFetch(
     }
 
     private fun readChunk(command: String, sink: OutputStream): ChunkOutcome =
-        when (val opened = lane.run(command)) {
+        when (val opened = lane.run(command, inactivityMillis = OPENING_FRAME_MS)) {
             is FastbootExchange.DataPhase -> transfer(opened, sink)
 
             // Терминальный ответ вместо `DATA`: устройство отказалось отдавать.
@@ -210,6 +210,18 @@ public class FastbootFetch(
     }
 
     private companion object {
+        /**
+         * Сколько ждать кадра `DATA` или отказа на сам `fetch:`.
+         *
+         * Десять секунд — из Legacy, где `fetchChunk` зовёт
+         * `readUntilDataOrFinal(10000)`, а не общий бюджет. Наши семь секунд
+         * здесь были расхождением с архивом, введённым молча: `fetch:` просит
+         * устройство открыть раздел, и это дольше, чем ответить `getvar`.
+         * Найдено разбором `07` §6.91, где отказ пришёл ровно по нашему
+         * укороченному бюджету.
+         */
+        const val OPENING_FRAME_MS = 10_000L
+
         const val PREFIX = "fetch:"
         const val PARTITION_SIZE = "partition-size:"
         const val MAX_FETCH_SIZE = "max-fetch-size"
