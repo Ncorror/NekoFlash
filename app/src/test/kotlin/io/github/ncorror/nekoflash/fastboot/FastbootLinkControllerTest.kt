@@ -147,6 +147,38 @@ class FastbootLinkControllerTest {
         assertEquals("IDLE", sink.snapshot().last().fields["lane"])
     }
 
+    /**
+     * Закрытая сессия забывается вместе с полосой, ручкой и последним исходом.
+     *
+     * На прогоне `07` §6.96 этого не было: F5 отключили, подключили `vayu`, и
+     * `fetch:` ответил полосой снятого телефона, а экран показывал его роль и
+     * замок. Замок принадлежит **своей** generation (`03` §5.1), и чужой задал
+     * бы не ту форму предупреждения.
+     */
+    @Test
+    fun aClosedSessionIsForgottenWithItsLane() {
+        val coordinator = ClaimingCoordinator(replies = listOf("OKAYyes", "OKAYyes"))
+        val controller = FastbootLinkController({ coordinator.claim() }, { it.run() }, InMemoryDiagnosticSink())
+        controller.connect(SessionGeneration(1))
+
+        controller.forget(SessionGeneration(1))
+
+        assertEquals(FastbootLinkState.Idle, controller.state.value)
+        assertTrue("интерфейс должен быть отпущен", coordinator.lastHandle?.closed == true)
+    }
+
+    /** Чужая generation чужого соединения не трогает. */
+    @Test
+    fun forgettingAnotherGenerationChangesNothing() {
+        val coordinator = ClaimingCoordinator(replies = listOf("OKAYyes", "OKAYyes"))
+        val controller = FastbootLinkController({ coordinator.claim() }, { it.run() }, InMemoryDiagnosticSink())
+        controller.connect(SessionGeneration(1))
+
+        controller.forget(SessionGeneration(2))
+
+        assertTrue("соединение должно остаться", controller.state.value is FastbootLinkState.Connected)
+    }
+
     @Test
     fun disconnectingReleasesTheInterfaceAndClearsTheState() {
         val coordinator = ClaimingCoordinator(replies = listOf("OKAYno", "OKAYno"))

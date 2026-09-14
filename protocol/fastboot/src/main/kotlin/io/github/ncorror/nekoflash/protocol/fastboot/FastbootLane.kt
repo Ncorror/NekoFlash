@@ -157,7 +157,37 @@ public class FastbootLane(
      * (`GETVAR_READ_RETRY_DELAY_MS = 100`).
      */
     private val pauseMillis: (Long) -> Unit = { Thread.sleep(it) },
+    /**
+     * Монотонные часы для измерения **одного** чтения.
+     *
+     * Отдельные от [elapsedMillis] не для симметрии: бюджет считается стенными
+     * часами (так в Legacy `readGetVarResponse`), а длительность одной передачи
+     * — монотонными наносекундами (так в Legacy `readPacket`). Сводить их к
+     * одним значило бы потерять либо бюджет при переводе времени, либо
+     * разрешение на мгновенном чтении.
+     */
+    private val nanoTime: () -> Long = System::nanoTime,
+    /** Куда писать замеры чтений. По умолчанию — никуда. */
+    private val trace: FastbootReadTrace = FastbootReadTrace.NOTHING,
 ) {
+    /** Одно чтение с замером. Замер снимается всегда, даже когда его никто не читает. */
+    private fun timedReceive(
+        buffer: ByteArray,
+        offset: Int,
+        length: Int,
+        timeoutMillis: Int,
+        phase: String,
+    ): UsbTransferResult {
+        val startedNanos = nanoTime()
+        val result = transport.receive(buffer, offset, length, timeoutMillis)
+        val elapsedMicros = (nanoTime() - startedNanos).coerceAtLeast(0L) / NANOS_IN_MICRO
+        val bytes = when (result) {
+            is UsbTransferResult.Completed -> result.bytes
+            is UsbTransferResult.Failed -> -1
+        }
+        trace.read(phase, timeoutMillis, elapsedMicros, bytes)
+        return result
+    }
     private var currentState: FastbootLaneState = FastbootLaneState.IDLE
 
     /** Состояние полосы прямо сейчас. */
@@ -398,7 +428,7 @@ public class FastbootLane(
 
         while (failure == null && received < expectedBytes) {
             val wanted = minOf(block.size.toLong(), expectedBytes - received).toInt()
-            val result = transport.receive(block, 0, wanted, readTimeoutMillis)
+            val result = timedReceive(block, 0, wanted, readTimeoutMillis, FastbootReadTrace.DATA_IN)
             if (result is UsbTransferResult.Failed) {
                 failure = waitedOut(quietSince, inactivityMillis, received, expectedBytes)
                 continue
@@ -577,7 +607,8 @@ public class FastbootLane(
                 outcome = FastbootExchange.TimedOut(idleMillis, info.toList())
             } else {
                 val slice = minOf(READ_SLICE_MS.toLong(), remaining).toInt().coerceAtLeast(1)
-                val packet = packetOf(transport.receive(buffer, 0, buffer.size, slice), buffer)
+                val received = timedReceive(buffer, 0, buffer.size, slice, FastbootReadTrace.FRAME)
+                val packet = packetOf(received, buffer)
                 if (packet == null) {
                     pauseMillis(minOf(EMPTY_READ_PAUSE_MS, remaining))
                 } else {
@@ -690,5 +721,8 @@ public class FastbootLane(
          * вхолостую, изображая ожидание.
          */
         internal const val EMPTY_READ_PAUSE_MS: Long = 100L
+
+        /** Наносекунд в микросекунде. */
+        private const val NANOS_IN_MICRO: Long = 1_000L
     }
 }

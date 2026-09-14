@@ -102,6 +102,9 @@ public class FastbootLinkController(
     /** Состояние соединения. */
     public val state: StateFlow<FastbootLinkState> = mutableState.asStateFlow()
 
+    /** Замеры чтений. Голова каждого обмена, чтобы не вытеснить журнал собой. */
+    private val reads = FastbootReadRecorder(::emit)
+
     private var lane: FastbootLane? = null
     private var handle: UsbTransportHandle? = null
 
@@ -128,6 +131,37 @@ public class FastbootLinkController(
 
             is UsbClaimResult.Claimed -> executor.execute { probe(generation, claimed.handle) }
         }
+    }
+
+    /**
+     * Забывает соединение, чья сессия закрылась без нас.
+     *
+     * Устройство отключили, перезагрузили или подменили другим — generation при
+     * этом инвалидируется, а полоса, ручка и исход последней команды остаются
+     * висеть. Прогон `07` §6.96 показал, чем это кончается: F5 отключили,
+     * подключили `vayu`, и `fetch:` ответил `полоса занята: STALLED` **полосой
+     * отключённого телефона**. Экран при этом всё ещё показывал роль и замок
+     * прошлого аппарата.
+     *
+     * Для замка это не косметика. `lock` принадлежит **своей** generation
+     * (`03` §5.1), и показывать `UNLOCKED` от снятого телефона рядом с
+     * подключённым запертым значит задать не ту форму предупреждения перед
+     * разрушающим действием.
+     *
+     * Вызов с чужой generation ничего не делает: забывается только то
+     * соединение, о котором сказано.
+     */
+    public fun forget(generation: SessionGeneration) {
+        val live = mutableState.value
+        val mine = when (live) {
+            is FastbootLinkState.Connected -> live.generation
+            is FastbootLinkState.Probing -> live.generation
+            is FastbootLinkState.Failed -> live.generation
+            FastbootLinkState.Idle -> null
+        }
+        if (mine != generation) return
+        emit("fastboot_forgotten", mapOf("generation" to generation.value.toString()))
+        disconnect()
     }
 
     /** Отпускает интерфейс. Повторный вызов безопасен. */
@@ -353,6 +387,7 @@ public class FastbootLinkController(
             mutableConsole.value is FastbootConsoleState.Running -> Unit
 
             else -> {
+                reads.reset()
                 mutableConsole.value = FastbootConsoleState.Running(trimmed, clock().toEpochMilli())
                 executor.execute {
                     emit(event, mapOf("command" to trimmed))
@@ -375,7 +410,7 @@ public class FastbootLinkController(
             is FastbootConsoleState.Answered -> mapOf(
                 "command" to state.command,
                 "reply" to state.reply.name,
-                "payload" to journalled(state.command, state.payload),
+                "payload" to journalledPayload(state.command, state.payload),
                 "infoLines" to state.info.size.toString(),
                 "lane" to state.lane.name,
             )
@@ -475,7 +510,7 @@ public class FastbootLinkController(
             is FastbootMutationOutcome.Applied -> mapOf(
                 "claim" to "applied",
                 "reply" to "OKAY",
-                "payload" to journalled(outcome.command, outcome.payload),
+                "payload" to journalledPayload(outcome.command, outcome.payload),
                 "infoLines" to outcome.info.size.toString(),
                 "confirmation" to (outcome.confirmation ?: "none"),
             )
@@ -535,25 +570,11 @@ public class FastbootLinkController(
      * `diagnostics privacy review` из Phase 11, и придумывать его на бегу
      * значило бы дать ложную уверенность списком, который заведомо неполон.
      */
-    private fun journalled(command: String, payload: String): String =
-        if (payload.isNotBlank() && SECRET_ANSWERS.any { command.contains(it, ignoreCase = true) }) {
-            "$HIDDEN, символов: ${payload.length}"
-        } else {
-            payload
-        }
-
-    private fun mutationClassOf(outcome: FastbootMutationOutcome): FastbootMutationClass = when (outcome) {
-        is FastbootMutationOutcome.Applied -> outcome.mutation
-        is FastbootMutationOutcome.Refused -> outcome.mutation
-        is FastbootMutationOutcome.Unconfirmed -> outcome.mutation
-        is FastbootMutationOutcome.Unknown -> outcome.mutation
-        is FastbootMutationOutcome.Departed -> FastbootMutationClass.REBOOT
-        is FastbootMutationOutcome.NotStarted -> FastbootMutation.classify(outcome.command)
-    }
-
     private fun probe(generation: SessionGeneration, claimed: UsbTransportHandle) {
         handle = claimed
-        val opened = FastbootLane(claimed)
+        // Замеры чтений идут в тот же журнал, что и всё остальное: разбор
+        // прогона не должен требовать ещё одного прогона (`07` §6.96).
+        val opened = FastbootLane(claimed, trace = reads)
         lane = opened
         emit("fastboot_probe_started", mapOf("generation" to generation.value.toString()))
 
@@ -598,10 +619,5 @@ public class FastbootLinkController(
 
     private companion object {
         const val DIAGNOSTIC_CATEGORY = "fastboot"
-
-        /** Вопросы, ответ на которые в выгрузку не идёт. Совпадение — по вопросу. */
-        val SECRET_ANSWERS = listOf("token")
-
-        const val HIDDEN = "не записано"
     }
 }

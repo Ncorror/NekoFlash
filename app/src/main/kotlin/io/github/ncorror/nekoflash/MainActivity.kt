@@ -10,6 +10,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -135,6 +136,15 @@ class MainActivity : ComponentActivity() {
         // написано: ручной скан тогда дал ноль. Закрывается другой,
         // соседний: устройство подключили при свёрнутом приложении.
         RescanOnResume(coordinator)
+
+        // Соединение Fastboot забывается вместе со своей сессией.
+        //
+        // Координатор закрывает сессию сам (отключение, перезагрузка, подмена
+        // аппарата), а контроллер об этом узнать неоткуда: он получает захват
+        // одним вызовом и наружу за ним не ходит. Без этой связки полоса и
+        // ручка отключённого телефона продолжают отвечать следующему
+        // (`07` §6.96), а экран показывает чужие роль и замок.
+        ForgetClosedFastbootSession(fastbootLink, fastbootState, sessions)
 
         NekoFlashApp(
             sessions = sessions,
@@ -360,6 +370,32 @@ private fun MainActivity.exportDiagnostics(
  * длины, а раздувать точку входа именно тем, что легко вынести, значит начинать
  * тот путь, которым `MainActivity` Legacy дошла до 3880 строк.
  */
+/**
+ * Снимает соединение, чьей сессии больше нет.
+ *
+ * Живёт на экране, а не в контроллере, по той же причине, по которой контроллер
+ * получает захват швом: зависеть от всего USB-слоя ради одного факта значило бы
+ * тащить его в каждый тест. Факт здесь один — есть ли ещё живая сессия с этой
+ * generation.
+ */
+@Composable
+private fun ForgetClosedFastbootSession(
+    link: FastbootLinkController,
+    state: FastbootLinkState,
+    sessions: List<UsbSession>,
+) {
+    val generation = when (state) {
+        is FastbootLinkState.Connected -> state.generation
+        is FastbootLinkState.Probing -> state.generation
+        is FastbootLinkState.Failed -> state.generation
+        FastbootLinkState.Idle -> null
+    }
+    val alive = generation != null && sessions.any { it.generation == generation }
+    LaunchedEffect(generation, alive) {
+        if (generation != null && !alive) link.forget(generation)
+    }
+}
+
 private fun fastbootPanel(
     link: FastbootLinkController,
     state: FastbootLinkState,
