@@ -19,6 +19,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.github.ncorror.nekoflash.R
 import io.github.ncorror.nekoflash.fastboot.FastbootConsoleState
+import io.github.ncorror.nekoflash.protocol.fastboot.FastbootMode
 import io.github.ncorror.nekoflash.protocol.fastboot.FastbootMutationClass
 import io.github.ncorror.nekoflash.protocol.fastboot.FastbootPartitionIndex
 import io.github.ncorror.nekoflash.protocol.fastboot.FastbootMutationOutcome
@@ -38,6 +39,15 @@ data class FastbootConsolePanel(
     val onFetchToFile: (String) -> Unit = {},
     /** Загрузить в буфер устройства файл, который выберет пользователь. */
     val onDownloadFile: () -> Unit = {},
+    /**
+     * Роль устройства — **здесь**, а не только в шапке связи.
+     *
+     * Загрузчик и `fastbootd` перечисляются одним интерфейсом и на экране
+     * отличаются одной строкой; оператор набирает раздел здесь и шапку в этот
+     * момент не видит. Прогон `07` §6.88 прошёл целиком не в той роли, и
+     * прочитать это по журналу удалось, а по экрану — нет.
+     */
+    val mode: FastbootMode = FastbootMode.UNKNOWN,
 )
 
 /**
@@ -128,6 +138,8 @@ private fun FastbootReadControls(console: FastbootConsolePanel) {
         singleLine = true,
         modifier = Modifier.fillMaxWidth(),
     )
+    FastbootFetchRole(console.mode)
+
     Button(onClick = { console.onFetch(partition) }) {
         Text(stringResource(R.string.fastboot_fetch_read))
     }
@@ -148,6 +160,38 @@ private fun FastbootReadControls(console: FastbootConsolePanel) {
     }
     Button(onClick = console.onDownloadFile) {
         Text(stringResource(R.string.fastboot_download_file))
+    }
+}
+
+/**
+ * Роль рядом с полем раздела — и подсказка, а не запрет.
+ *
+ * Legacy печатает перед `fetch:` ровно такое предупреждение и **отправляет
+ * команду** (`07` §6.81). Здесь так же: кнопка работает в любой роли, потому
+ * что где у этого устройства реализован `fetch:`, знает устройство, а не мы
+ * (`01` §3, `03` §5.1). Сказано только то, что известно из архива: команда
+ * обычно живёт в `fastbootd`. Чем ответит аппарат, здесь не предсказывается.
+ */
+@Composable
+private fun FastbootFetchRole(mode: FastbootMode) {
+    Text(
+        text = stringResource(
+            R.string.fastboot_fetch_role,
+            stringResource(
+                when (mode) {
+                    FastbootMode.BOOTLOADER -> R.string.fastboot_mode_bootloader
+                    FastbootMode.FASTBOOTD -> R.string.fastboot_mode_fastbootd
+                    FastbootMode.UNKNOWN -> R.string.fastboot_mode_unknown
+                },
+            ),
+        ),
+        style = MaterialTheme.typography.bodySmall,
+    )
+    if (mode == FastbootMode.BOOTLOADER) {
+        Text(
+            text = stringResource(R.string.fastboot_fetch_role_bootloader),
+            style = MaterialTheme.typography.bodySmall,
+        )
     }
 }
 

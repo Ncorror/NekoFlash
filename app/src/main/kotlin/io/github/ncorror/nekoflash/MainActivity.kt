@@ -30,6 +30,7 @@ import io.github.ncorror.nekoflash.adb.AdbLinkController
 import io.github.ncorror.nekoflash.fastboot.FastbootConsoleState
 import io.github.ncorror.nekoflash.fastboot.FastbootLinkController
 import io.github.ncorror.nekoflash.fastboot.FastbootLinkState
+import io.github.ncorror.nekoflash.protocol.fastboot.FastbootMode
 import io.github.ncorror.nekoflash.ui.FastbootConsolePanel
 import io.github.ncorror.nekoflash.ui.FastbootPanel
 import io.github.ncorror.nekoflash.usb.api.UsbInterfaceKind
@@ -167,7 +168,7 @@ class MainActivity : ComponentActivity() {
             ),
             recentEvents = RecentEvents { application.recentDiagnostics() },
             fastboot = fastbootPanel(fastbootLink, fastbootState, sessions),
-            fastbootConsole = fastbootConsolePanel(fastbootLink, fastbootConsole),
+            fastbootConsole = fastbootConsolePanel(fastbootLink, fastbootConsole, fastbootState),
             onExportDiagnostics = { saveLauncher.launch(application.suggestedDiagnosticsFileName()) },
         )
     }
@@ -380,6 +381,7 @@ private fun fastbootPanel(
 private fun fastbootConsolePanel(
     link: FastbootLinkController,
     state: FastbootConsoleState,
+    linkState: FastbootLinkState,
 ): FastbootConsolePanel {
     val resolver = LocalContext.current.contentResolver
     val pendingFetch = remember { mutableStateOf<String?>(null) }
@@ -412,6 +414,9 @@ private fun fastbootConsolePanel(
             saveLauncher.launch(partition.ifBlank { "partition" } + ".img")
         },
         onDownloadFile = { openLauncher.launch(arrayOf("*/*")) },
+        // Роль берётся из той же связи, что и в шапке, а не из отдельной
+        // догадки: две строки о роли, способные разойтись, хуже одной.
+        mode = (linkState as? FastbootLinkState.Connected)?.identity?.mode ?: FastbootMode.UNKNOWN,
     )
 }
 

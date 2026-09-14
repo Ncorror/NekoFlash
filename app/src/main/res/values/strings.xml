@@ -226,6 +226,8 @@
     <string name="fastboot_destructive_cancel">Cancel</string>
     <string name="fastboot_destructive_note">The confirmation here is not permission: the command reaches the device unchanged either way, only the deliberateness of the tap differs. The confirmation word is asked for only when the lock is confirmed; "unknown" does not count as locked, otherwise not knowing would turn into forbidding. The free-form command field is untouched by all of this and runs the same commands without a prompt. Flashing the buffer sends whatever the download buffer holds right now — if this app put it there, that is a pattern for checking byte accounting, not an image.</string>
     <string name="fastboot_fetch_label">Partition to read</string>
+    <string name="fastboot_fetch_role">Device role right now: %1$s</string>
+    <string name="fastboot_fetch_role_bootloader">fetch: usually lives in fastbootd, not in the bootloader. Sending it from here is allowed — the device answers.</string>
     <string name="fastboot_fetch_read">Read the partition</string>
     <string name="fastboot_fetch_complete">%1$s read in full: %2$d bytes</string>
     <string name="fastboot_fetch_partial">%1$s was NOT read in full: %2$d bytes. This cannot be passed off as the partition — a missing piece is indistinguishable from zeros inside it.</string>
