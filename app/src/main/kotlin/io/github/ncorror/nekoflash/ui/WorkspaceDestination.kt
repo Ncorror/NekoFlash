@@ -8,7 +8,7 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
-import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -42,6 +42,11 @@ internal enum class WorkspaceDestination(val label: Int) {
  * в сборке нет, и рисовать их сейчас значило бы решать задачу оформления вместо
  * задачи навигации. Вкладки обходятся словами, а слова здесь точнее любого
  * значка — «Операции» и «Диагностика» пиктограммой не различить.
+ *
+ * **Прокручиваемые, а не равной ширины**, и это исправление первого же взгляда
+ * на экран: четыре слова в четверть ширины телефона не помещаются, и Compose
+ * переносил их посреди слова — «Устройст / во». Прокрутка отдаёт каждой вкладке
+ * столько, сколько занимает слово; за краем остаётся край, а не обрубок.
  */
 @Composable
 internal fun DestinationTabs(
@@ -49,7 +54,11 @@ internal fun DestinationTabs(
     onSelect: (WorkspaceDestination) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    PrimaryTabRow(selectedTabIndex = current.ordinal, modifier = modifier) {
+    PrimaryScrollableTabRow(
+        selectedTabIndex = current.ordinal,
+        modifier = modifier,
+        edgePadding = 0.dp,
+    ) {
         WorkspaceDestination.entries.forEach { destination ->
             Tab(
                 selected = destination == current,

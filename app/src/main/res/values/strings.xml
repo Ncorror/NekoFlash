@@ -318,4 +318,5 @@
     <string name="target_bar_label">Working with</string>
     <string name="target_bar_state">%1$s · %2$s</string>
     <string name="target_bar_others">%1$d other device(s) are plugged in. Everything below belongs to the one above — pick another to work with it instead.</string>
+    <string name="operations_empty">No operations yet in this install. A long transfer — sideload, a file read or written — appears here while it runs and stays here after it ends, including when it ended with nothing known.</string>
 </resources>

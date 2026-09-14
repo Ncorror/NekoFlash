@@ -30,11 +30,19 @@ data class OperationsPanel(
  */
 @Composable
 internal fun OperationsSection(panel: OperationsPanel) {
-    if (panel.live.isEmpty() && panel.history.isEmpty()) return
-
     SectionHeading(
         text = stringResource(R.string.operations_title),
     )
+    if (panel.live.isEmpty() && panel.history.isEmpty()) {
+        // Раздел, не нарисовавший ничего, читается как поломка приложения.
+        // Пустая история — это ответ, и он говорится словами: здесь ещё
+        // ничего не происходило, а не «экран не работает».
+        Text(
+            text = stringResource(R.string.operations_empty),
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        return
+    }
     panel.live.forEach { record -> OperationRow(record, live = true) }
     panel.history.forEach { record -> OperationRow(record, live = false) }
     Text(
