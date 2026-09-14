@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import io.github.ncorror.nekoflash.R
 import io.github.ncorror.nekoflash.adb.AdbCommandState
 import io.github.ncorror.nekoflash.adb.AdbFileState
+import io.github.ncorror.nekoflash.adb.AdbInstallState
 import io.github.ncorror.nekoflash.adb.AdbTerminalState
 import io.github.ncorror.nekoflash.adb.AdbLinkState
 import io.github.ncorror.nekoflash.usb.api.UsbScanSummary
@@ -64,6 +65,7 @@ fun NekoFlashApp(
     adbCommand: AdbCommandState = AdbCommandState.None,
     terminal: AdbTerminalState = AdbTerminalState(),
     files: AdbFileState = AdbFileState.None,
+    install: AdbInstallState = AdbInstallState.None,
     onRescanUsb: () -> Unit = {},
     onClaim: (UsbSession) -> Unit = {},
     onRelease: (UsbSession) -> Unit = {},
@@ -98,6 +100,7 @@ fun NekoFlashApp(
             terminal = terminal,
             terminalActions = terminalActions,
             files = files,
+            install = install,
             fileActions = fileActions,
             onRescanUsb = onRescanUsb,
             onClaim = onClaim,
@@ -188,6 +191,7 @@ private fun Workspace(
     terminal: AdbTerminalState,
     terminalActions: TerminalActions,
     files: AdbFileState,
+    install: AdbInstallState,
     fileActions: FileActions,
     onRescanUsb: () -> Unit,
     onClaim: (UsbSession) -> Unit,
@@ -244,6 +248,7 @@ private fun Workspace(
             adbLink = adbLink,
             adbCommand = adbCommand,
             files = files,
+            install = install,
             fileActions = fileActions,
             onClaim = onClaim,
             onRelease = onRelease,
@@ -319,6 +324,7 @@ private fun SessionList(
     adbLink: AdbLinkState,
     adbCommand: AdbCommandState,
     files: AdbFileState,
+    install: AdbInstallState,
     fileActions: FileActions,
     onClaim: (UsbSession) -> Unit,
     onRelease: (UsbSession) -> Unit,
@@ -365,6 +371,7 @@ private fun SessionList(
         adbLink = adbLink,
         adbCommand = adbCommand,
         files = files,
+        install = install,
         fileActions = fileActions,
         onClaim = { onClaim(session) },
         onRelease = { onRelease(session) },
@@ -468,6 +475,7 @@ private fun SessionCard(
     adbLink: AdbLinkState,
     adbCommand: AdbCommandState,
     files: AdbFileState,
+    install: AdbInstallState,
     fileActions: FileActions,
     onClaim: () -> Unit,
     onRelease: () -> Unit,
@@ -506,6 +514,7 @@ private fun SessionCard(
                         adbLink = adbLink,
                         adbCommand = adbCommand,
                         files = files,
+                        install = install,
                         fileActions = fileActions,
                         onAdbConnect = onAdbConnect,
                         onAdbDisconnect = onAdbDisconnect,

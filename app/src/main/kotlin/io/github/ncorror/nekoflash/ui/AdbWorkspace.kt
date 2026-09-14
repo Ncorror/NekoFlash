@@ -15,6 +15,7 @@ import androidx.compose.ui.res.stringResource
 import io.github.ncorror.nekoflash.R
 import io.github.ncorror.nekoflash.adb.AdbCommandState
 import io.github.ncorror.nekoflash.adb.AdbFileState
+import io.github.ncorror.nekoflash.adb.AdbInstallState
 import io.github.ncorror.nekoflash.protocol.adb.AdbRecoveryVerdict
 import io.github.ncorror.nekoflash.adb.AdbForwardController
 import io.github.ncorror.nekoflash.adb.AdbForwardEntry
@@ -43,6 +44,7 @@ internal fun AdbLinkSection(
     adbLink: AdbLinkState,
     adbCommand: AdbCommandState,
     files: AdbFileState,
+    install: AdbInstallState,
     fileActions: FileActions,
     onAdbConnect: () -> Unit,
     onAdbDisconnect: () -> Unit,
@@ -89,7 +91,7 @@ internal fun AdbLinkSection(
         // Интерактивная оболочка живёт в своём разделе: она переживает
         // отдельную команду, и листать до неё через все протокольные секции
         // приходилось каждый раз.
-        FilesSection(files = files, actions = fileActions)
+        FilesSection(files = files, install = install, actions = fileActions)
         // Sideload стоит сразу за файлами не по алфавиту: база журнала
         // снимается там, вердикт читается там же, а между ними — эта передача.
         // Три шага одного дела, и разносить их по экрану значило бы заставить
@@ -160,6 +162,8 @@ data class FileActions(
     val onRecoveryBaseline: () -> Unit = {},
     /** Прочитать журнал Recovery и объявить вердикт, если его разрешает база. */
     val onRecoveryVerdict: () -> Unit = {},
+    /** Поставить APK, который выберет пользователь. Путь на устройстве не нужен. */
+    val onInstallApk: () -> Unit = {},
 )
 
 /**
@@ -181,11 +185,14 @@ private const val LARGE_WRITE_BYTES = 16L * 1024L * 1024L
  * пока не умеет, и это ограничение вида, а не возможности.
  */
 @Composable
-private fun FilesSection(files: AdbFileState, actions: FileActions) {
+private fun FilesSection(files: AdbFileState, install: AdbInstallState, actions: FileActions) {
     val path = remember { mutableStateOf("") }
     val idle = files !is AdbFileState.Busy
 
     LabelledValue(label = stringResource(R.string.files_label), value = fileStateText(files))
+    if (install != AdbInstallState.None) {
+        Text(text = installStateText(install), style = MaterialTheme.typography.bodySmall)
+    }
     OutlinedTextField(
         value = path.value,
         onValueChange = { text -> path.value = text },
@@ -205,6 +212,12 @@ private fun FilesSection(files: AdbFileState, actions: FileActions) {
     }
     Button(onClick = { actions.onWriteFromFile(path.value) }, enabled = idle && path.value.isNotBlank()) {
         Text(stringResource(R.string.files_write_from_file))
+    }
+    // Установка поля пути не берёт: временный путь на устройстве выбирает
+    // протокол, и дать его выбрать оператору значило бы предложить решение,
+    // которое ни на что не влияет и может всё сломать.
+    Button(onClick = actions.onInstallApk, enabled = idle) {
+        Text(stringResource(R.string.install_apk))
     }
     Button(
         onClick = { actions.onWrite(path.value, SMALL_WRITE_BYTES) },
@@ -236,6 +249,28 @@ private fun FilesSection(files: AdbFileState, actions: FileActions) {
         text = stringResource(R.string.files_write_note),
         style = MaterialTheme.typography.bodySmall,
     )
+}
+
+/**
+ * Исход установки словами.
+ *
+ * `Unknown` отделён от отказа и говорит **что делать**: после обрыва на границе
+ * мутации пакет мог установиться, и «попробуйте ещё раз» здесь — совет
+ * поставить поверх неизвестного.
+ */
+@Composable
+private fun installStateText(install: AdbInstallState): String = when (install) {
+    AdbInstallState.None -> ""
+    is AdbInstallState.Running -> stringResource(R.string.install_running, install.name, install.stage.name)
+    is AdbInstallState.Installed -> stringResource(R.string.install_done, install.name, install.output)
+    is AdbInstallState.Refused ->
+        stringResource(R.string.install_refused, install.name, install.stage.name, install.detail, install.output)
+
+    is AdbInstallState.Unknown ->
+        stringResource(R.string.install_unknown, install.name, install.stage.name, install.detail)
+
+    is AdbInstallState.SourceChanged ->
+        stringResource(R.string.install_source_changed, install.name, install.detail)
 }
 
 @Composable

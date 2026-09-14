@@ -112,6 +112,8 @@ public class AdbLinkController(
      */
     private val fileOperations = AdbSyncController(executor, diagnostics)
 
+    private val installs = AdbInstallController(executor, diagnostics)
+
     /**
      * Владелец запросов перезагрузки.
      *
@@ -186,6 +188,9 @@ public class AdbLinkController(
 
     /** Состояние передачи пакета в Recovery. */
     public val sideload: StateFlow<AdbSideloadState> = sideloads.state
+
+    /** Состояние установки пакета. */
+    public val install: StateFlow<AdbInstallState> = installs.state
 
     /** Состояние последнего запроса перезагрузки. */
     public val reboot: StateFlow<AdbRebootState> = reboots.state
@@ -326,6 +331,20 @@ public class AdbLinkController(
             val live = connection ?: return
             if (fileOperations.active) return
             fileOperations.readTo(live, path, destination)
+        }
+
+        /**
+         * Ставит выбранный APK.
+         *
+         * Живёт рядом с записью файла, потому что начинается так же — переносом
+         * на устройство, — но исход у неё другой: файл кончается файлом, а
+         * установка меняет состояние устройства.
+         */
+        public fun install(name: String, options: List<String>, origin: () -> ArtifactSource) {
+            val live = connection ?: return
+            if (installs.active || fileOperations.active) return
+            holdProcess()
+            installs.install(live, name, options, origin)
         }
 
         /** Пишет на устройство файл, выбранный пользователем. */

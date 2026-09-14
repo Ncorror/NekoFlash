@@ -4,6 +4,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.ManagedActivityResultLauncher
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -94,6 +95,27 @@ class MainActivity : ComponentActivity() {
      * 60 строк, а поднимать пороги запрещено (`15` §4.1). Граница вышла
      * осмысленная — выше неё только владение процессом, ниже только экран.
      */
+    /**
+     * Системный диалог сохранения отчёта.
+     *
+     * Вынесен из экрана не ради длины, а потому что это законченная вещь: файл
+     * создаёт пользователь там, где ему нужно, и приложение не заводит
+     * собственного хранилища отчётов.
+     */
+    @Composable
+    private fun diagnosticsSaveLauncher(
+        application: NekoFlashApplication,
+        onStatus: (String) -> Unit,
+    ): ManagedActivityResultLauncher<String, Uri?> {
+        val savedTemplate = stringResource(R.string.diagnostics_export_done)
+        val failedTemplate = stringResource(R.string.diagnostics_export_failed)
+        return rememberLauncherForActivityResult(
+            ActivityResultContracts.CreateDocument("application/zip"),
+        ) { destination ->
+            exportDiagnostics(application, destination, savedTemplate, failedTemplate, onStatus)
+        }
+    }
+
     @Composable
     private fun NekoFlashScreen(
         application: NekoFlashApplication,
@@ -107,23 +129,13 @@ class MainActivity : ComponentActivity() {
         val commandState by adbLink.command.collectAsState()
         val terminalState by adbLink.terminal.collectAsState()
         val fileState by adbLink.files.collectAsState()
+        val installState by adbLink.install.collectAsState()
         val fastbootState by fastbootLink.state.collectAsState()
         val fastbootConsole by fastbootLink.console.collectAsState()
         var exportStatus by remember { mutableStateOf<String?>(null) }
 
-        val savedTemplate = stringResource(R.string.diagnostics_export_done)
-        val failedTemplate = stringResource(R.string.diagnostics_export_failed)
         val claimFailedTemplate = stringResource(R.string.usb_claim_failed)
-
-        // Системный диалог сохранения: файл создаёт пользователь там, где
-        // ему нужно, а приложение не заводит собственного хранилища отчётов.
-        val saveLauncher = rememberLauncherForActivityResult(
-            ActivityResultContracts.CreateDocument("application/zip"),
-        ) { destination ->
-            exportDiagnostics(application, destination, savedTemplate, failedTemplate) { message ->
-                exportStatus = message
-            }
-        }
+        val saveLauncher = diagnosticsSaveLauncher(application) { message -> exportStatus = message }
 
         // Скан при каждом возвращении на экран.
         //
@@ -156,6 +168,7 @@ class MainActivity : ComponentActivity() {
             terminal = terminalState,
             terminalActions = terminalActions(adbLink),
             files = fileState,
+            install = installState,
             fileActions = fileActions(adbLink),
             onRescanUsb = { coordinator.scanAttachedDevices() },
             onClaim = claimAction(coordinator, claimFailedTemplate) { exportStatus = it },
@@ -502,6 +515,16 @@ private fun fileActions(link: AdbLinkController): FileActions {
         }
     }
 
+    // Выбор APK — отдельный диалог, а не тот же самый: у него другой фильтр и
+    // другое продолжение, и придерживать между ними нечего — путь на устройстве
+    // выбирает протокол, а не оператор.
+    val apkLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { chosen ->
+        if (chosen != null) {
+            val source = SafArtifactSource(resolver, chosen)
+            link.storage.install(chosen.lastPathSegment ?: "package.apk", emptyList()) { source }
+        }
+    }
+
     return FileActions(
         onDescribe = link.storage::describe,
         onRead = link.storage::read,
@@ -516,8 +539,15 @@ private fun fileActions(link: AdbLinkController): FileActions {
         },
         onRecoveryBaseline = link.recovery::captureBaseline,
         onRecoveryVerdict = link.recovery::readVerdict,
+        // Тип называется, но выбор им не запирается: что считать пакетом, решает
+        // устройство, и отсеять «не тот» файл своим списком значило бы отказать
+        // за него (`01` §3). Второй тип — `*/*` — оставляет выбор оператору.
+        onInstallApk = { apkLauncher.launch(arrayOf(APK_MIME, "*/*")) },
     )
 }
+
+/** Тип APK как его знает система. Подсказка диалогу, а не наш фильтр. */
+private const val APK_MIME = "application/vnd.android.package-archive"
 
 private fun terminalActions(link: AdbLinkController) = TerminalActions(
     onStart = link::startShell,

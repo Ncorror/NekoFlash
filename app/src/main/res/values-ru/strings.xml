@@ -267,6 +267,12 @@
     <string name="sideload_verify">Прочитайте вердикт Recovery: сказать, установилось ли, может только оно.</string>
     <string name="sideload_note">Содержимое порождает приложение — выбор своего пакета появится вместе с artifact source. Остальное настоящее: тот же поток, те же запросы блоков, те же подтверждения. Отмена возможна только до ухода первого блока; после него Recovery уже может менять устройство.</string>
     <string name="files_read_to_file">Прочитать в файл…</string>
+    <string name="install_apk">Установить APK с этого телефона…</string>
+    <string name="install_running">Ставим %1$s — стадия %2$s</string>
+    <string name="install_done">%1$s: пакетный менеджер сообщает об установке. Его слова: %2$s</string>
+    <string name="install_refused">%1$s: устройство отказало на стадии %2$s. %3$s %4$s</string>
+    <string name="install_unknown">%1$s: чем кончилось — неизвестно. Обрыв на стадии %2$s, пакет мог установиться. %3$s Проверьте список приложений на устройстве, прежде чем ставить ещё раз.</string>
+    <string name="install_source_changed">%1$s: файл изменился между выбором и отправкой, поэтому не ставили. %2$s</string>
     <string name="files_write_from_file">Записать файл с этого телефона…</string>
     <string name="files_saved">Сохранено %1$d байт в %2$s. SHA-256 %3$s</string>
     <string name="files_saved_not_atomic">У провайдера нет атомарной замены: если что-то пошло не так, проверьте файл, прежде чем на него полагаться.</string>
