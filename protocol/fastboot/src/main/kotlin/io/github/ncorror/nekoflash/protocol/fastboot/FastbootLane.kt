@@ -366,6 +366,25 @@ public class FastbootLane(
         }
     }
 
+    /**
+     * Цикл приёма.
+     *
+     * **Неуспешное чтение — это «байт ещё не было», а не «байтов не будет».**
+     * Правило записано на самом классе и до `07` §6.93 соблюдалось только при
+     * чтении кадров: приём данных сдавался на первом же `Failed`. На прогоне
+     * §6.93 устройство объявило `DATA` с осмысленным объёмом (96 МиБ, ровно
+     * `partition-size`), а первое чтение отказало **через миллисекунды** при
+     * запрошенных десяти секундах — то самое мгновенно возвращающееся пустое
+     * чтение, о котором Legacy оставил комментарий «V5.8.10 onyx handshake
+     * fix». Транспорт не различает таймаут и ошибку (`NOT_COMPLETED`), поэтому
+     * единственное честное прочтение одного такого ответа — «байт пока нет»;
+     * решает бюджет бездействия, а не отдельное чтение.
+     *
+     * **Приём нулевой длины остаётся провалом сразу.** `Completed(0)` — это
+     * состоявшаяся передача, то есть слово устройства; `Failed` — отсутствие
+     * слова. Сводить их к одному значило бы потерять различие, ради которого
+     * [receiveProblem] и разделён.
+     */
     private fun drain(
         sink: java.io.OutputStream,
         expectedBytes: Long,
@@ -375,10 +394,15 @@ public class FastbootLane(
         val block = ByteArray(DATA_IN_BLOCK_BYTES)
         var received = 0L
         var failure: String? = null
+        var quietSince = elapsedMillis()
 
         while (failure == null && received < expectedBytes) {
             val wanted = minOf(block.size.toLong(), expectedBytes - received).toInt()
             val result = transport.receive(block, 0, wanted, readTimeoutMillis)
+            if (result is UsbTransferResult.Failed) {
+                failure = waitedOut(quietSince, inactivityMillis, received, expectedBytes)
+                continue
+            }
             failure = receiveProblem(result, wanted, received, expectedBytes)
             if (failure == null) {
                 val count = (result as UsbTransferResult.Completed).bytes
@@ -386,10 +410,28 @@ public class FastbootLane(
                     .exceptionOrNull()
                     ?.let { "запись принятого не удалась на $received: ${it.javaClass.simpleName}" }
                 received += count
+                quietSince = elapsedMillis()
             }
         }
 
         return settle(received, expectedBytes, failure, inactivityMillis)
+    }
+
+    /** Кончилось ли терпение на байты, либо `null` — ждём дальше, выдержав паузу. */
+    private fun waitedOut(
+        quietSince: Long,
+        inactivityMillis: Long,
+        received: Long,
+        expectedBytes: Long,
+    ): String? {
+        val idle = (elapsedMillis() - quietSince).coerceAtLeast(0L)
+        val remaining = inactivityMillis - idle
+        return if (remaining <= 0L) {
+            "байт не было $idle мс на $received из $expectedBytes"
+        } else {
+            pauseMillis(minOf(EMPTY_READ_PAUSE_MS, remaining))
+            null
+        }
     }
 
     /**

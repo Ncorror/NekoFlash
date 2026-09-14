@@ -117,10 +117,10 @@ class FastbootFetchTest {
             .willReply("FAILnot found")
             .willReply("DATA00000010")
             .willSendData(ByteArray(8) { 7 })
-            .willBeSilent(100)
+            .willBeSilent(BEYOND_PATIENCE_READS)
         val sink = ByteArrayOutputStream()
 
-        val outcome = fetch(transport).fetch("boot", sink)
+        val outcome = fetchOnVirtualClock(transport).fetch("boot", sink)
 
         val partial = outcome as FastbootFetchOutcome.Partial
         assertEquals("принято ровно столько, сколько пришло", 8L, partial.bytesReceived)
@@ -218,6 +218,30 @@ class FastbootFetchTest {
     }
 
     /**
+     * Терпение на байты не кончается на первом же неуспешном чтении.
+     *
+     * Пустое чтение на этом хосте возвращается мгновенно (`07` §6.93), и
+     * сдаваться по одному такому ответу значило бы объявлять обрывом то, что
+     * ещё не начиналось. Решает бюджет бездействия, а не отдельное чтение.
+     */
+    @Test
+    fun oneFailedReadIsNotTheEndOfTheData() {
+        val transport = FakeFastbootTransport()
+            .willReply("FAILnot found")
+            .willReply("FAILnot found")
+            .willReply("DATA00000010")
+            .willBeSilent(3)
+            .willSendData(ByteArray(16) { 5 })
+            .willReply("OKAY")
+        val sink = ByteArrayOutputStream()
+
+        val outcome = fetchOnVirtualClock(transport).fetch("boot", sink)
+
+        assertEquals(16L, (outcome as FastbootFetchOutcome.Completed).bytesReceived)
+        assertEquals(16, sink.size())
+    }
+
+    /**
      * Причина обрыва называет и место, и объявленный объём.
      *
      * «Не состоялся на 0» без второго числа не отличает отказ транспорта от
@@ -232,7 +256,7 @@ class FastbootFetchTest {
             .willReply("DATA00000010")
             .willReceiveEmpty()
 
-        val outcome = fetch(transport).fetch("boot", ByteArrayOutputStream())
+        val outcome = fetchOnVirtualClock(transport).fetch("boot", ByteArrayOutputStream())
 
         val partial = outcome as FastbootFetchOutcome.Partial
         assertTrue(partial.detail, partial.detail.contains("на 0 из 16"))
@@ -253,8 +277,29 @@ class FastbootFetchTest {
         FastbootLane(FakeFastbootTransport()).receiveData(ByteArrayOutputStream(), -1)
     }
 
+    private companion object {
+        /** Столько пустых чтений подряд заведомо переживает любой бюджет. */
+        const val BEYOND_PATIENCE_READS = 2_000
+    }
+
     private fun fetch(transport: FakeFastbootTransport): FastbootFetch {
         val lane = FastbootLane(transport)
+        return FastbootFetch(lane, FastbootGetVar(lane))
+    }
+
+    /**
+     * То же, но на управляемых часах.
+     *
+     * Нужно там, где проверяется исчерпание терпения: на настоящих часах такой
+     * тест ждал бы две минуты, и «медленно» быстро становится «выключено».
+     */
+    private fun fetchOnVirtualClock(transport: FakeFastbootTransport): FastbootFetch {
+        var now = 0L
+        val lane = FastbootLane(
+            transport,
+            elapsedMillis = { now },
+            pauseMillis = { now += it },
+        )
         return FastbootFetch(lane, FastbootGetVar(lane))
     }
 }
