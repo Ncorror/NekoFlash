@@ -10,6 +10,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -25,6 +26,7 @@ import io.github.ncorror.nekoflash.protocol.fastboot.FastbootMutationClass
 import io.github.ncorror.nekoflash.protocol.fastboot.FastbootPartitionIndex
 import io.github.ncorror.nekoflash.protocol.fastboot.FastbootMutationOutcome
 import io.github.ncorror.nekoflash.protocol.fastboot.FastbootReply
+import kotlinx.coroutines.delay
 
 /** Консоль Fastboot: произвольная команда, переменная по имени и весь список. */
 data class FastbootConsolePanel(
@@ -176,6 +178,33 @@ private fun FastbootReadControls(console: FastbootConsolePanel) {
 }
 
 /**
+ * Ожидание, которое видно.
+ *
+ * Строка тикает раз в секунду, потому что молчать здесь можно долго по
+ * построению: терпение на фазу данных — две минуты, и неподвижное «ждём
+ * ответа» за это время читается как зависание. Прогон `07` §6.95 оборвали на
+ * 68-й секунде ровно поэтому — экран не отличался от повисшего.
+ *
+ * Отсчёт ведётся от отметки, поставленной при отправке, а не от появления
+ * строки на экране: «сколько ждали» должно измеряться там же, где начинается
+ * ожидание (`07` §6.91 — тот же урок, только про журнал).
+ */
+@Composable
+private fun FastbootWaitingLine(state: FastbootConsoleState.Running) {
+    var seconds by remember(state.startedAtMillis) { mutableStateOf(0L) }
+    LaunchedEffect(state.startedAtMillis) {
+        while (true) {
+            seconds = (System.currentTimeMillis() - state.startedAtMillis).coerceAtLeast(0L) / MILLIS_IN_SECOND
+            delay(MILLIS_IN_SECOND)
+        }
+    }
+    Text(
+        text = stringResource(R.string.fastboot_console_waiting, state.command, seconds),
+        style = MaterialTheme.typography.bodySmall,
+    )
+}
+
+/**
  * Потерянная рамка — с объяснением и выходом, а не одним словом.
  *
  * `STALLED` печаталось и раньше, но только как слово в строке полосы: после
@@ -233,10 +262,7 @@ private fun FastbootConsoleOutcome(state: FastbootConsoleState) {
     when (state) {
         is FastbootConsoleState.Idle -> Unit
 
-        is FastbootConsoleState.Running -> Text(
-            text = stringResource(R.string.fastboot_console_running, state.command),
-            style = MaterialTheme.typography.bodySmall,
-        )
+        is FastbootConsoleState.Running -> FastbootWaitingLine(state)
 
         is FastbootConsoleState.Answered -> FastbootAnswer(state)
 
@@ -553,6 +579,9 @@ private fun FastbootLaneLine(lane: String) {
         style = MaterialTheme.typography.bodySmall,
     )
 }
+
+/** Миллисекунд в секунде — чтобы деление не выглядело магическим числом. */
+private const val MILLIS_IN_SECOND = 1_000L
 
 /** Маленькая загрузка: доказывает путь, ничего не занимая. */
 private const val SMALL_DOWNLOAD_BYTES = 4L * 1024

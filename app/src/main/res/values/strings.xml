@@ -178,6 +178,7 @@
     <string name="fastboot_variable_read">Read the variable</string>
     <string name="fastboot_variable_read_all">Read everything</string>
     <string name="fastboot_console_running">Sent, waiting for an answer: %1$s</string>
+    <string name="fastboot_console_waiting">Sent %2$d s ago, still no answer: %1$s</string>
     <string name="fastboot_console_okay">%1$s → OKAY: %2$s</string>
     <string name="fastboot_console_fail">%1$s → the device refused: %2$s</string>
     <string name="fastboot_console_info">  %1$s</string>

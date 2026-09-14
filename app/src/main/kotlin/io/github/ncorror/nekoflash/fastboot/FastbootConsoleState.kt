@@ -27,8 +27,18 @@ public sealed interface FastbootConsoleState {
     /** Ничего не отправлялось. */
     public data object Idle : FastbootConsoleState
 
-    /** Команда ушла, ответа ещё нет. */
-    public data class Running(val command: String) : FastbootConsoleState
+    /**
+     * Команда ушла, ответа ещё нет.
+     *
+     * [startedAtMillis] — когда её отправили. Нужен затем, что ожидание здесь
+     * бывает долгим по построению: терпение на фазу данных — две минуты, и
+     * неподвижная строка «ждём ответа» за это время читается как зависание.
+     * Прогон `07` §6.95 оборвали на 68-й секунде именно поэтому.
+     */
+    public data class Running(
+        val command: String,
+        val startedAtMillis: Long,
+    ) : FastbootConsoleState
 
     /**
      * Устройство ответило терминально.

@@ -353,7 +353,7 @@ public class FastbootLinkController(
             mutableConsole.value is FastbootConsoleState.Running -> Unit
 
             else -> {
-                mutableConsole.value = FastbootConsoleState.Running(trimmed)
+                mutableConsole.value = FastbootConsoleState.Running(trimmed, clock().toEpochMilli())
                 executor.execute {
                     emit(event, mapOf("command" to trimmed))
                     val outcome = runCatching { action(live, trimmed) }

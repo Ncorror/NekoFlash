@@ -181,6 +181,7 @@
     <string name="fastboot_variable_read">Прочитать переменную</string>
     <string name="fastboot_variable_read_all">Прочитать всё</string>
     <string name="fastboot_console_running">Отправлено, ждём ответа: %1$s</string>
+    <string name="fastboot_console_waiting">Отправлено %2$d с назад, ответа пока нет: %1$s</string>
     <string name="fastboot_console_okay">%1$s → OKAY: %2$s</string>
     <string name="fastboot_console_fail">%1$s → устройство отказало: %2$s</string>
     <string name="fastboot_console_info">  %1$s</string>
