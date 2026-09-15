@@ -15,22 +15,32 @@ package io.github.ncorror.nekoflash.protocol.fastboot
  */
 public fun interface FastbootReadTrace {
     /**
-     * @param phase где читали: кадр ответа или фаза данных.
+     * @param phase где читали: кадр ответа, фаза данных или проба.
+     * @param wantedBytes сколько байт **просили** этой передачей.
      * @param requestedMillis сколько времени отвели этому чтению.
      * @param elapsedMicros сколько оно **заняло** на самом деле.
      * @param bytes сколько принято; отрицательное — платформа не выполнила
      *   передачу, и таймаут от ошибки здесь не отличить (`NOT_COMPLETED`).
      */
-    public fun read(phase: String, requestedMillis: Int, elapsedMicros: Long, bytes: Int)
+    public fun read(phase: String, wantedBytes: Int, requestedMillis: Int, elapsedMicros: Long, bytes: Int)
 
     public companion object {
         /** Никуда не пишет: протокол обязан работать и без наблюдателя. */
-        public val NOTHING: FastbootReadTrace = FastbootReadTrace { _, _, _, _ -> }
+        public val NOTHING: FastbootReadTrace = FastbootReadTrace { _, _, _, _, _ -> }
 
         /** Чтение кадра ответа — `OKAY`, `FAIL`, `INFO`, `TEXT`, `DATA`. */
         public const val FRAME: String = "frame"
 
         /** Чтение внутри открытой фазы данных. */
         public const val DATA_IN: String = "data-in"
+
+        /**
+         * Повторное чтение той же фазы данных **меньшим** запросом.
+         *
+         * Отдельная фаза, а не ещё одна строка `data-in`: по журналу обязано
+         * быть видно, что это не следующий блок, а та же порция, спрошенная
+         * иначе. Зачем спрошенная — `FastbootLane.drain`.
+         */
+        public const val DATA_PROBE: String = "data-probe"
     }
 }

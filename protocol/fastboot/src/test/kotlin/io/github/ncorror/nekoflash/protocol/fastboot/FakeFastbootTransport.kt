@@ -78,6 +78,17 @@ internal class FakeFastbootTransport(
     var receiveCalls: Int = 0
         private set
 
+    /**
+     * Ронять приём, если просят больше этого числа байт.
+     *
+     * Так вёл себя `marble` на прогоне `07` §6.99: чтения кадров по 512 байт
+     * проходили, чтения данных по 16384 отказывали мгновенно в тот же эндпоинт.
+     */
+    var failReceiveOver: Int? = null
+
+    /** Сколько байт просили каждым приёмом — по нему видно размер запроса. */
+    val receiveSizes: MutableList<Int> = mutableListOf()
+
     fun willReply(vararg frames: String): FakeFastbootTransport = apply {
         frames.forEach { inbound += FakeInbound.Frame(it) }
     }
@@ -97,6 +108,9 @@ internal class FakeFastbootTransport(
 
     override fun receive(destination: ByteArray, offset: Int, length: Int, timeoutMillis: Int): UsbTransferResult {
         receiveCalls += 1
+        receiveSizes += length
+        val limit = failReceiveOver
+        if (limit != null && length > limit) return UsbTransferResult.Failed(UsbTransferFailure.NOT_COMPLETED)
         val next = inbound.removeFirstOrNull() ?: FakeInbound.Silence
         return when (next) {
             is FakeInbound.Silence -> UsbTransferResult.Failed(UsbTransferFailure.NOT_COMPLETED)

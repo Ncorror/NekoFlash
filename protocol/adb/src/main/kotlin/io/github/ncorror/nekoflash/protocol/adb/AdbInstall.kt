@@ -1,5 +1,9 @@
 package io.github.ncorror.nekoflash.protocol.adb
 
+import io.github.ncorror.nekoflash.core.diagnostics.DiagnosticEvent
+import io.github.ncorror.nekoflash.core.diagnostics.DiagnosticSink
+import java.time.Instant
+
 /** Файл, который ставим: имя для оператора и объём для `install-write`. */
 public data class AdbInstallFile(
     val name: String,
@@ -92,20 +96,35 @@ public fun interface AdbInstallPush {
  *
  * **Временный файл убирается той же командной строкой**, что и ставит. Отдельным
  * вызовом он остался бы лежать при любом обрыве связи между ними.
+ *
+ * **Каждый шаг называется в журнале.** Установка — мутация, и до прогона `07`
+ * §6.98 она не писала о себе ничего: в выгрузке оставались `service_open` с
+ * командной строкой и `service_completed bytes=85`, из которых исход не
+ * восстанавливается. Три из четырёх установок того прогона так и остались
+ * неразобранными — устройство назвало причину отказа на экране, экран уехал, а
+ * в журнале число байт. Fastboot пишет `reply=` и `payload=` у каждой команды;
+ * здесь не писалось ничего, и несимметрично это было именно у того из двух,
+ * который меняет состояние устройства.
  */
 public class AdbInstall(
     private val shell: (String) -> AdbServiceOutcome,
     private val push: AdbInstallPush,
     private val stamp: () -> Long = System::currentTimeMillis,
+    private val diagnostics: DiagnosticSink = DiagnosticSink { },
+    private val clock: () -> Instant = Instant::now,
 ) {
     /** Ставит один APK. */
     public fun install(file: AdbInstallFile, options: List<String> = emptyList()): AdbInstallOutcome {
         val remote = tempPath(file.name, index = null, at = stamp())
+        emit(
+            "install_started",
+            mapOf("name" to file.name, "bytes" to file.sizeBytes.toString(), "path" to remote),
+        )
         val pushFailure = push.push(file, remote)
         return if (pushFailure != null) {
-            AdbInstallOutcome.Refused(AdbInstallStage.UPLOAD, pushFailure, "")
+            journalled(AdbInstallOutcome.Refused(AdbInstallStage.UPLOAD, pushFailure, ""))
         } else {
-            commitSingle(remote, options)
+            journalled(commitSingle(remote, options))
         }
     }
 
@@ -120,10 +139,13 @@ public class AdbInstall(
         files: List<AdbInstallFile>,
         options: List<String> = emptyList(),
     ): AdbInstallOutcome = if (files.size < 2) {
-        AdbInstallOutcome.NotStarted("для набора нужны хотя бы два файла, получено ${files.size}")
+        journalled(AdbInstallOutcome.NotStarted("для набора нужны хотя бы два файла, получено ${files.size}"))
     } else {
-        val session = SplitSession(files, options)
-        session.run()
+        emit(
+            "install_started",
+            mapOf("files" to files.size.toString(), "bytes" to files.sumOf { it.sizeBytes }.toString()),
+        )
+        journalled(SplitSession(files, options).run())
     }
 
     private fun commitSingle(remote: String, options: List<String>): AdbInstallOutcome {
@@ -250,12 +272,29 @@ public class AdbInstall(
      * посреди, и что успело выполниться — неизвестно.
      */
     private fun outcomeOf(stage: AdbInstallStage, call: AdbServiceOutcome): AdbInstallOutcome = when (call) {
-        is AdbServiceOutcome.Failed -> AdbInstallOutcome.Unknown(stage, "${call.reason}: ${call.detail}")
+        is AdbServiceOutcome.Failed -> {
+            emit(
+                "install_step",
+                mapOf("stage" to stage.name, "rc" to "none", "failure" to "${call.reason}: ${call.detail}"),
+            )
+            AdbInstallOutcome.Unknown(stage, "${call.reason}: ${call.detail}")
+        }
 
         is AdbServiceOutcome.Completed -> {
             val text = call.text()
             val code = RC.find(text)?.groupValues?.get(1)?.toIntOrNull()
             val clean = RC.replace(text, "").trim()
+            emit(
+                "install_step",
+                mapOf(
+                    "stage" to stage.name,
+                    "rc" to (code?.toString() ?: "none"),
+                    // Слова пакетного менеджера — единственное объяснение отказа,
+                    // которое вообще существует, и держать их только на экране
+                    // значит потерять их к разбору (`07` §6.98).
+                    "output" to clean.take(OUTPUT_EXCERPT),
+                ),
+            )
             when {
                 code == null -> AdbInstallOutcome.Unknown(
                     stage,
@@ -266,6 +305,42 @@ public class AdbInstall(
                 else -> AdbInstallOutcome.Refused(stage, "pm вернул $code", clean)
             }
         }
+    }
+
+    /**
+     * Называет исход в журнале и возвращает его же.
+     *
+     * Отдельно от [outcomeOf]: тот пишет **ответ устройства** на один шаг, а
+     * это — наше о нём заключение. Сводить их к одной строке значило бы сделать
+     * `Unknown` неотличимым от отказа в записи ровно там, где `03` §3 требует
+     * их различать.
+     */
+    private fun journalled(outcome: AdbInstallOutcome): AdbInstallOutcome {
+        val fields = when (outcome) {
+            is AdbInstallOutcome.Installed ->
+                mapOf("outcome" to "INSTALLED", "output" to outcome.output.take(OUTPUT_EXCERPT))
+
+            is AdbInstallOutcome.Refused ->
+                mapOf("outcome" to "REFUSED", "stage" to outcome.stage.name, "detail" to outcome.detail)
+
+            is AdbInstallOutcome.Unknown ->
+                mapOf("outcome" to "UNKNOWN", "stage" to outcome.stage.name, "detail" to outcome.detail)
+
+            is AdbInstallOutcome.NotStarted -> mapOf("outcome" to "NOT_STARTED", "detail" to outcome.detail)
+        }
+        emit("install_finished", fields)
+        return outcome
+    }
+
+    private fun emit(message: String, fields: Map<String, String>) {
+        diagnostics.emit(
+            DiagnosticEvent(
+                timestamp = clock(),
+                category = AdbHandshake.DIAGNOSTIC_CATEGORY,
+                message = message,
+                fields = fields,
+            ),
+        )
     }
 
     /**

@@ -185,7 +185,7 @@ public class FastbootLane(
             is UsbTransferResult.Completed -> result.bytes
             is UsbTransferResult.Failed -> -1
         }
-        trace.read(phase, timeoutMillis, elapsedMicros, bytes)
+        trace.read(phase, length, timeoutMillis, elapsedMicros, bytes)
         return result
     }
     private var currentState: FastbootLaneState = FastbootLaneState.IDLE
@@ -414,6 +414,15 @@ public class FastbootLane(
      * состоявшаяся передача, то есть слово устройства; `Failed` — отсутствие
      * слова. Сводить их к одному значило бы потерять различие, ради которого
      * [receiveProblem] и разделён.
+     *
+     * **Отказавший большой запрос перепрашивается меньшим — один раз.** Это не
+     * догадка, а измерение: на прогоне `07` §6.99 чтения кадров просили 512
+     * байт и работали, а чтения данных просили 16384 и отказывали мгновенно —
+     * в тот же эндпоинт, через шесть миллисекунд после удавшегося кадра. Два
+     * объяснения — «эндпоинт умер» и «эта передача слишком велика для
+     * платформы» — по журналу неразличимы, а различает их **одно** чтение того
+     * же размера, каким читаются кадры. Спросить дешевле, чем догадаться:
+     * прогон стоит телефона, кабеля и живого человека.
      */
     private fun drain(
         sink: java.io.OutputStream,
@@ -422,20 +431,22 @@ public class FastbootLane(
         readTimeoutMillis: Int,
     ): FastbootReceiveOutcome {
         val block = ByteArray(DATA_IN_BLOCK_BYTES)
+        var blockBytes = DATA_IN_BLOCK_BYTES
         var received = 0L
         var failure: String? = null
         var quietSince = elapsedMillis()
 
         while (failure == null && received < expectedBytes) {
-            val wanted = minOf(block.size.toLong(), expectedBytes - received).toInt()
-            val result = timedReceive(block, 0, wanted, readTimeoutMillis, FastbootReadTrace.DATA_IN)
-            if (result is UsbTransferResult.Failed) {
+            val read = readData(block, blockBytes, expectedBytes - received, readTimeoutMillis)
+            blockBytes = read.blockBytes
+            val wanted = minOf(blockBytes.toLong(), expectedBytes - received).toInt()
+            if (read.result is UsbTransferResult.Failed) {
                 failure = waitedOut(quietSince, inactivityMillis, received, expectedBytes)
                 continue
             }
-            failure = receiveProblem(result, wanted, received, expectedBytes)
+            failure = receiveProblem(read.result, wanted, received, expectedBytes)
             if (failure == null) {
-                val count = (result as UsbTransferResult.Completed).bytes
+                val count = (read.result as UsbTransferResult.Completed).bytes
                 failure = runCatching { sink.write(block, 0, count) }
                     .exceptionOrNull()
                     ?.let { "запись принятого не удалась на $received: ${it.javaClass.simpleName}" }
@@ -445,6 +456,38 @@ public class FastbootLane(
         }
 
         return settle(received, expectedBytes, failure, inactivityMillis)
+    }
+
+    /** Одно чтение данных и, если оно отказало, проба тем же размером, каким читаются кадры. */
+    private data class DataRead(val result: UsbTransferResult, val blockBytes: Int)
+
+    /**
+     * Читает очередной блок, при отказе перепрашивая его меньшим запросом.
+     *
+     * Проба делается **только** когда просили больше, чем просит чтение кадров:
+     * иначе спрашивать нечего — размер уже тот, который на этом транспорте
+     * работает. Удалась проба — дальше просим столько же: размер, который
+     * платформа приняла, лучше размера, который она отвергла, даже ценой числа
+     * передач. Не удалась — возвращается **первый** отказ, и решает бюджет
+     * бездействия, как и раньше.
+     */
+    private fun readData(
+        block: ByteArray,
+        blockBytes: Int,
+        remaining: Long,
+        timeoutMillis: Int,
+    ): DataRead {
+        val wanted = minOf(blockBytes.toLong(), remaining).toInt()
+        val first = timedReceive(block, 0, wanted, timeoutMillis, FastbootReadTrace.DATA_IN)
+        val probeable = first is UsbTransferResult.Failed && readBufferBytes < wanted
+        return if (!probeable) {
+            DataRead(first, blockBytes)
+        } else {
+            val smaller = minOf(readBufferBytes.toLong(), remaining).toInt()
+            val probe = timedReceive(block, 0, smaller, timeoutMillis, FastbootReadTrace.DATA_PROBE)
+            val helped = probe is UsbTransferResult.Completed && probe.bytes > 0
+            if (helped) DataRead(probe, readBufferBytes) else DataRead(first, blockBytes)
+        }
     }
 
     /** Кончилось ли терпение на байты, либо `null` — ждём дальше, выдержав паузу. */

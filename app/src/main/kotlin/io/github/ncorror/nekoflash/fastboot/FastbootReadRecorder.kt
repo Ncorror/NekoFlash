@@ -19,6 +19,11 @@ import io.github.ncorror.nekoflash.protocol.fastboot.FastbootReadTrace
  *
  * Обрыв записи называется строкой, а не молчанием: молчащий журнал неотличим от
  * журнала, в котором чтений не было.
+ *
+ * **Запрошенный размер пишется числом, а не подразумевается фазой.** По
+ * выгрузке `07` §6.99 фаза `data-in` означала 16384, а `frame` — 512, и весь
+ * вывод о том, что отказ зависит от размера запроса, держался на этом
+ * соответствии, нигде не записанном. Подразумеваемое — не наблюдение.
  */
 internal class FastbootReadRecorder(
     private val emit: (String, Map<String, String>) -> Unit,
@@ -30,7 +35,13 @@ internal class FastbootReadRecorder(
         seen.clear()
     }
 
-    override fun read(phase: String, requestedMillis: Int, elapsedMicros: Long, bytes: Int) {
+    override fun read(
+        phase: String,
+        wantedBytes: Int,
+        requestedMillis: Int,
+        elapsedMicros: Long,
+        bytes: Int,
+    ) {
         val index = (seen[phase] ?: 0) + 1
         seen[phase] = index
         when {
@@ -38,6 +49,7 @@ internal class FastbootReadRecorder(
                 "fastboot_read",
                 mapOf(
                     "phase" to phase,
+                    "wanted" to wantedBytes.toString(),
                     "requestedMs" to requestedMillis.toString(),
                     "elapsedUs" to elapsedMicros.toString(),
                     "bytes" to bytes.toString(),

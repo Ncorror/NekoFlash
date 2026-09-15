@@ -277,6 +277,88 @@ class FastbootFetchTest {
         FastbootLane(FakeFastbootTransport()).receiveData(ByteArrayOutputStream(), -1)
     }
 
+    /**
+     * Отказ на большом запросе перепрашивается размером, которым читаются кадры.
+     *
+     * Это и есть различитель двух объяснений прогона `07` §6.99: «эндпоинт
+     * умер» и «эта передача слишком велика». Догадаться нечем, спросить — одно
+     * чтение.
+     */
+    @Test
+    fun aRefusedLargeReadIsAskedAgainSmaller() {
+        val payload = ByteArray(1024) { it.toByte() }
+        val transport = FakeFastbootTransport()
+            .willReply("FAILnot found")
+            .willReply("FAILnot found")
+            .willReply("DATA00000400")
+            .willSendData(payload)
+            .willReply("OKAY")
+        transport.failReceiveOver = FastbootLane.DEFAULT_READ_BUFFER
+
+        val outcome = fetch(transport).fetch("boot", ByteArrayOutputStream())
+
+        assertTrue(outcome.toString(), outcome is FastbootFetchOutcome.Completed)
+        assertEquals(1024L, (outcome as FastbootFetchOutcome.Completed).bytesReceived)
+    }
+
+    /** Удавшийся меньший запрос становится размером на весь остаток приёма. */
+    @Test
+    fun theSizeThatWorkedIsKeptForTheRest() {
+        val payload = ByteArray(2048) { it.toByte() }
+        val transport = FakeFastbootTransport()
+            .willReply("FAILnot found")
+            .willReply("FAILnot found")
+            .willReply("DATA00000800")
+            .willSendData(payload)
+            .willReply("OKAY")
+        transport.failReceiveOver = FastbootLane.DEFAULT_READ_BUFFER
+
+        fetch(transport).fetch("boot", ByteArrayOutputStream())
+
+        // Большим просим ровно один раз: получив отказ и увидев, что меньший
+        // проходит, спрашивать снова тем же размером незачем.
+        val oversized = transport.receiveSizes.count { it > FastbootLane.DEFAULT_READ_BUFFER }
+        assertEquals(transport.receiveSizes.toString(), 1, oversized)
+    }
+
+    /**
+     * Проба не спасает мёртвый эндпоинт и не притворяется, что спасла.
+     *
+     * Отказали оба размера — исход тот же, что и был: решает бюджет
+     * бездействия, а не отдельное чтение.
+     */
+    @Test
+    fun aDeadEndpointStaysDeadAfterTheProbe() {
+        val transport = FakeFastbootTransport()
+            .willReply("FAILnot found")
+            .willReply("FAILnot found")
+            .willReply("DATA00000400")
+        // Кадры проходят, данные — нет: ни большим запросом, ни пробой. Дальше
+        // за кадром `DATA` в очереди пусто, и приём отвечает тишиной.
+        transport.failReceiveOver = FastbootLane.DEFAULT_READ_BUFFER
+
+        val outcome = fetchOnVirtualClock(transport).fetch("boot", ByteArrayOutputStream())
+
+        val partial = outcome as FastbootFetchOutcome.Partial
+        assertTrue(partial.detail, partial.detail.contains("байт не было"))
+        assertEquals(0L, partial.bytesReceived)
+    }
+
+    /** Замер называет запрошенный размер: по фазе он только подразумевался. */
+    @Test
+    fun theTraceNamesHowManyBytesWereAsked() {
+        val seen = mutableListOf<Pair<String, Int>>()
+        val transport = FakeFastbootTransport().willReply("OKAY")
+        val lane = FastbootLane(
+            transport,
+            trace = { phase, wanted, _, _, _ -> seen += phase to wanted },
+        )
+
+        lane.run("getvar:product")
+
+        assertEquals(listOf(FastbootReadTrace.FRAME to FastbootLane.DEFAULT_READ_BUFFER), seen)
+    }
+
     private companion object {
         /** Столько пустых чтений подряд заведомо переживает любой бюджет. */
         const val BEYOND_PATIENCE_READS = 2_000

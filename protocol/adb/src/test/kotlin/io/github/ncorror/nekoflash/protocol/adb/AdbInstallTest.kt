@@ -1,5 +1,7 @@
 package io.github.ncorror.nekoflash.protocol.adb
 
+import io.github.ncorror.nekoflash.core.diagnostics.DiagnosticEvent
+import java.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -34,6 +36,7 @@ class AdbInstallTest {
         shell: FakeShell,
         pushFailure: String? = null,
         pushed: MutableList<Pair<String, String>> = mutableListOf(),
+        journal: MutableList<DiagnosticEvent> = mutableListOf(),
     ) = AdbInstall(
         shell = shell::run,
         push = { file, remote ->
@@ -41,6 +44,8 @@ class AdbInstallTest {
             pushFailure
         },
         stamp = { 42L },
+        diagnostics = { event -> journal += event },
+        clock = { Instant.EPOCH },
     )
 
     /** Успех — это слово пакетного менеджера, прочитанное по коду возврата. */
@@ -268,5 +273,62 @@ class AdbInstallTest {
 
         assertEquals("/data/local/tmp/nekoflash-session-42-0-a.apk", pushed[0].second)
         assertEquals("/data/local/tmp/nekoflash-session-42-1-b.apk", pushed[1].second)
+    }
+
+    /**
+     * Слова пакетного менеджера попадают в журнал, а не только на экран.
+     *
+     * На прогоне `07` §6.98 три установки из четырёх отказали, и в выгрузке от
+     * них осталось `service_completed bytes=85`: причина была названа
+     * устройством, показана оператору и потеряна. Разобрать их теперь нечем.
+     */
+    @Test
+    fun theDeviceWordsReachTheJournal() {
+        val journal = mutableListOf<DiagnosticEvent>()
+        val shell = FakeShell().willReply("Failure [INSTALL_FAILED_ALREADY_EXISTS]\nNEKOFLASH_PM_RC:1")
+
+        installer(shell, journal = journal).install(AdbInstallFile("app.apk", 10))
+
+        val step = journal.single { it.message == "install_step" }
+        assertEquals("1", step.fields["rc"])
+        assertTrue(step.fields.toString(), step.fields["output"]!!.contains("INSTALL_FAILED_ALREADY_EXISTS"))
+    }
+
+    /** Исход называется своим классом: `Unknown` не должен читаться как отказ. */
+    @Test
+    fun theOutcomeIsNamedByItsOwnClass() {
+        val journal = mutableListOf<DiagnosticEvent>()
+        val shell = FakeShell().willReply("что-то сказал и оборвался")
+
+        installer(shell, journal = journal).install(AdbInstallFile("app.apk", 10))
+
+        val finished = journal.single { it.message == "install_finished" }
+        assertEquals("UNKNOWN", finished.fields["outcome"])
+        assertEquals(AdbInstallStage.COMMIT.name, finished.fields["stage"])
+    }
+
+    /** Начало установки называется до отправки: по обрыву видно, что её начинали. */
+    @Test
+    fun theStartIsNamedBeforeAnythingIsSent() {
+        val journal = mutableListOf<DiagnosticEvent>()
+
+        installer(FakeShell(), journal = journal).install(AdbInstallFile("app.apk", 10))
+
+        val started = journal.first()
+        assertEquals("install_started", started.message)
+        assertEquals("app.apk", started.fields["name"])
+    }
+
+    /** Отказ записи файла — тоже исход, и он тоже называется. */
+    @Test
+    fun aFailedUploadIsJournalledToo() {
+        val journal = mutableListOf<DiagnosticEvent>()
+
+        installer(FakeShell(), pushFailure = "CANCELLED: остановлено", journal = journal)
+            .install(AdbInstallFile("app.apk", 10))
+
+        val finished = journal.single { it.message == "install_finished" }
+        assertEquals("REFUSED", finished.fields["outcome"])
+        assertEquals(AdbInstallStage.UPLOAD.name, finished.fields["stage"])
     }
 }

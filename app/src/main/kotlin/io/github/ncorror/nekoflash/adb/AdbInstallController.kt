@@ -139,6 +139,7 @@ public class AdbInstallController(
 
             is AdbSyncOutcome.Done -> {
                 val installer = AdbInstall(
+                    diagnostics = diagnostics,
                     shell = { command -> connection.call("shell:$command", timeoutMillis = PM_TIMEOUT_MS) },
                     push = { _, remote ->
                         mutableState.value = AdbInstallState.Running(name, AdbInstallStage.UPLOAD)
