@@ -102,7 +102,7 @@ public class AdbLinkController(
      * Отдельный класс: этот следит за жизнью транспорта, тот — за жизнью одной
      * сессии оболочки, и заканчиваются они по разным причинам.
      */
-    private val shellSessions = AdbTerminalController(executor, terminalWriterExecutor, diagnostics)
+    private val shellTabs = AdbTerminalTabs(executor, terminalWriterExecutor, diagnostics)
 
     /**
      * Владелец файловых операций — и читающих, и записи.
@@ -181,7 +181,11 @@ public class AdbLinkController(
     public val command: StateFlow<AdbCommandState> = mutableCommand.asStateFlow()
 
     /** Состояние интерактивной оболочки. */
-    public val terminal: StateFlow<AdbTerminalState> = shellSessions.state
+    /** Открытые вкладки оболочки. У ADB потоки независимы, поэтому их может быть несколько. */
+    public val terminalTabs: StateFlow<List<AdbTerminalTab>> = shellTabs.tabs
+
+    /** Номер показываемой вкладки. */
+    public val terminalSelected: StateFlow<Int?> = shellTabs.selected
 
     /** Состояние последней файловой операции. */
     public val files: StateFlow<AdbFileState> = fileOperations.state
@@ -435,25 +439,69 @@ public class AdbLinkController(
      * Одноразовые команды и файловые операции при этом остаются доступны:
      * каждая работает на своём логическом потоке и ждёт на своём ящике.
      */
-    public fun startShell() {
-        val live = connection ?: return
-        if (shellSessions.active) return
-        shellSessions.start(live)
-    }
+    /**
+     * Оболочка: открыть, показать, закрыть, говорить.
+     *
+     * Сгруппированы в одну вещь по той же причине, что и файловые действия:
+     * их стало семь, и семь методов об одном на владельце соединения — это уже
+     * не его предмет. Владелец остаётся владельцем связи, а оболочка получает
+     * свой вход.
+     */
+    public val shell: ShellActions = ShellActions()
 
-    /** Передаёт строку в оболочку. */
-    public fun sendShellInput(text: String) {
-        shellSessions.sendInput(text)
-    }
+    /** @suppress группировка действий оболочки; своего состояния не имеет. */
+    public inner class ShellActions internal constructor() {
 
-    /** Прерывает текущую команду в оболочке, не закрывая её. */
-    public fun interruptShell() {
-        shellSessions.interrupt()
-    }
+        /**
+         * Открывает первую оболочку по этому соединению.
+         *
+         * Одноразовые команды и файловые операции при этом остаются доступны:
+         * каждая работает на своём логическом потоке и ждёт на своём ящике.
+         *
+         * Если оболочка уже открыта, ничего не делает: «начать работать» —
+         * намерение однократное, и повторное нажатие не должно плодить вкладки.
+         */
+        public fun start() {
+            val live = connection ?: return
+            if (shellTabs.tabs.value.isEmpty()) shellTabs.open(live)
+        }
 
-    /** Закрывает оболочку. */
-    public fun stopShell() {
-        shellSessions.stop()
+        /**
+         * Открывает ещё одну оболочку рядом с уже открытыми.
+         *
+         * Отдельно от [start]: «начать работать» и «нужна вторая» это разные
+         * намерения, и первая кнопка не должна плодить вкладки нажатием
+         * невпопад.
+         */
+        public fun openTab() {
+            val live = connection ?: return
+            shellTabs.open(live)
+        }
+
+        /** Показывает вкладку [id]. */
+        public fun selectTab(id: Int) {
+            shellTabs.select(id)
+        }
+
+        /** Закрывает вкладку [id] вместе с её сессией. */
+        public fun closeTab(id: Int) {
+            shellTabs.close(id)
+        }
+
+        /** Передаёт строку в показываемую оболочку. */
+        public fun send(text: String) {
+            shellTabs.current()?.sessions?.sendInput(text)
+        }
+
+        /** Прерывает текущую команду в показываемой оболочке, не закрывая её. */
+        public fun interrupt() {
+            shellTabs.current()?.sessions?.interrupt()
+        }
+
+        /** Закрывает показываемую оболочку, оставляя вкладку с её выводом. */
+        public fun stop() {
+            shellTabs.current()?.sessions?.stop()
+        }
     }
 
     /**
@@ -566,9 +614,9 @@ public class AdbLinkController(
         coordinator.sessions.value.firstOrNull { session -> session.generation == generation }?.targetId
 
     private fun forgetConnection() {
-        shellSessions.stop()
-        // Слушатели переживают отдельную команду, но не транспорт: проброс
-        // поверх мёртвого соединения принимал бы клиентов в никуда.
+        // Вкладки принадлежат соединению и пережить его не могут: оболочки
+        // устройства, которого нет, показывать нечего.
+        shellTabs.closeAll()
         // Слушатели переживают отдельную команду, но не транспорт: проброс
         // поверх мёртвого соединения принимал бы клиентов в никуда, а ожидание
         // обратного — поток, идти по которому уже некуда.

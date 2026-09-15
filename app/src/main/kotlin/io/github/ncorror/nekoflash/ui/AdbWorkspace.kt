@@ -1,5 +1,7 @@
 package io.github.ncorror.nekoflash.ui
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
@@ -12,6 +14,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import io.github.ncorror.nekoflash.R
 import io.github.ncorror.nekoflash.adb.AdbCommandState
 import io.github.ncorror.nekoflash.adb.AdbFileState
@@ -405,7 +408,16 @@ data class TerminalActions(
     val onSend: (String) -> Unit = {},
     val onInterrupt: () -> Unit = {},
     val onStop: () -> Unit = {},
+    /** Открыть ещё одну оболочку рядом с уже открытыми. */
+    val onOpenTab: () -> Unit = {},
+    /** Показать вкладку с этим номером. */
+    val onSelectTab: (Int) -> Unit = {},
+    /** Закрыть вкладку вместе с её сессией. */
+    val onCloseTab: (Int) -> Unit = {},
 )
+
+/** Вкладка оболочки на экране: номер и имя, без живых объектов. */
+data class TerminalTab(val id: Int, val title: String)
 
 /**
  * Интерактивная оболочка.
@@ -416,9 +428,15 @@ data class TerminalActions(
  * блокируют UI.
  */
 @Composable
-internal fun TerminalSection(terminal: AdbTerminalState, actions: TerminalActions) {
+internal fun TerminalSection(
+    terminal: AdbTerminalState,
+    tabs: List<TerminalTab>,
+    selected: Int?,
+    actions: TerminalActions,
+) {
     val input = remember { mutableStateOf("") }
 
+    TerminalTabs(tabs = tabs, selected = selected, actions = actions)
     LabelledValue(
         label = stringResource(R.string.terminal_label),
         value = when {
@@ -462,6 +480,41 @@ internal fun TerminalSection(terminal: AdbTerminalState, actions: TerminalAction
         text = stringResource(R.string.terminal_note),
         style = MaterialTheme.typography.bodySmall,
     )
+}
+
+/**
+ * Полоса вкладок оболочки.
+ *
+ * Появляется только когда оболочка открыта: одна кнопка «ещё одна» при полном
+ * отсутствии оболочек предлагала бы вторую там, где нет первой.
+ *
+ * Закрыть вкладку можно и когда она одна: «закрыть последнюю» — это обычный
+ * конец работы, и прятать кнопку значило бы заставлять оператора искать другой
+ * путь к тому же.
+ */
+@Composable
+private fun TerminalTabs(tabs: List<TerminalTab>, selected: Int?, actions: TerminalActions) {
+    if (tabs.isEmpty()) return
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Button(onClick = actions.onOpenTab) {
+            Text(stringResource(R.string.terminal_tab_open))
+        }
+        selected?.let { current ->
+            Button(onClick = { actions.onCloseTab(current) }) {
+                Text(stringResource(R.string.terminal_tab_close))
+            }
+        }
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        tabs.forEach { tab ->
+            Button(
+                onClick = { actions.onSelectTab(tab.id) },
+                enabled = tab.id != selected,
+            ) {
+                Text(tab.title)
+            }
+        }
+    }
 }
 
 /**

@@ -64,6 +64,8 @@ fun NekoFlashApp(
     adbLink: AdbLinkState = AdbLinkState.Idle,
     adbCommand: AdbCommandState = AdbCommandState.None,
     terminal: AdbTerminalState = AdbTerminalState(),
+    terminalTabs: List<TerminalTab> = emptyList(),
+    terminalSelected: Int? = null,
     files: AdbFileState = AdbFileState.None,
     install: AdbInstallState = AdbInstallState.None,
     onRescanUsb: () -> Unit = {},
@@ -98,6 +100,8 @@ fun NekoFlashApp(
             adbLink = adbLink,
             adbCommand = adbCommand,
             terminal = terminal,
+            terminalTabs = terminalTabs,
+            terminalSelected = terminalSelected,
             terminalActions = terminalActions,
             files = files,
             install = install,
@@ -189,6 +193,8 @@ private fun Workspace(
     adbLink: AdbLinkState,
     adbCommand: AdbCommandState,
     terminal: AdbTerminalState,
+    terminalTabs: List<TerminalTab>,
+    terminalSelected: Int?,
     terminalActions: TerminalActions,
     files: AdbFileState,
     install: AdbInstallState,
@@ -230,7 +236,8 @@ private fun Workspace(
                 CommandPalette(actions = paletteActions)
             }
 
-            WorkspaceDestination.TERMINAL -> TerminalWorkspace(adbLink, terminal, terminalActions)
+            WorkspaceDestination.TERMINAL ->
+                TerminalWorkspace(adbLink, terminal, terminalTabs, terminalSelected, terminalActions)
             WorkspaceDestination.OPERATIONS -> OperationsSection(panel = operations)
             WorkspaceDestination.DIAGNOSTICS -> DiagnosticsWorkspace(
                 exportStatus = exportStatus,
@@ -277,6 +284,8 @@ private fun Workspace(
 private fun TerminalWorkspace(
     adbLink: AdbLinkState,
     terminal: AdbTerminalState,
+    terminalTabs: List<TerminalTab>,
+    terminalSelected: Int?,
     actions: TerminalActions,
 ) {
     SectionHeading(
@@ -284,7 +293,7 @@ private fun TerminalWorkspace(
         style = MaterialTheme.typography.headlineMedium,
     )
     if (adbLink is AdbLinkState.Connected) {
-        TerminalSection(terminal = terminal, actions = actions)
+        TerminalSection(terminal = terminal, tabs = terminalTabs, selected = terminalSelected, actions = actions)
     } else {
         // Не «кнопка погасла», а сказано, чего не хватает: пустой экран без
         // объяснения читается как поломка.

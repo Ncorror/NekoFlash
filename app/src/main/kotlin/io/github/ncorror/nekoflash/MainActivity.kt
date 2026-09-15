@@ -29,6 +29,8 @@ import io.github.ncorror.nekoflash.ui.OperationsPanel
 import io.github.ncorror.nekoflash.ui.PaletteAction
 import io.github.ncorror.nekoflash.ui.RecentEvents
 import io.github.ncorror.nekoflash.adb.AdbLinkController
+import io.github.ncorror.nekoflash.adb.AdbTerminalState
+import io.github.ncorror.nekoflash.adb.AdbTerminalTab
 import io.github.ncorror.nekoflash.fastboot.FastbootConsoleState
 import io.github.ncorror.nekoflash.fastboot.FastbootLinkController
 import io.github.ncorror.nekoflash.fastboot.FastbootLinkState
@@ -47,10 +49,12 @@ import io.github.ncorror.nekoflash.ui.RebootPanel
 import io.github.ncorror.nekoflash.ui.ReversePanel
 import io.github.ncorror.nekoflash.ui.SideloadPanel
 import io.github.ncorror.nekoflash.ui.TerminalActions
+import io.github.ncorror.nekoflash.ui.TerminalTab
 import io.github.ncorror.nekoflash.ui.WelcomeScreen
 import io.github.ncorror.nekoflash.ui.theme.NekoFlashTheme
 import io.github.ncorror.nekoflash.usb.api.UsbClaimResult
 import io.github.ncorror.nekoflash.usb.api.UsbSessionCoordinator
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -127,7 +131,9 @@ class MainActivity : ComponentActivity() {
         val linkState by adbLink.state.collectAsState()
         val scan by coordinator.lastScan.collectAsState()
         val commandState by adbLink.command.collectAsState()
-        val terminalState by adbLink.terminal.collectAsState()
+        val terminalTabs by adbLink.terminalTabs.collectAsState()
+        val terminalSelected by adbLink.terminalSelected.collectAsState()
+        val terminalState = shownTerminalState(terminalTabs.firstOrNull { it.id == terminalSelected })
         val fileState by adbLink.files.collectAsState()
         val installState by adbLink.install.collectAsState()
         val fastbootState by fastbootLink.state.collectAsState()
@@ -166,6 +172,8 @@ class MainActivity : ComponentActivity() {
             adbLink = linkState,
             adbCommand = commandState,
             terminal = terminalState,
+            terminalTabs = terminalTabs.map { tab -> TerminalTab(tab.id, tab.title) },
+            terminalSelected = terminalSelected,
             terminalActions = terminalActions(adbLink),
             files = fileState,
             install = installState,
@@ -551,11 +559,28 @@ private fun fileActions(link: AdbLinkController): FileActions {
 private const val APK_MIME = "application/vnd.android.package-archive"
 
 private fun terminalActions(link: AdbLinkController) = TerminalActions(
-    onStart = link::startShell,
-    onSend = link::sendShellInput,
-    onInterrupt = link::interruptShell,
-    onStop = link::stopShell,
+    onStart = link.shell::start,
+    onSend = link.shell::send,
+    onInterrupt = link.shell::interrupt,
+    onStop = link.shell::stop,
+    onOpenTab = link.shell::openTab,
+    onSelectTab = link.shell::selectTab,
+    onCloseTab = link.shell::closeTab,
 )
+
+/**
+ * Состояние показываемой вкладки.
+ *
+ * Собрано здесь, а не слиянием всех вкладок в один снимок: слить значило бы
+ * пересобирать общий объект на каждый пришедший байт любой из оболочек, а
+ * экран показывает одну. Когда вкладок нет, отдаётся пустое состояние — это не
+ * заглушка, а правда: показывать нечего.
+ */
+@Composable
+private fun shownTerminalState(tab: AdbTerminalTab?): AdbTerminalState {
+    val flow = remember(tab) { tab?.sessions?.state ?: MutableStateFlow(AdbTerminalState()) }
+    return flow.collectAsState().value
+}
 
 /** Преобразует технический результат claim в короткое UI-сообщение. */
 private fun claimAction(
