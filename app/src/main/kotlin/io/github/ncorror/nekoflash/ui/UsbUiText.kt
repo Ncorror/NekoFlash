@@ -6,6 +6,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.res.stringResource
@@ -62,6 +63,25 @@ internal fun SectionHeading(text: String, style: TextStyle = MaterialTheme.typog
         modifier = Modifier.semantics { heading() },
     )
 }
+
+/**
+ * Помечает раздел как одно место для обхода.
+ *
+ * `isTraversalGroup` говорит TalkBack, что содержимое раздела проходится
+ * целиком, прежде чем уйти в следующий, а не перемешивается с соседним по
+ * положению на экране. На широкой раскладке, где карточки стоят рядом, без
+ * этого обход прыгает слева направо через оба раздела сразу.
+ *
+ * Та же мысль, что и у заголовков (`heading`), только на шаг крупнее: там —
+ * «прыгнуть к разделу», здесь — «не выпасть из него по дороге».
+ *
+ * Модификатором, а не своей карточкой: у разделов уже есть свои отступы, и
+ * подменять их общим значило бы переверстать экран ради семантики.
+ *
+ * Порядок обхода проверяется только на устройстве, с включённым TalkBack;
+ * здесь он **написан**, и заявлять его доказанным до прогона нельзя.
+ */
+internal fun Modifier.sectionGroup(): Modifier = semantics { isTraversalGroup = true }
 
 @Composable
 internal fun localizedSessionState(state: UsbSessionState): String = stringResource(
