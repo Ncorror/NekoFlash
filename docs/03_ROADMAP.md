@@ -23,7 +23,7 @@ Bootstrap acceptance criteria:
 - [x] repository hygiene and documentation-consistency checks;
 - [x] CI wired to `production-reset` and configured to run bootstrap gates plus `test lint assembleDebug`;
 - [x] minimal founding-model tests;
-- [ ] authoritative Gradle `test lint assembleDebug` pass on a runner with Android SDK/dependency access;
+- [x] authoritative Gradle `test lint assembleDebug` pass on a runner with Android SDK/dependency access;
 - [ ] visual verification of Welcome on Android hardware/emulator.
 
 Phase 1 is not complete until the unchecked gates are closed. ADB/Fastboot implementation is forbidden before Phase 1 bootstrap is closed.
@@ -34,6 +34,10 @@ GitHub Actions run `95185983331` for commit `99bfee22be8f821c404fa64654580881c2b
 
 GitHub Actions run `95189797254` for commit `61d9b3a692d0c85105ec3b0c8d3fe345d004b24d` successfully provisioned the Android SDK, passed the repository/localization/documentation gates, downloaded Gradle 9.5.0 and entered `test lint assembleDebug`. It then failed at `:app:extractDebugSupportedLocales` because automatic locale-config generation was enabled without the required `app/src/main/res/resources.properties` default-locale declaration. This is a Phase 1 bootstrap configuration defect; no complete Gradle PASS is claimed. The corrective changeset adds `unqualifiedResLocale=en` and makes the localization gate enforce that invariant.
 
+GitHub Actions run `95193972365` for commit `99a34bdff03c8401e570a8ef780176508b8dd05c` closed the authoritative build gate: repository hygiene, EN/RU/default-locale and documentation-consistency checks passed; Gradle 9.5.0 completed `test lint assembleDebug` successfully; `:core:model:test`, `:core:diagnostics:test`, `:app:assembleDebug` and `:app:lint` all completed without failure. The run reported `BUILD SUCCESSFUL` with 58 actionable tasks (57 executed, 1 from cache).
+
+The CI workflow now publishes the generated debug APK as a short-lived artifact solely to make the remaining Welcome visual gate reproducible on Android hardware/emulator. This does not add a product module or protocol implementation.
+
 ## Next minimal step
 
-Rerun the authoritative `production-reset` workflow after the default-locale fix, then close only any concrete build/lint/test defect that remains. Do not add ADB/Fastboot implementation until the full Phase 1 bootstrap gates are green and recorded in this file and `04_HARDWARE_EVIDENCE.md`.
+Run the updated `production-reset` workflow, download its debug APK artifact, and visually verify the Welcome screen on Android hardware/emulator against the byte-identical Legacy JPEG. If that visual gate passes, record the evidence and close Phase 1. Do not add ADB/Fastboot implementation before that closure.
