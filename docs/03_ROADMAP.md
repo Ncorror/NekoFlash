@@ -30,6 +30,8 @@ Phase 1 is not complete until the unchecked gates are closed. ADB/Fastboot imple
 
 Bootstrap verification on 2026-09-16: repository hygiene, EN/RU parity and documentation consistency passed; the JVM core sources compiled with the local Kotlin compiler and a smoke check passed. The Gradle command did not reach project configuration because this environment could not resolve `services.gradle.org`, so no Gradle test/lint/assemble PASS is claimed.
 
+GitHub Actions run `95185983331` for commit `99bfee22be8f821c404fa64654580881c2b1c902` reached the Android SDK setup but stopped before Gradle because the workflow requested the obsolete API-37 package identifier `platforms;android-37`. The runner's `sdkmanager` requires the minor-aware package `platforms;android-37.0`. This is a CI provisioning defect; no project build/test/lint result is inferred from that failed run.
+
 ## Next minimal step
 
-Push the bootstrap changeset to `production-reset`, let authoritative Android CI run the bootstrap gates plus `test lint assembleDebug`, close only resulting build/lint defects without adding protocol code, then record that exact result in this file and `04_HARDWARE_EVIDENCE.md`.
+Fix only the API-37 SDK package provisioning in CI, rerun the authoritative `production-reset` workflow for the resulting commit, then close only any concrete build/lint/test defects without adding protocol code. Record the exact rerun result in this file and `04_HARDWARE_EVIDENCE.md`.

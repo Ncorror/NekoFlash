@@ -38,5 +38,6 @@ The rewrite branch `production-reset` was created from that exact commit before 
 - `./gradlew test lint assembleDebug`: NOT RUN TO PROJECT CONFIGURATION. The wrapper failed while fetching Gradle 9.5.0 because `services.gradle.org` could not be resolved in this environment. This is an environment limitation, not a build PASS or a product failure.
 - New hardware runs: none.
 - CI definition for the rewrite branch now targets `production-reset` and includes `./gradlew --no-daemon test lint assembleDebug`; no CI PASS is claimed until GitHub executes that exact changeset.
+- GitHub Actions run `95185983331` on commit `99bfee22be8f821c404fa64654580881c2b1c902`: CI checkout and JDK setup passed; Android SDK license acceptance and `platform-tools` installation passed; provisioning then failed before Gradle with `Warning: Failed to find package 'platforms;android-37'`. The corrective CI baseline is `platforms;android-37.0` with AGP 9.3-compatible Build Tools `36.0.0`. This run is evidence of a CI provisioning defect only; it is not a product build failure and not a build PASS.
 
 Public GitHub check on 2026-09-16 found the snapshot commit page for `e89d61e405ac3c5059d0cf8bc420879cc508de9f` and the public `main` page still showed the same Phase 5-era tree/status. No visible post-snapshot drift was found; the exact snapshots remain the evidence authority.
