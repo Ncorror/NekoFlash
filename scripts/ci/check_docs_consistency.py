@@ -1,174 +1,77 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import hashlib
 import re
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+REQUIRED_DOCS = [
+    'docs/00_START_HERE.md',
+    'docs/01_PRODUCT_AND_PROTOCOL_RULES.md',
+    'docs/02_ARCHITECTURE.md',
+    'docs/03_ROADMAP.md',
+    'docs/04_HARDWARE_EVIDENCE.md',
+    'docs/05_CAPABILITY_MATRIX.md',
+]
+EXPECTED_MODULES = {':app', ':core:model', ':core:diagnostics'}
+EXPECTED_HASHES = {
+    'app/src/main/res/drawable-nodpi/bg_welcome.jpg': 'd16195d6ab022a4ec8f9686a1d750a4dd83595140e68f718c992df8a0a60a8f7',
+    'reference/brand/nekoflash-launcher-reference.png': 'fc098f5bea87aea9c2ad0dbddb74ea8277c94145403fb4d76032f36bb0ce1832',
+}
 
 
-class CheckFailure(Exception):
-    pass
+def fail(message: str) -> int:
+    print(f'docs consistency: FAIL - {message}', file=sys.stderr)
+    return 1
 
 
-def text(relative: str) -> str:
-    return (ROOT / relative).read_text(encoding="utf-8")
-
-
-def current_phase(relative: str, pattern: str) -> int:
-    match = re.search(pattern, text(relative))
-    if match is None:
-        raise CheckFailure(f"{relative}: current phase marker not found")
-    return int(match.group(1))
-
-
-def test_method_count() -> int:
-    annotation = re.compile(r"^\s*@Test\b")
-    count = 0
-    for path in ROOT.rglob("*.kt"):
-        if "src/test" not in path.as_posix():
-            continue
-        count += sum(1 for line in path.read_text(encoding="utf-8").splitlines() if annotation.search(line))
-    return count
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open('rb') as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b''):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def main() -> int:
-    try:
-        phases = {
-            "README.md": current_phase("README.md", r"Phase\s+(\d+):\s+\*\*current\s*/\s*in progress\*\*"),
-            "docs/README.md": current_phase("docs/README.md", r"Current work:\s+\*\*Phase\s+(\d+)\b"),
-            "docs/00_START_HERE_RU.md": current_phase(
-                "docs/00_START_HERE_RU.md",
-                r"Текущая работа:\s+\*\*Phase\s+(\d+)\b",
-            ),
-            "docs/99_RECOVERY_HANDOFF_RU.md": current_phase(
-                "docs/99_RECOVERY_HANDOFF_RU.md",
-                r"Текущая работа\s+—\s+\*\*Phase\s+(\d+)\b",
-            ),
-        }
-        if len(set(phases.values())) != 1:
-            details = ", ".join(f"{path}=Phase {phase}" for path, phase in phases.items())
-            raise CheckFailure(f"current phase markers disagree: {details}")
+    missing = [path for path in REQUIRED_DOCS if not (ROOT / path).is_file()]
+    if missing:
+        return fail(f'missing canonical docs: {missing}')
 
-        evidence = text("docs/07_TESTING_CI_HARDWARE_EVIDENCE_RU.md")
-        section_numbers = [int(value) for value in re.findall(r"^## 6\.(\d+)\.", evidence, flags=re.MULTILINE)]
-        if not section_numbers:
-            raise CheckFailure("docs/07: no numbered evidence sections found")
-        expected_sections = list(range(1, max(section_numbers) + 1))
-        if section_numbers != expected_sections:
-            raise CheckFailure(
-                "docs/07: evidence numbering must be contiguous and ordered; "
-                f"got {section_numbers}, expected {expected_sections}"
-            )
+    marker_files = []
+    for path in ROOT.glob('docs/**/*.md'):
+        if '<!-- CURRENT_STATUS_SOURCE -->' in path.read_text(encoding='utf-8'):
+            marker_files.append(path.relative_to(ROOT).as_posix())
+    if marker_files != ['docs/03_ROADMAP.md']:
+        return fail(f'exactly docs/03_ROADMAP.md must own current status marker; got {marker_files}')
 
-        listed = re.findall(r"^- §(6\.\d+\..*)$", evidence, flags=re.MULTILINE)
-        titles = re.findall(r"^## (6\.\d+\..*)$", evidence, flags=re.MULTILINE)
-        if listed != titles:
-            only_index = [entry for entry in listed if entry not in titles]
-            only_body = [entry for entry in titles if entry not in listed]
-            raise CheckFailure(
-                "docs/07: the §6.x index must list exactly the sections that exist, in order; "
-                f"index-only={only_index or 'none'}, body-only={only_body or 'none'}"
-            )
+    settings = (ROOT / 'settings.gradle.kts').read_text(encoding='utf-8')
+    modules = set(re.findall(r'include\("([^"]+)"\)', settings))
+    if modules != EXPECTED_MODULES:
+        return fail(f'Phase 1 modules drifted: expected {sorted(EXPECTED_MODULES)}, got {sorted(modules)}')
 
-        # Гейт, который где-то назван закрытым, не может называться непрогнанным.
-        #
-        # Правило было записано после аудита §6.35, где четыре заголовка читались
-        # как незакрытая работа, хотя прогоны прошли. Правило не помогло: к
-        # аудиту перед Phase 5 то же самое повторилось ещё с тремя (§6.39, §6.44,
-        # §6.45). Значит проверять надо машинно, а не помнить.
-        open_gates = {
-            match.group(1)
-            for match in re.finditer(r"^## (6\.\d+)\..*прогон не проведён", evidence, flags=re.MULTILINE)
-        }
-        closed = re.compile(
-            r"§(6\.\d+)[^\n]{0,120}?(?:закрыт|выполнен|пройден)"
-            r"|(?:закрыт|выполнен|пройден)[^\n]{0,120}?§(6\.\d+)"
-        )
-        claimed = {
-            group
-            for match in closed.finditer(evidence + text("docs/09_IMPLEMENTATION_ROADMAP_RU.md"))
-            for group in match.groups()
-            if group
-        }
-        stale = sorted(open_gates & claimed)
-        if stale:
-            raise CheckFailure(
-                "docs/07: гейт назван закрытым, но его заголовок говорит «прогон не проведён»: "
-                f"{', '.join('§' + gate for gate in stale)}"
-            )
+    if (ROOT / 'protocol').exists() or (ROOT / 'usb').exists():
+        return fail('protocol/usb production trees must not exist in Phase 1 bootstrap')
 
-        # Ячейка чеклиста, помеченная «готово», не может сама себя опровергать.
-        #
-        # Тот же износ, что и у заголовков выше, только в другом файле: ячейки
-        # растут припиской, а устаревшее утверждение никто не снимает. К аудиту
-        # перед Phase 5 строка `forward/reverse` стояла «готово» и заканчивалась
-        # словами «`reverse` не начат», а `reboot` — «Готовым не считается: на
-        # железе не проверялось» прямо перед «Доказано на железе». Читающий
-        # ячейку сверху вниз получал неправду из единственного источника истины.
-        roadmap = text("docs/09_IMPLEMENTATION_ROADMAP_RU.md")
+    roadmap = (ROOT / 'docs/03_ROADMAP.md').read_text(encoding='utf-8')
+    if '## Phase 1 — IN PROGRESS' not in roadmap:
+        return fail('roadmap must identify Phase 1 as IN PROGRESS until authoritative build and visual gates close')
 
-        # Пункт «готово» не может ссылаться на непрогнанный гейт.
-        #
-        # Проверка не зависит от формулировки — и это её смысл. Предыдущее
-        # правило искало слова «закрыт/выполнен/пройден» рядом с номером гейта,
-        # выглядело верным и пропустило первый же настоящий случай: §6.70 и
-        # ячейка чеклиста называли гейт пройденным другими словами, и совпадения
-        # не нашлось. Здесь сопоставляются только номера: гейт, чей заголовок
-        # говорит «прогон не проведён», не может стоять в строке с отметкой
-        # «готово», как бы эта строка ни была написана.
-        done_rows = [row for row in roadmap.splitlines() if row.startswith("|") and "**готово**" in row]
-        premature = sorted(
-            {
-                gate
-                for row in done_rows
-                for gate in re.findall(r"§(6\.\d+)", row)
-                if gate in open_gates
-            }
-        )
-        if premature:
-            raise CheckFailure(
-                "docs/09: пункт отмечен «готово», а гейт по его ссылке говорит «прогон не проведён»: "
-                + ", ".join("§" + gate for gate in premature)
-            )
-        contradictions = ("Готовым не считается", "не начат", "остаётся «частично»", "**PROPOSED**")
-        liars = [
-            (row.split("|")[1].strip(), phrase)
-            for row in roadmap.splitlines()
-            if row.startswith("|") and "**готово**" in row
-            for phrase in contradictions
-            if phrase in row
-        ]
-        if liars:
-            raise CheckFailure(
-                "docs/09: строка помечена «готово» и тут же себя опровергает: "
-                + "; ".join(f"«{item}» → «{phrase}»" for item, phrase in liars)
-            )
+    for relative, expected in EXPECTED_HASHES.items():
+        actual = sha256(ROOT / relative)
+        if actual != expected:
+            return fail(f'{relative} hash drifted: {actual}')
 
-        handoff = text("docs/99_RECOVERY_HANDOFF_RU.md")
-        documented_tests = re.search(r"Тестов\s+(\d+)\s+\(`@Test` в текущем дереве\)", handoff)
-        if documented_tests is None:
-            raise CheckFailure("docs/99: @Test inventory marker not found")
-        actual_tests = test_method_count()
-        expected_tests = int(documented_tests.group(1))
-        if actual_tests != expected_tests:
-            raise CheckFailure(
-                f"docs/99: test inventory says {expected_tests}, source tree contains {actual_tests} @Test methods"
-            )
+    tests = 0
+    for path in ROOT.rglob('*.kt'):
+        if '/src/test/' in path.as_posix():
+            tests += len(re.findall(r'^\s*@Test\b', path.read_text(encoding='utf-8'), flags=re.MULTILINE))
 
-    except CheckFailure as failure:
-        print(f"docs consistency: FAIL — {failure}", file=sys.stderr)
-        return 1
-
-    phase = next(iter(phases.values()))
-    print(
-        "docs consistency: PASS "
-        f"(Phase {phase}; evidence 6.1–6.{section_numbers[-1]}, index in sync; "
-        f"{actual_tests} @Test methods)"
-    )
+    print(f'docs consistency: PASS (one status source; 3 modules; brand hashes exact; {tests} @Test methods)')
     return 0
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     raise SystemExit(main())

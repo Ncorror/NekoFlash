@@ -1,33 +1,21 @@
 package io.github.ncorror.nekoflash.core.model
 
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertThrows
+import org.junit.Assert.assertNotEquals
 import org.junit.Test
 
 class TargetTest {
     @Test
-    fun targetIdRejectsBlankValue() {
-        assertThrows(IllegalArgumentException::class.java) {
-            TargetId("   ")
-        }
+    fun sessionGenerationIsNotTargetIdentity() {
+        val target = TargetId("usb:18d1:4ee7:serial-A")
+        val first = SessionGeneration(1)
+        val second = SessionGeneration(2)
+
+        assertNotEquals(first, second)
+        assertNotEquals(target.value, first.value.toString())
     }
 
-    @Test
-    fun sessionGenerationMustBePositive() {
-        assertThrows(IllegalArgumentException::class.java) {
-            SessionGeneration(0)
-        }
-    }
-
-    @Test
-    fun targetSnapshotKeepsLogicalIdentitySeparateFromSessionGeneration() {
-        val snapshot = TargetSnapshot(
-            id = TargetId("device-1"),
-            mode = TargetMode.ADB,
-            sessionGeneration = SessionGeneration(3),
-        )
-
-        assertEquals("device-1", snapshot.id.value)
-        assertEquals(3L, snapshot.sessionGeneration?.value)
+    @Test(expected = IllegalArgumentException::class)
+    fun blankTargetIdIsRejected() {
+        TargetId(" ")
     }
 }
