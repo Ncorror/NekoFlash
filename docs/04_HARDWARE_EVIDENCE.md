@@ -26,9 +26,9 @@ The rewrite branch `production-reset` was created from that exact commit before 
 - Native USBFS for the rewrite does not exist yet and requires fresh validation when implemented.
 - Successful destructive Fastboot mutation for the rewrite requires an owner-approved unlocked target.
 - Rebuilt Mi Unlock requires fresh end-to-end validation.
-- Phase 1 Welcome still requires Android visual verification.
+- Phase 1 functional Welcome/Continue visual verification passed; only the closeout scrim-removal changeset still requires CI plus a quick visual smoke before Phase 1 is marked DONE.
 
-## Phase 1 bootstrap verification — 2026-09-16
+## Phase 1 verification history
 
 - Repository hygiene: PASS.
 - EN/RU resource parity: PASS (4 translatable strings per locale).
@@ -43,6 +43,9 @@ The rewrite branch `production-reset` was created from that exact commit before 
 - GitHub Actions run `95193972365` on commit `99a34bdff03c8401e570a8ef780176508b8dd05c`: repository hygiene PASS; localization PASS (`4` strings EN/RU, default locale `en`); documentation consistency PASS; Gradle 9.5.0 `test lint assembleDebug` PASS; `:core:model:test`, `:core:diagnostics:test`, `:app:assembleDebug` and `:app:lint` completed successfully; overall `BUILD SUCCESSFUL` with 58 actionable tasks (57 executed, 1 from cache). This is the authoritative Phase 1 build/test/lint PASS.
 - CI artifact publication exposes `app-debug.apk` for Welcome verification and a separate verification archive with JVM test/lint reports; neither artifact constitutes hardware evidence by itself.
 - Android visual check on 2026-09-17: the original Welcome JPEG was present, but the Compose screen used `ContentScale.Fit`, the lower overlay extended under the navigation bar, and no continuation control/path was available. Visual gate: FAIL. Root cause classification: Phase 1 presentation/bootstrap defect; JPEG asset integrity remains PASS.
+- Follow-up Android visual check on 2026-09-17 for commit `f759e25f7f8d465056678d52ddab8248d3e54d7f`: Welcome full-viewport crop PASS; title/subtitle visibility PASS; navigation-bar-safe Continue control PASS; Continue transition to the explicit Phase 1-ready shell PASS. Functional visual gate: PASS. The remaining dark bottom scrim was classified by the owner as cosmetic polish and selected for removal; JPEG integrity remains unchanged.
+- Verification artifact `NekoFlash-phase1-verification-f759e25f7f8d465056678d52ddab8248d3e54d7f.zip`: `OutcomeTest` 1/1 PASS, `TargetTest` 2/2 PASS, `InMemoryDiagnosticSinkTest` 1/1 PASS; total 4 tests, 0 failures, 0 errors, 0 skipped. Android lint: 0 errors, 8 warnings. Warning classes are baseline/version advisories (`OldTargetApi`, Gradle/AGP/Compose/Kotlin newer-version notices), `DataExtractionRules`, and `MissingApplicationIcon`. The launcher warning is consistent with the Phase 1 rule that launcher artwork stays reference-only until owner review; no warning is promoted to a capability restriction or protocol claim.
+- Documentation audit on 2026-09-17 found one real drift: roadmap/evidence still described the earlier visual FAIL after the corrected APK had passed. The closeout changeset reconciles that history, adds an explicit repository-resident new-chat recovery contract, and removes the cosmetic Welcome scrim. No architecture/module/protocol boundary drift was found.
 
 ## Deferred hardware observations for the future ADB phase
 

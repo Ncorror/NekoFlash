@@ -55,9 +55,32 @@ def main() -> int:
     if (ROOT / 'protocol').exists() or (ROOT / 'usb').exists():
         return fail('protocol/usb production trees must not exist in Phase 1 bootstrap')
 
+    start_here = (ROOT / 'docs/00_START_HERE.md').read_text(encoding='utf-8')
+    handoff_tokens = [
+        'production-reset',
+        '03_ROADMAP.md',
+        'only current phase/status authority',
+        'code/tests/docs/evidence drift audit',
+        'exact Legacy/A2/current snapshots',
+    ]
+    missing_handoff = [token for token in handoff_tokens if token not in start_here]
+    if missing_handoff:
+        return fail(f'new-session recovery contract drifted: missing {missing_handoff}')
+
+    workflow = (ROOT / '.github/workflows/android-ci.yml').read_text(encoding='utf-8')
+    workflow_tokens = [
+        'branches: [production-reset]',
+        './scripts/ci/check_all.sh',
+        'NekoFlash-phase1-debug-${{ github.sha }}',
+        'NekoFlash-phase1-verification-${{ github.sha }}',
+    ]
+    missing_workflow = [token for token in workflow_tokens if token not in workflow]
+    if missing_workflow:
+        return fail(f'CI/status contract drifted: missing {missing_workflow}')
+
     roadmap = (ROOT / 'docs/03_ROADMAP.md').read_text(encoding='utf-8')
     if '## Phase 1 — IN PROGRESS' not in roadmap:
-        return fail('roadmap must identify Phase 1 as IN PROGRESS until authoritative build and visual gates close')
+        return fail('roadmap must identify Phase 1 as IN PROGRESS until the final closeout gate closes')
 
     for relative, expected in EXPECTED_HASHES.items():
         actual = sha256(ROOT / relative)
