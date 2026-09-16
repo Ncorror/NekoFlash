@@ -47,3 +47,16 @@ jobs:
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 7
+
+      - name: Upload verification reports
+        uses: actions/upload-artifact@v7
+        with:
+          name: NekoFlash-phase1-verification-${{ github.sha }}
+          path: |
+            core/model/build/test-results/test/
+            core/model/build/reports/tests/test/
+            core/diagnostics/build/test-results/test/
+            core/diagnostics/build/reports/tests/test/
+            app/build/reports/lint-results-debug.*
+          if-no-files-found: error
+          retention-days: 7

@@ -36,8 +36,10 @@ GitHub Actions run `95189797254` for commit `61d9b3a692d0c85105ec3b0c8d3fe345d00
 
 GitHub Actions run `95193972365` for commit `99a34bdff03c8401e570a8ef780176508b8dd05c` closed the authoritative build gate: repository hygiene, EN/RU/default-locale and documentation-consistency checks passed; Gradle 9.5.0 completed `test lint assembleDebug` successfully; `:core:model:test`, `:core:diagnostics:test`, `:app:assembleDebug` and `:app:lint` all completed without failure. The run reported `BUILD SUCCESSFUL` with 58 actionable tasks (57 executed, 1 from cache).
 
-The CI workflow now publishes the generated debug APK as a short-lived artifact solely to make the remaining Welcome visual gate reproducible on Android hardware/emulator. This does not add a product module or protocol implementation.
+The CI workflow publishes the generated debug APK as a short-lived artifact solely to make the remaining Welcome visual gate reproducible on Android hardware/emulator. It also publishes a separate verification artifact containing JVM test results/reports and Android lint reports. These artifacts do not add a product module or protocol implementation.
+
+Android visual verification on 2026-09-17 found that the JPEG bytes were correct but the Compose presentation was not: `ContentScale.Fit` produced the wrong viewport treatment relative to the Legacy reference, the bottom text block was obscured by edge-to-edge navigation insets, and the bootstrap had no continuation path. This is a Phase 1 UI/bootstrap defect, not artwork drift. The corrective changeset keeps the JPEG byte-identical, restores full-viewport `Crop`, applies system-bar-safe overlays, adds a minimal Continue transition to an explicit Phase 1-ready shell, and leaves USB/ADB/Fastboot absent.
 
 ## Next minimal step
 
-Run the updated `production-reset` workflow, download its debug APK artifact, and visually verify the Welcome screen on Android hardware/emulator against the byte-identical Legacy JPEG. If that visual gate passes, record the evidence and close Phase 1. Do not add ADB/Fastboot implementation before that closure.
+Run CI for the Welcome-layout/report-artifact correction, download both the debug APK and the verification artifact, then repeat the visual check on Android hardware. Phase 1 closes only if the Welcome layout is fully visible, system bars do not cover controls, Continue reaches the Phase 1-ready shell, and the existing build/test/lint gates remain green. Do not add ADB/Fastboot implementation before that closure.

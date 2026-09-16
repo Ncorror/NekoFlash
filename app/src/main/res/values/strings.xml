@@ -4,4 +4,7 @@
     <string name="welcome_title">NekoFlash</string>
     <string name="welcome_subtitle">Professional Android host toolkit</string>
     <string name="welcome_phase">Clean rebuild · Phase 1 bootstrap</string>
+    <string name="welcome_continue">Continue</string>
+    <string name="phase1_ready_title">Phase 1 foundation ready</string>
+    <string name="phase1_ready_body">The clean production shell is running. USB, ADB and Fastboot are intentionally not implemented yet.</string>
 </resources>
