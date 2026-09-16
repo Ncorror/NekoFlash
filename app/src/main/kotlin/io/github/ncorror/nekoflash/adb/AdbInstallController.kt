@@ -69,6 +69,8 @@ public class AdbInstallController(
     private val diagnostics: DiagnosticSink = DiagnosticSink { },
 ) {
     private val mutableState = MutableStateFlow<AdbInstallState>(AdbInstallState.None)
+    private val lifecycleLock = Any()
+    private var lifecycleEpoch = 0L
 
     @Volatile
     private var running = false
@@ -92,11 +94,14 @@ public class AdbInstallController(
         options: List<String>,
         origin: () -> ArtifactSource,
     ) {
-        if (running) return
-        running = true
-        mutableState.value = AdbInstallState.Running(name, AdbInstallStage.UPLOAD)
+        val epoch = synchronized(lifecycleLock) {
+            if (running) return
+            running = true
+            mutableState.value = AdbInstallState.Running(name, AdbInstallStage.UPLOAD)
+            lifecycleEpoch
+        }
         executor.execute {
-            mutableState.value = runCatching { run(connection, name, options, origin) }
+            val result = runCatching { run(connection, name, options, origin, epoch) }
                 .getOrElse { error ->
                     AdbInstallState.Unknown(
                         name,
@@ -104,7 +109,27 @@ public class AdbInstallController(
                         error.message ?: error.javaClass.simpleName,
                     )
                 }
+            synchronized(lifecycleLock) {
+                if (lifecycleEpoch == epoch) {
+                    mutableState.value = result
+                    running = false
+                }
+            }
+        }
+    }
+
+    /** Инвалидирует установку, если её транспорт больше не принадлежит ADB owner. */
+    internal fun invalidate() {
+        synchronized(lifecycleLock) {
+            lifecycleEpoch += 1L
             running = false
+            mutableState.value = AdbInstallState.None
+        }
+    }
+
+    private fun publish(epoch: Long, state: AdbInstallState) {
+        synchronized(lifecycleLock) {
+            if (lifecycleEpoch == epoch) mutableState.value = state
         }
     }
 
@@ -113,13 +138,14 @@ public class AdbInstallController(
         name: String,
         options: List<String>,
         origin: () -> ArtifactSource,
+        epoch: Long,
     ): AdbInstallState {
         val source = origin()
         val stability = ArtifactStamps.compare(source.openedStamp, source.stamp())
         return if (stability is ArtifactStability.Changed) {
             AdbInstallState.SourceChanged(name, stability.detail)
         } else {
-            stateOf(name, push(connection, name, source, options))
+            stateOf(name, push(connection, name, source, options, epoch))
         }
     }
 
@@ -128,28 +154,42 @@ public class AdbInstallController(
         name: String,
         source: ArtifactSource,
         options: List<String>,
+        epoch: Long,
     ): AdbInstallOutcome {
         val session = connection.syncSession(diagnostics)
-        return when (val opened = session.open()) {
-            is AdbSyncOutcome.Failed -> AdbInstallOutcome.Refused(
-                AdbInstallStage.UPLOAD,
-                "${opened.reason.name}: ${opened.detail}",
-                "",
-            )
-
-            is AdbSyncOutcome.Done -> {
-                val installer = AdbInstall(
-                    diagnostics = diagnostics,
-                    shell = { command -> connection.call("shell:$command", timeoutMillis = PM_TIMEOUT_MS) },
-                    push = { _, remote ->
-                        mutableState.value = AdbInstallState.Running(name, AdbInstallStage.UPLOAD)
-                        sendTo(session, remote, source)
-                    },
+        return try {
+            when (val opened = session.open()) {
+                is AdbSyncOutcome.Failed -> AdbInstallOutcome.Refused(
+                    AdbInstallStage.UPLOAD,
+                    "${opened.reason.name}: ${opened.detail}",
+                    "",
                 )
-                val file = AdbInstallFile(source.identity.name, source.identity.sizeBytes ?: UNKNOWN_SIZE)
-                mutableState.value = AdbInstallState.Running(name, AdbInstallStage.COMMIT)
-                installer.install(file, options).also { session.close() }
+
+                is AdbSyncOutcome.Done -> {
+                    val installer = AdbInstall(
+                        diagnostics = diagnostics,
+                        shell = { command -> connection.call("shell:$command", timeoutMillis = PM_TIMEOUT_MS) },
+                        push = { _, remote ->
+                            publish(epoch, AdbInstallState.Running(name, AdbInstallStage.UPLOAD))
+                            sendTo(session, remote, source).also { failure ->
+                                // Граница COMMIT начинается только после того,
+                                // как временный APK действительно долетел. До
+                                // этого UI не должен утверждать, что pm уже
+                                // меняет пакетное состояние.
+                                if (failure == null) {
+                                    publish(epoch, AdbInstallState.Running(name, AdbInstallStage.COMMIT))
+                                }
+                            }
+                        },
+                    )
+                    val file = AdbInstallFile(source.identity.name, source.identity.sizeBytes ?: UNKNOWN_SIZE)
+                    installer.install(file, options)
+                }
             }
+        } finally {
+            // `sync:` принадлежит этой установке и закрывается при любом
+            // исходе, включая исключение провайдера/протокола.
+            session.close()
         }
     }
 

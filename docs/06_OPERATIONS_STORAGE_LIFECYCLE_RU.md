@@ -8,6 +8,8 @@ Activity/ViewModel не должны быть владельцами физич�
 
 Для длительного взаимодействия с USB target проект должен использовать подходящий Android foreground service type для connected device interaction и соблюдать актуальные platform requirements.
 
+Требование выше нормативное. **В текущем snapshot полная связка `OperationEngine` + foreground ownership фактически проведена через Sideload.** Обычные ADB file/install и Fastboot операции пока остаются controller-owned и ещё не получают автоматически durable `OperationRecord`; Operations Center поэтому не должен выдавать свою историю за полный журнал всех protocol actions. Расширение этой интеграции — отдельная работа, а не основание приписывать уже существующему UI гарантию, которой нет.
+
 ## 2. Operation record
 
 Минимальная модель:
@@ -28,6 +30,8 @@ EvidenceRefs
 ```
 
 Persistence нужна для history/evidence и честного восстановления после process death, а не для магического «resume flash с середины».
+
+**Граница мутации — durable fact.** Запись `MutationBoundary=CROSSED` должна успешно попасть в journal **до** первого I/O, который может изменить устройство. Если journal не сохранил эту запись, операция останавливается fail-closed до отправки mutating payload. Публиковать границу только в памяти, проглотить ошибку `save()` и продолжить передачу запрещено: после process death старая `NOT_CROSSED` запись превратила бы уже затронутое устройство в «не тронутое».
 
 ## 3. Process death
 

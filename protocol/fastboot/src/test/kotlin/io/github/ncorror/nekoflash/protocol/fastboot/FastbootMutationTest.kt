@@ -160,6 +160,34 @@ class FastbootMutationTest {
         assertEquals(FastbootLaneState.STALLED, lane.state)
     }
 
+
+    /** Частично отправленная mutating-команда — Unknown, а не NotStarted. */
+    @Test
+    fun aShortMutatingCommandWriteIsUnknown() {
+        val transport = FakeFastbootTransport()
+        transport.shortWriteAfter = 3
+        val lane = FastbootLane(transport)
+
+        val outcome = mutation(lane).run("erase:boot")
+
+        assertTrue(outcome is FastbootMutationOutcome.Unknown)
+        assertEquals(FastbootMutationClass.PARTITION, (outcome as FastbootMutationOutcome.Unknown).mutation)
+        assertEquals(FastbootLaneState.STALLED, lane.state)
+    }
+
+    /** USB OUT failure без byte count тоже оставляет mutating-команду Unknown. */
+    @Test
+    fun aFailedMutatingCommandWriteIsUnknown() {
+        val transport = FakeFastbootTransport()
+        transport.failWrite = true
+        val lane = FastbootLane(transport)
+
+        val outcome = mutation(lane).run("flash:boot")
+
+        assertTrue(outcome is FastbootMutationOutcome.Unknown)
+        assertEquals(FastbootLaneState.STALLED, lane.state)
+    }
+
     /** Не отправленная команда — не мутация: устройство её не видело. */
     @Test
     fun aCommandThatNeverLeftTheHostIsNotStarted() {

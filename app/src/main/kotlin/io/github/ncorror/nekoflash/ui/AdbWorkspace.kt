@@ -45,6 +45,7 @@ import io.github.ncorror.nekoflash.usb.api.UsbSession
 internal fun AdbLinkSection(
     session: UsbSession,
     adbLink: AdbLinkState,
+    connectAvailable: Boolean,
     adbCommand: AdbCommandState,
     files: AdbFileState,
     install: AdbInstallState,
@@ -77,7 +78,7 @@ internal fun AdbLinkSection(
     }
     Button(
         onClick = if (connected) onAdbDisconnect else onAdbConnect,
-        enabled = !busy,
+        enabled = !busy && (connected || connectAvailable),
     ) {
         Text(
             stringResource(
@@ -89,6 +90,12 @@ internal fun AdbLinkSection(
         text = stringResource(R.string.adb_connect_hint),
         style = MaterialTheme.typography.bodySmall,
     )
+    if (!connected && !connectAvailable) {
+        Text(
+            text = stringResource(R.string.adb_owned_by_other_target),
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
     if (connected) {
         ShellSection(command = adbCommand, onRunCommand = onRunCommand)
         // Интерактивная оболочка живёт в своём разделе: она переживает

@@ -70,6 +70,28 @@ class OperationEngineTest {
         assertEquals("первый блок ушёл", boundary.detail)
     }
 
+
+    @Test(expected = IllegalStateException::class)
+    fun beginFailsClosedWhenTheInitialJournalWriteFails() {
+        OperationEngine(FailingJournal(failOnSave = 1), clock = { NOW })
+            .begin(intent(), TARGET, GENERATION)
+    }
+
+    @Test
+    fun mutationBoundaryFailureDoesNotBecomeAnInMemoryFact() {
+        val journal = FailingJournal(failOnSave = 2)
+        val engine = OperationEngine(journal, clock = { NOW })
+        val handle = engine.begin(intent(), TARGET, GENERATION)
+
+        val failure = runCatching {
+            handle.crossedMutationBoundary("первый блок ушёл", NOW)
+        }.exceptionOrNull()
+
+        assertTrue(failure is IllegalStateException)
+        assertTrue(engine.live.value.single().mutationBoundary is MutationBoundary.NotCrossed)
+        assertTrue(journal.history().records.single().mutationBoundary is MutationBoundary.NotCrossed)
+    }
+
     /** Законченная операция уходит из живых в историю. */
     @Test
     fun afinishedOperationLeavesTheLiveList() {
@@ -142,6 +164,17 @@ class OperationEngineTest {
 
         override fun save(record: io.github.ncorror.nekoflash.core.operation.OperationRecord) {
             saves += 1
+            super.save(record)
+        }
+    }
+
+
+    private class FailingJournal(private val failOnSave: Int) : InMemoryOperationJournal() {
+        private var saves = 0
+
+        override fun save(record: io.github.ncorror.nekoflash.core.operation.OperationRecord) {
+            saves += 1
+            if (saves == failOnSave) throw IllegalStateException("journal write failed")
             super.save(record)
         }
     }

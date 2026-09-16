@@ -29,7 +29,7 @@ concurrency:
 jobs:
   build:
     name: Test, lint and assemble
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout sources

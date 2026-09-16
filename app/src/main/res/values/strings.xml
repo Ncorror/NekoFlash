@@ -24,6 +24,7 @@
     <string name="usb_rescan">Rescan USB</string>
     <string name="usb_rescan_hint">Re-examines attached devices and asks for permission again where it is missing.</string>
     <string name="diagnostics_export">Export diagnostics</string>
+    <string name="diagnostics_export_sensitive">The exported ZIP is raw evidence. It can contain device/host identifiers, serials, paths, command text and protocol responses. Review it before sharing.</string>
     <string name="diagnostics_export_done">Diagnostics saved (sections: %1$d)</string>
     <string name="diagnostics_export_failed">Could not save diagnostics: %1$s</string>
     <string name="sessions_empty">No device attached. Connect a device over USB.</string>
@@ -53,6 +54,7 @@
     <string name="adb_connect">Connect over ADB</string>
     <string name="adb_disconnect">Disconnect</string>
     <string name="adb_connect_hint">A recognised device is connected automatically: the interface is claimed and the ADB handshake runs. The device may ask you to allow debugging from this host. Disconnecting stays in effect until the device is reattached.</string>
+    <string name="adb_owned_by_other_target">ADB is already active for another selected target. Select that target or disconnect it before connecting this one.</string>
     <string name="adb_state_label">ADB link</string>
     <string name="adb_state_idle">Not connected</string>
     <string name="adb_state_connecting">Handshake in progress</string>
@@ -334,5 +336,6 @@
     <string name="target_bar_label">Working with</string>
     <string name="target_bar_state">%1$s · %2$s</string>
     <string name="target_bar_others">%1$d other device(s) are plugged in. Everything below belongs to the one above — pick another to work with it instead.</string>
+    <string name="target_bar_switch_to">%1$s · %2$s · %3$s</string>
     <string name="operations_empty">No operations yet in this install. A long transfer — sideload, a file read or written — appears here while it runs and stays here after it ends, including when it ended with nothing known.</string>
 </resources>

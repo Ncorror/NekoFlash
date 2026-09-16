@@ -212,6 +212,7 @@ English и Russian являются first-class UI locales. Для каждог�
 - §6.98. Установка, отмена и вкладки прошли — 2026-09-15, POCO X3 Pro
 - §6.99. Байтов не будет вовсе — 2026-09-15, POCO F5; вилка §6.94 закрыта версией 2
 - §6.100. Аппаратный гейт: размер запроса и оживление полосы — план
+- §6.101. Аудит transport/lifecycle/multi-target после safety-патча — план; прогон не проведён
 
 ## 6.1. Phase 1 bootstrap CI evidence — 2026-08-28
 
@@ -5876,3 +5877,58 @@ Turbo, serial `4fa957f4`), **UNLOCKED**, `fastbootd`. Выгрузка `19:49:41
 Восстановление полосы после встречи с мёртвым эндпоинтом. Шаги 6–8 его
 **измеряют**, а не чинят: чинить, не зная, лечится ли это перезагрузкой шины,
 значило бы писать вслепую ровно тот код, ради которого прогон и делается.
+
+
+## 6.101. Аудит transport/lifecycle/multi-target после safety-патча — план; прогон не проведён
+
+Раздел записан **до** аппаратного прогона. Он проверяет не новую feature, а набор
+исправлений, где ложный хороший исход опаснее явной ошибки: Fastboot command OUT,
+смену владельца USB во время асинхронного probe/handshake и единый target-context
+интерфейса. Unit/regression tests недостаточны, потому что часть условий зависит от
+реального Android USB host backend.
+
+### Что изменено до прогона
+
+- Fastboot command OUT: short/failed/over-reported write больше не означает
+  `NotSent`; исход ambiguous, lane становится `STALLED`, mutating operation —
+  `Unknown`, автоматического retry нет. `NotSent` остаётся только до первого USB I/O.
+- Таймауты Fastboot и UI progress throttling используют monotonic clock.
+- `download:` отвергает размер больше `0xFFFF_FFFF` до первого байта.
+- Fastboot `probe()` и operation completion защищены lifecycle epoch; поздний результат
+  старой generation не имеет права воскресить `Connected`.
+- ADB handshake/command completion и дочерние file/install/reboot/raw/sideload controllers
+  также не публикуют UI-состояние после смены owner; у долгих передач свой cancellation token.
+- `MutationBoundary=CROSSED` Sideload должен сохраниться durable до первого mutating
+  payload; ошибка journal — отказ до провода.
+- Target Bar задаёт один `SessionGeneration` для workspace; Command Palette и protocol
+  actions не обходят этот выбор.
+
+### Минимальный аппаратный сценарий
+
+1. На двух Android-устройствах последовательно выбрать A и B. Убедиться, что при
+   активном ADB на A интерфейс B не показывает рабочую кнопку подключения и палитра
+   не отправляет ADB-команды на A, пока Target Bar показывает B.
+2. Начать ADB handshake и физически отключить цель до завершения. Старый worker не
+   должен вернуть UI в `Connected`; после подключения другой generation её состояние
+   не должно быть перезаписано старым результатом. Повторить тот же переход во время
+   `pull/push` и install: поздний progress/result старой generation не должен появиться
+   в workspace новой цели.
+3. В Fastboot начать probe и сделать disconnect/reclaim до его завершения. Поздний
+   probe не должен воскресить старый handle/state.
+4. Повторить известный DATA IN/reclaim сценарий §6.99–§6.100 и затем выполнить
+   `getvar:product`. Если transport не доказал готовность, UI/evidence не имеют права
+   называть lane `IDLE/ready`.
+5. Для command OUT fault injection (если доступный backend/стенд позволяет) получить
+   short или failed write. Проверить: `STALLED`, mutating result `Unknown`, без retry.
+6. Запустить Sideload с искусственно недоступным/непишущимся operation journal до
+   первой mutation boundary. На устройство не должен уйти payload block.
+7. Выгрузить diagnostics после каждого спорного исхода и проверить generation, lane,
+   outcome и отсутствие приписанного старой цели результата.
+
+### PASS
+
+PASS только если все late async completions отбрасываются, ambiguous Fastboot OUT
+никогда не превращается в `NotStarted/untouched`, mutation boundary не пересекается
+без durable record, а выбранная в Target Bar цель совпадает с целью каждого доступного
+protocol action. До такого прогона этот changeset считается **исправленным статически,
+но аппаратно не доказанным**.

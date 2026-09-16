@@ -76,22 +76,7 @@ fun FastbootDestructiveSection(
             modifier = Modifier.fillMaxWidth(),
         )
 
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = { pending = FastbootPlan(listOf(FastbootCommands.erase(partition))) }) {
-                Text(stringResource(R.string.fastboot_destructive_erase))
-            }
-            Button(onClick = { pending = FastbootPlan(listOf(FastbootCommands.format(partition))) }) {
-                Text(stringResource(R.string.fastboot_destructive_format))
-            }
-            Button(onClick = { pending = FastbootPlan(listOf(FastbootCommands.flash(partition))) }) {
-                Text(stringResource(R.string.fastboot_destructive_flash))
-            }
-            // План из двух шагов — тот же путь, только список длиннее, и он
-            // виден целиком до нажатия.
-            Button(onClick = { pending = FastbootPlans.flashBuffer(partition) }) {
-                Text(stringResource(R.string.fastboot_destructive_flash_and_reboot))
-            }
-        }
+        DestructiveButtons(partition = partition) { plan -> pending = plan }
 
         pending?.let { plan ->
             FastbootConfirmation(
@@ -120,6 +105,37 @@ fun FastbootDestructiveSection(
  * ответом `FAIL` и раздел не изменится, а на части загрузчиков сначала
  * передаётся весь объём данных и только потом приходит отказ (`03` §5.1).
  */
+/**
+ * Четыре входа в один и тот же путь: набранное имя раздела и план из него.
+ *
+ * Кнопка без имени раздела не нажимается — не по политике, а потому, что
+ * `erase:` без имени это не команда: устройству пришлось бы отвечать на
+ * обрезанную строку, и его отказ ничего бы не сказал ни о разделе, ни о нас.
+ * Имя очищается от краевых пробелов здесь же: `erase:boot ` и `erase:boot` —
+ * разные строки на проводе, и различать их оператору не за что.
+ */
+@Composable
+private fun DestructiveButtons(partition: String, onPending: (FastbootPlan) -> Unit) {
+    val name = partition.trim()
+    val ready = name.isNotEmpty()
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Button(onClick = { onPending(FastbootPlan(listOf(FastbootCommands.erase(name)))) }, enabled = ready) {
+            Text(stringResource(R.string.fastboot_destructive_erase))
+        }
+        Button(onClick = { onPending(FastbootPlan(listOf(FastbootCommands.format(name)))) }, enabled = ready) {
+            Text(stringResource(R.string.fastboot_destructive_format))
+        }
+        Button(onClick = { onPending(FastbootPlan(listOf(FastbootCommands.flash(name)))) }, enabled = ready) {
+            Text(stringResource(R.string.fastboot_destructive_flash))
+        }
+        // План из двух шагов — тот же путь, только список длиннее, и он виден
+        // целиком до нажатия.
+        Button(onClick = { onPending(FastbootPlans.flashBuffer(name)) }, enabled = ready) {
+            Text(stringResource(R.string.fastboot_destructive_flash_and_reboot))
+        }
+    }
+}
+
 @Composable
 private fun FastbootConfirmation(
     plan: FastbootPlan,

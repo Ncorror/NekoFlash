@@ -33,8 +33,9 @@ internal fun TargetBar(
     sessions: List<UsbSession>,
     selected: UsbSession,
     onSelect: (UsbSession) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(modifier = modifier.fillMaxWidth().sectionGroup()) {
         Column(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -58,7 +59,14 @@ internal fun TargetBar(
                 )
                 sessions.filter { it.generation != selected.generation }.forEach { other ->
                     TextButton(onClick = { onSelect(other) }) {
-                        Text(other.targetId.value)
+                        Text(
+                            stringResource(
+                                R.string.target_bar_switch_to,
+                                other.targetId.value,
+                                localizedInterfaceKind(other.candidate.kind),
+                                localizedSessionState(other.state),
+                            ),
+                        )
                     }
                 }
             }

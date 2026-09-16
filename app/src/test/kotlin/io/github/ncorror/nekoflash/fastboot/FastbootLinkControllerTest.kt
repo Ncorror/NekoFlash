@@ -6,6 +6,7 @@ import io.github.ncorror.nekoflash.protocol.fastboot.FastbootLockState
 import io.github.ncorror.nekoflash.protocol.fastboot.FastbootMode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import java.util.concurrent.Executor
 import org.junit.Test
 
 /**
@@ -179,6 +180,27 @@ class FastbootLinkControllerTest {
         assertTrue("соединение должно остаться", controller.state.value is FastbootLinkState.Connected)
     }
 
+
+    @Test
+    fun aQueuedProbeCannotReconnectAfterDisconnect() {
+        val coordinator = ClaimingCoordinator(replies = listOf("OKAYyes", "OKAYyes"))
+        val executor = QueueExecutor()
+        val controller = FastbootLinkController(
+            claim = { coordinator.claim() },
+            executor = executor,
+            diagnostics = InMemoryDiagnosticSink(),
+        )
+
+        controller.connect(SessionGeneration(11))
+        assertTrue(controller.state.value is FastbootLinkState.Probing)
+
+        controller.disconnect()
+        executor.runAll()
+
+        assertEquals(FastbootLinkState.Idle, controller.state.value)
+        assertTrue("stale handle must stay closed", coordinator.lastHandle?.closed == true)
+    }
+
     @Test
     fun disconnectingReleasesTheInterfaceAndClearsTheState() {
         val coordinator = ClaimingCoordinator(replies = listOf("OKAYno", "OKAYno"))
@@ -190,4 +212,16 @@ class FastbootLinkControllerTest {
         assertEquals(FastbootLinkState.Idle, controller.state.value)
         assertTrue("интерфейс должен быть отпущен", coordinator.lastHandle?.closed == true)
     }
+    private class QueueExecutor : Executor {
+        private val tasks = mutableListOf<Runnable>()
+
+        override fun execute(command: Runnable) {
+            tasks += command
+        }
+
+        fun runAll() {
+            while (tasks.isNotEmpty()) tasks.removeAt(0).run()
+        }
+    }
+
 }

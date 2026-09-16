@@ -38,3 +38,62 @@ internal fun mutationClassOf(outcome: FastbootMutationOutcome): FastbootMutation
 private val SECRET_ANSWERS = listOf("token")
 
 private const val HIDDEN = "не записано"
+
+internal fun describe(outcome: FastbootMutationOutcome): String = when (outcome) {
+    is FastbootMutationOutcome.Applied -> "выполнено"
+    is FastbootMutationOutcome.Refused -> "устройство отказало: ${outcome.detail}"
+    is FastbootMutationOutcome.Unconfirmed -> "OKAY без подтверждения: ${outcome.detail}"
+    is FastbootMutationOutcome.Departed -> "устройство ушло, не ответив"
+    is FastbootMutationOutcome.Unknown -> "неизвестно: ${outcome.detail}"
+    is FastbootMutationOutcome.NotStarted -> "не отправлено: ${outcome.detail}"
+}
+
+internal fun mutationFields(state: FastbootConsoleState.Mutated): Map<String, String> {
+    val outcome = state.outcome
+    val common = mapOf(
+        "command" to outcome.command,
+        "mutation" to mutationClassOf(outcome).name,
+        "lane" to state.lane.name,
+    )
+    return common + when (outcome) {
+        is FastbootMutationOutcome.Applied -> mapOf(
+            "claim" to "applied",
+            "reply" to "OKAY",
+            "payload" to journalledPayload(outcome.command, outcome.payload),
+            "infoLines" to outcome.info.size.toString(),
+            "confirmation" to (outcome.confirmation ?: "none"),
+        )
+
+        is FastbootMutationOutcome.Refused -> mapOf(
+            "claim" to "refused",
+            "reply" to "FAIL",
+            "detail" to outcome.detail,
+        )
+
+        is FastbootMutationOutcome.Unconfirmed -> mapOf(
+            "claim" to "unconfirmed",
+            "reply" to "OKAY",
+            "expected" to outcome.expected,
+            "observed" to outcome.observed,
+        )
+
+        is FastbootMutationOutcome.Departed -> mapOf(
+            "claim" to "departed",
+            "reply" to "none",
+            "waitedMillis" to outcome.waitedMillis.toString(),
+            "infoLines" to outcome.info.size.toString(),
+        )
+
+        is FastbootMutationOutcome.Unknown -> mapOf(
+            "claim" to "unknown",
+            "reply" to "none",
+            "detail" to outcome.detail,
+        )
+
+        is FastbootMutationOutcome.NotStarted -> mapOf(
+            "claim" to "not_started",
+            "reply" to "none",
+            "detail" to outcome.detail,
+        )
+    }
+}

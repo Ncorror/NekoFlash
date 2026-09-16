@@ -34,6 +34,14 @@ internal class SafArtifactSink(
     /** У SAF его нет: см. описание класса. */
     override val atomicCommit: Boolean = false
 
+    /**
+     * Результат cleanup кэшируется. [ArtifactWriter] уже вызывает [abandon] при
+     * ошибке, а UI затем спрашивает [removed], чтобы честно сообщить оператору
+     * судьбу документа. Повторно удалять тот же URI нельзя: второй delete уже
+     * вернул бы `false` и превратил успешный cleanup в ложное сообщение.
+     */
+    private var cleanupResult: Boolean? = null
+
     override fun open(): OutputStream = resolver.openOutputStream(uri, "wt")
         ?: throw IOException("провайдер не открыл $destination на запись")
 
@@ -51,7 +59,7 @@ internal class SafArtifactSink(
     }
 
     /** `true`, если недописанный документ действительно убран. */
-    fun removed(): Boolean = runCatching {
+    fun removed(): Boolean = cleanupResult ?: runCatching {
         DocumentsContract.deleteDocument(resolver, uri)
-    }.getOrDefault(false)
+    }.getOrDefault(false).also { removed -> cleanupResult = removed }
 }

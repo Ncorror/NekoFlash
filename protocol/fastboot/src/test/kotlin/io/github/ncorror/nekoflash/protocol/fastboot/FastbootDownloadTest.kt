@@ -25,6 +25,18 @@ class FastbootDownloadTest {
     }
 
     @Test
+    fun theLargestLegacyDownloadSizeFitsTheWireField() {
+        val download = FastbootDownload(FastbootLane(FakeFastbootTransport()))
+
+        assertEquals("download:ffffffff", download.command(0xFFFF_FFFFL))
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun aDownloadLargerThanUint32IsRejectedBeforeUsb() {
+        FastbootDownload(FastbootLane(FakeFastbootTransport())).command(0x1_0000_0000L)
+    }
+
+    @Test
     fun theWholePayloadReachesTheDeviceAndItAnswers() {
         val transport = FakeFastbootTransport().willReply("DATA00000010", "OKAY")
         transport.dataAfterCommands = 1
@@ -165,6 +177,19 @@ class FastbootDownloadTest {
         val unknown = outcome as FastbootDownloadOutcome.Unknown
         assertEquals(0L, unknown.bytesSent)
         assertEquals("ни одного байта данных", 0L, transport.dataBytes)
+        assertEquals(FastbootLaneState.STALLED, lane.state)
+    }
+
+    /** Failure при отправке самой команды `download:` тоже неоднозначен. */
+    @Test
+    fun aFailedDownloadCommandWriteIsUnknown() {
+        val transport = FakeFastbootTransport()
+        transport.failWrite = true
+        val lane = FastbootLane(transport)
+
+        val outcome = FastbootDownload(lane).send(payload(16), 16)
+
+        assertTrue(outcome is FastbootDownloadOutcome.Unknown)
         assertEquals(FastbootLaneState.STALLED, lane.state)
     }
 

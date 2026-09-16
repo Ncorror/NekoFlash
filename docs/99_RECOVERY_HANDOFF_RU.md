@@ -33,8 +33,8 @@
 Phase 0, 1, 2, 3 и 4 — **COMPLETE**. Текущая работа — **Phase 5: Fastboot generic
 engine**. Legacy/A2 frozen.
 
-Модулей восемь: `:app`, `:core:model`, `:core:diagnostics`, `:core:operation`,
-`:usb:api`, `:usb:android`, `:protocol:adb`, `:protocol:fastboot`. Тестов 909 (`@Test` в текущем дереве).
+Модулей девять: `:app`, `:core:model`, `:core:diagnostics`, `:core:operation`,
+`:core:artifact`, `:usb:api`, `:usb:android`, `:protocol:adb`, `:protocol:fastboot`. Тестов 918 (`@Test` в текущем дереве).
 
 **Что готово, а что нет — только в чеклисте `09_IMPLEMENTATION_ROADMAP_RU.md`.**
 Пересказа здесь намеренно нет: он уже расходился с действительностью и устаревал

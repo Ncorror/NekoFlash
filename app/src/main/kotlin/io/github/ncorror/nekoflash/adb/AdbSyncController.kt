@@ -24,6 +24,7 @@ import io.github.ncorror.nekoflash.protocol.adb.AdbRecoveryResult
 import io.github.ncorror.nekoflash.protocol.adb.AdbRecoveryVerdict
 import io.github.ncorror.nekoflash.protocol.adb.AdbSyncStat
 import java.util.concurrent.Executor
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -157,12 +158,14 @@ public class AdbSyncController(
     private val diagnostics: DiagnosticSink = DiagnosticSink { },
 ) {
     private val mutableState = MutableStateFlow<AdbFileState>(AdbFileState.None)
+    private val lifecycleLock = Any()
+    private var lifecycleEpoch = 0L
 
     @Volatile
     private var running = false
 
     @Volatile
-    private var cancelRequested = false
+    private var activeCancel: AtomicBoolean? = null
 
     /** Когда в последний раз показывали ход: строка тикает, а не мигает. */
     @Volatile
@@ -193,7 +196,25 @@ public class AdbSyncController(
      * а не промолчит (`03` §3).
      */
     public fun cancel() {
-        cancelRequested = true
+        activeCancel?.set(true)
+    }
+
+    /**
+     * Инвалидирует незавершённую операцию вместе со старым ADB transport.
+     *
+     * У каждой операции свой cancellation token: новая generation не может
+     * случайно снять отмену со старого worker, который ещё выходит из I/O.
+     */
+    internal fun invalidate() {
+        synchronized(lifecycleLock) {
+            lifecycleEpoch += 1L
+            activeCancel?.set(true)
+            activeCancel = null
+            running = false
+            shownAtMillis = 0L
+            baseline = null
+            mutableState.value = AdbFileState.None
+        }
     }
 
     /**
@@ -203,17 +224,20 @@ public class AdbSyncController(
      * состояния — экран перерисовывался бы чаще, чем его успевают читать, и
      * тратил бы на это то самое время, за которое идёт передача.
      */
-    private fun showProgress(path: String, bytes: Long, cancellable: Boolean) {
-        val now = System.currentTimeMillis()
-        if (now - shownAtMillis >= PROGRESS_INTERVAL_MS) {
-            shownAtMillis = now
-            mutableState.value = AdbFileState.Busy(path, bytes, cancellable)
+    private fun showProgress(epoch: Long, path: String, bytes: Long, cancellable: Boolean) {
+        val now = System.nanoTime() / NANOS_PER_MILLI
+        synchronized(lifecycleLock) {
+            if (lifecycleEpoch != epoch) return
+            if (now - shownAtMillis >= PROGRESS_INTERVAL_MS) {
+                shownAtMillis = now
+                mutableState.value = AdbFileState.Busy(path, bytes, cancellable)
+            }
         }
     }
 
     /** Спрашивает сведения о пути. */
     public fun describe(connection: AdbConnection, path: String) {
-        start(connection, path) { session, target ->
+        start(connection, path) { session, target, _, _ ->
             when (val outcome = session.stat(target)) {
                 is AdbSyncOutcome.Done -> AdbFileState.Described(target, outcome.value)
                 is AdbSyncOutcome.Failed -> failed(target, outcome)
@@ -230,13 +254,13 @@ public class AdbSyncController(
      * не достанет.
      */
     public fun read(connection: AdbConnection, path: String) {
-        start(connection, path) { session, target ->
+        start(connection, path) { session, target, epoch, cancel ->
             val digest = ArtifactDigest()
             var received = 0L
-            val outcome = session.receive(target, cancelRequested = { cancelRequested }) { chunk ->
+            val outcome = session.receive(target, cancelRequested = cancel::get) { chunk ->
                 digest.update(chunk)
                 received += chunk.size
-                showProgress(target, received, cancellable = true)
+                showProgress(epoch, target, received, cancellable = true)
             }
             when (outcome) {
                 is AdbSyncOutcome.Done -> AdbFileState.Read(
@@ -261,17 +285,17 @@ public class AdbSyncController(
      * оператор.
      */
     public fun readTo(connection: AdbConnection, path: String, destination: () -> ArtifactSink) {
-        start(connection, path) { session, target ->
+        start(connection, path) { session, target, epoch, cancel ->
             // Приёмник заводится **здесь**, а не в обработчике системного
             // диалога: открытие документа у чужого провайдера — это ввод-вывод,
             // и делать его на главном потоке значит подвесить экран.
             val sink = destination()
             val writer = ArtifactWriter(sink)
             var saved = 0L
-            val outcome = session.receive(target, cancelRequested = { cancelRequested }) { chunk ->
+            val outcome = session.receive(target, cancelRequested = cancel::get) { chunk ->
                 writer.accept(chunk)
                 saved += chunk.size
-                showProgress(target, saved, cancellable = true)
+                showProgress(epoch, target, saved, cancellable = true)
             }
             when (outcome) {
                 is AdbSyncOutcome.Done -> saved(target, writer.finish(), sink)
@@ -343,7 +367,7 @@ public class AdbSyncController(
      * только незнание.
      */
     public fun writeFrom(connection: AdbConnection, path: String, origin: () -> ArtifactSource) {
-        start(connection, path) { session, target ->
+        start(connection, path) { session, target, epoch, cancel ->
             // Источник открывается здесь по той же причине, что и приёмник:
             // разговор с чужим провайдером — это ввод-вывод.
             val source = origin()
@@ -351,18 +375,24 @@ public class AdbSyncController(
             if (stability is ArtifactStability.Changed) {
                 AdbFileState.SourceChanged(target, stability.detail)
             } else {
-                sendFrom(session, target, source)
+                sendFrom(session, target, source, epoch, cancel)
             }
         }
     }
 
-    private fun sendFrom(session: AdbSyncSession, path: String, source: ArtifactSource): AdbFileState =
+    private fun sendFrom(
+        session: AdbSyncSession,
+        path: String,
+        source: ArtifactSource,
+        epoch: Long,
+        cancel: AtomicBoolean,
+    ): AdbFileState =
         source.open().use { input ->
             var sent = 0L
             val outcome = session.send(
                 path = path,
                 modifiedAtSeconds = (System.currentTimeMillis() / MILLIS_PER_SECOND).toInt(),
-                cancelRequested = { cancelRequested },
+                cancelRequested = cancel::get,
             ) { buffer ->
                 input.read(buffer).coerceAtLeast(0).also { read ->
                     // Показывается **прочитанное из источника**, а не
@@ -370,7 +400,7 @@ public class AdbSyncController(
                     // самого конца, и ждать его, чтобы двинуть счётчик, значило
                     // бы держать строку неподвижной всю передачу.
                     sent += read
-                    showProgress(path, sent, cancellable = true)
+                    showProgress(epoch, path, sent, cancellable = true)
                 }
             }
             when (outcome) {
@@ -392,13 +422,16 @@ public class AdbSyncController(
      * 10).
      */
     public fun captureRecoveryBaseline(connection: AdbConnection) {
-        start(connection, AdbRecoveryInstall.PRIMARY_PATH) { session, target ->
+        start(connection, AdbRecoveryInstall.PRIMARY_PATH) { session, target, epoch, _ ->
             when (val outcome = readText(session, target)) {
                 is TextOutcome.Read -> {
-                    baseline = AdbRecoveryCorrelator.capture(AdbRecoveryLog(target, outcome.text))
+                    val captured = AdbRecoveryCorrelator.capture(AdbRecoveryLog(target, outcome.text))
+                    synchronized(lifecycleLock) {
+                        if (lifecycleEpoch == epoch) baseline = captured
+                    }
                     AdbFileState.Verdict(
                         verdict = AdbRecoveryVerdict.UNKNOWN,
-                        detail = "база снята: символов ${baseline?.prefixLength ?: 0}",
+                        detail = "база снята: символов ${captured.prefixLength}",
                         evidence = null,
                         baselineTaken = true,
                     )
@@ -417,23 +450,24 @@ public class AdbSyncController(
      * файл целиком, и выгружать его в отчёт по умолчанию незачем.
      */
     public fun readRecoveryVerdict(connection: AdbConnection) {
-        start(connection, AdbRecoveryInstall.PRIMARY_PATH) { session, target ->
+        val capturedBaseline = synchronized(lifecycleLock) { baseline }
+        start(connection, AdbRecoveryInstall.PRIMARY_PATH) { session, target, _, _ ->
             when (val outcome = readText(session, target)) {
-                is TextOutcome.Read -> verdictOf(AdbRecoveryLog(target, outcome.text))
+                is TextOutcome.Read -> verdictOf(AdbRecoveryLog(target, outcome.text), capturedBaseline)
                 is TextOutcome.Failed -> failed(target, outcome.outcome)
             }
         }
     }
 
-    private fun verdictOf(log: AdbRecoveryLog): AdbFileState {
-        val result: AdbRecoveryResult = AdbRecoveryCorrelator.verdict(listOf(log), baseline)
+    private fun verdictOf(log: AdbRecoveryLog, capturedBaseline: AdbRecoveryBaseline?): AdbFileState {
+        val result: AdbRecoveryResult = AdbRecoveryCorrelator.verdict(listOf(log), capturedBaseline)
         // Значение вердикта и одна строка доказательства — всё, что уходит
         // наружу. Текст журнала остаётся на устройстве.
         return AdbFileState.Verdict(
             verdict = result.verdict,
             detail = result.detail,
             evidence = result.evidence,
-            baselineTaken = baseline != null,
+            baselineTaken = capturedBaseline != null,
         )
     }
 
@@ -463,17 +497,17 @@ public class AdbSyncController(
      * устройстве известно ровно то, что доказано, и не больше.
      */
     public fun write(connection: AdbConnection, path: String, sizeBytes: Long) {
-        start(connection, path) { session, target ->
+        start(connection, path) { session, target, epoch, cancel ->
             val payload = GeneratedPayload(sizeBytes)
             var sent = 0L
             val outcome = session.send(
                 path = target,
                 modifiedAtSeconds = (System.currentTimeMillis() / MILLIS_PER_SECOND).toInt(),
-                cancelRequested = { cancelRequested },
+                cancelRequested = cancel::get,
             ) { buffer ->
                 payload.fill(buffer).also { filled ->
                     sent += filled
-                    showProgress(target, sent, cancellable = true)
+                    showProgress(epoch, target, sent, cancellable = true)
                 }
             }
             when (outcome) {
@@ -499,26 +533,46 @@ public class AdbSyncController(
     private fun start(
         connection: AdbConnection,
         path: String,
-        work: (AdbSyncSession, String) -> AdbFileState,
+        work: (AdbSyncSession, String, Long, AtomicBoolean) -> AdbFileState,
     ) {
         val trimmed = path.trim()
-        if (trimmed.isEmpty() || running) return
+        if (trimmed.isEmpty()) return
+        val cancel = AtomicBoolean(false)
+        val epoch = synchronized(lifecycleLock) {
+            if (running) return
+            running = true
+            activeCancel = cancel
+            shownAtMillis = 0L
+            mutableState.value = AdbFileState.Busy(trimmed)
+            lifecycleEpoch
+        }
 
-        running = true
-        cancelRequested = false
-        shownAtMillis = 0L
-        mutableState.value = AdbFileState.Busy(trimmed)
         executor.execute {
-            val session = connection.syncSession(diagnostics)
-            mutableState.value = when (val opened = session.open()) {
-                is AdbSyncOutcome.Done -> runCatching { work(session, trimmed) }.getOrElse { error ->
-                    AdbFileState.Failed(trimmed, error.message ?: error.javaClass.simpleName)
-                }
+            val result = runCatching {
+                val session = connection.syncSession(diagnostics)
+                try {
+                    when (val opened = session.open()) {
+                        is AdbSyncOutcome.Done -> runCatching {
+                            work(session, trimmed, epoch, cancel)
+                        }.getOrElse { error ->
+                            AdbFileState.Failed(trimmed, error.message ?: error.javaClass.simpleName)
+                        }
 
-                is AdbSyncOutcome.Failed -> failed(trimmed, opened)
+                        is AdbSyncOutcome.Failed -> failed(trimmed, opened)
+                    }
+                } finally {
+                    session.close()
+                }
+            }.getOrElse { error ->
+                AdbFileState.Failed(trimmed, error.message ?: error.javaClass.simpleName)
             }
-            session.close()
-            running = false
+            synchronized(lifecycleLock) {
+                if (lifecycleEpoch == epoch) {
+                    mutableState.value = result
+                    running = false
+                    if (activeCancel === cancel) activeCancel = null
+                }
+            }
         }
     }
 
@@ -530,6 +584,7 @@ public class AdbSyncController(
 
     private companion object {
         const val MILLIS_PER_SECOND = 1_000L
+        const val NANOS_PER_MILLI = 1_000_000L
 
         /**
          * Как часто двигать строку хода.

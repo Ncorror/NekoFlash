@@ -133,9 +133,9 @@ public object FastbootVariables {
     }
 
     private fun scopedPair(match: MatchResult): Pair<String, String>? {
-        val family = match.groupValues[1].lowercase()
-        val target = match.groupValues[2].trim().lowercase()
-        val value = match.groupValues[3].trim()
+        val family = match.groupValues[FAMILY_GROUP].lowercase()
+        val target = match.groupValues[TARGET_GROUP].trim().lowercase()
+        val value = match.groupValues[VALUE_GROUP].trim()
         return if (target.isBlank() || value.isBlank()) null else "$family:$target" to value
     }
 
@@ -168,4 +168,9 @@ public object FastbootVariables {
 
     private const val ALL = "all"
     private const val DONE = "done!"
+
+    /** Группы [PARTITION_SCOPED]: семейство, раздел, значение. */
+    private const val FAMILY_GROUP = 1
+    private const val TARGET_GROUP = 2
+    private const val VALUE_GROUP = 3
 }

@@ -112,8 +112,11 @@ public class AdbSideloadController(
     private val holdProcess: () -> Unit = {},
 ) {
     private val mutableState = MutableStateFlow<AdbSideloadState>(AdbSideloadState.None)
+    private val lifecycleLock = Any()
+    private var lifecycleEpoch = 0L
 
-    private val cancelling = AtomicBoolean(false)
+    @Volatile
+    private var activeCancel: AtomicBoolean? = null
 
     @Volatile
     private var running = false
@@ -139,12 +142,25 @@ public class AdbSideloadController(
         target: TargetId,
         generation: SessionGeneration,
     ) {
-        if (running) return
-        running = true
-        cancelling.set(false)
-        mutableState.value = AdbSideloadState.Running(nothingYet(sizeBytes), cancellable = true)
-        val handle = record("пакет, порождённый приложением, $sizeBytes байт", target, generation, sizeBytes)
-        executor.execute { transfer(connection, peerMode, sizeBytes, handle) }
+        val cancel = AtomicBoolean(false)
+        val epoch = synchronized(lifecycleLock) {
+            if (running) return
+            running = true
+            activeCancel = cancel
+            mutableState.value = AdbSideloadState.Running(nothingYet(sizeBytes), cancellable = true)
+            lifecycleEpoch
+        }
+        val handle = runCatching {
+            record("пакет, порождённый приложением, $sizeBytes байт", target, generation, sizeBytes)
+        }.getOrElse { failure ->
+            finishUi(
+                epoch,
+                cancel,
+                AdbSideloadState.Refused(journalFailure(failure)),
+            )
+            return
+        }
+        executor.execute { transfer(connection, peerMode, sizeBytes, handle, epoch, cancel) }
     }
 
     /**
@@ -160,13 +176,17 @@ public class AdbSideloadController(
         generation: SessionGeneration,
         sizeBytes: Long?,
     ): OperationHandle? {
-        holdProcess()
-        return operations?.begin(
+        // Durable STARTED должен существовать до фонового I/O. Если запись не
+        // удалась, Sideload не начинается вовсе — это та же fail-closed
+        // политика, что и у mutation boundary.
+        val handle = operations?.begin(
             intent = OperationIntent(OperationKind.ADB_SIDELOAD, summary),
             targetId = target,
             generation = generation,
             totalBytes = sizeBytes,
         )
+        holdProcess()
+        return handle
     }
 
     /**
@@ -176,7 +196,44 @@ public class AdbSideloadController(
      * правильно — устройство уже могло начать меняться.
      */
     public fun cancel() {
-        cancelling.set(true)
+        activeCancel?.set(true)
+    }
+
+    /**
+     * Отвязывает UI-состояние Sideload от исчезнувшего ADB transport.
+     *
+     * OperationHandle намеренно не удаляется: durable history обязана получить
+     * фактический поздний исход старой операции. Инвалидируется только экран,
+     * а старый worker получает свой собственный cancellation token.
+     */
+    internal fun invalidate() {
+        synchronized(lifecycleLock) {
+            lifecycleEpoch += 1L
+            activeCancel?.set(true)
+            activeCancel = null
+            running = false
+            mutableState.value = AdbSideloadState.None
+        }
+    }
+
+    /** Журнал не сохранил начало операции: до провода дело не доходит. */
+    private fun journalFailure(failure: Throwable): String =
+        "не удалось сохранить журнал операции: ${failure.message ?: failure.javaClass.simpleName}"
+
+    private fun publish(epoch: Long, state: AdbSideloadState) {
+        synchronized(lifecycleLock) {
+            if (lifecycleEpoch == epoch) mutableState.value = state
+        }
+    }
+
+    private fun finishUi(epoch: Long, cancel: AtomicBoolean, state: AdbSideloadState) {
+        synchronized(lifecycleLock) {
+            if (lifecycleEpoch == epoch) {
+                mutableState.value = state
+                running = false
+                if (activeCancel === cancel) activeCancel = null
+            }
+        }
     }
 
     /**
@@ -196,12 +253,25 @@ public class AdbSideloadController(
         generation: SessionGeneration,
         origin: () -> ArtifactSource,
     ) {
-        if (running) return
-        running = true
-        cancelling.set(false)
-        mutableState.value = AdbSideloadState.Staging(0L, "")
-        val handle = record("выбранный пакет", target, generation, sizeBytes = null)
-        executor.execute { prepare(connection, peerMode, stagingDirectory, origin, handle) }
+        val cancel = AtomicBoolean(false)
+        val epoch = synchronized(lifecycleLock) {
+            if (running) return
+            running = true
+            activeCancel = cancel
+            mutableState.value = AdbSideloadState.Staging(0L, "")
+            lifecycleEpoch
+        }
+        val handle = runCatching {
+            record("выбранный пакет", target, generation, sizeBytes = null)
+        }.getOrElse { failure ->
+            finishUi(
+                epoch,
+                cancel,
+                AdbSideloadState.Refused(journalFailure(failure)),
+            )
+            return
+        }
+        executor.execute { prepare(connection, peerMode, stagingDirectory, origin, handle, epoch, cancel) }
     }
 
     private fun prepare(
@@ -210,22 +280,23 @@ public class AdbSideloadController(
         stagingDirectory: File,
         origin: () -> ArtifactSource,
         handle: OperationHandle?,
+        epoch: Long,
+        cancel: AtomicBoolean,
     ) {
         handle?.state(STAGING)
-        val prepared = runCatching { ready(origin(), stagingDirectory) }.getOrElse { error ->
+        val prepared = runCatching { ready(origin(), stagingDirectory, epoch) }.getOrElse { error ->
             Ready.No("источник не открылся: ${error.message ?: error.javaClass.simpleName}")
         }
         when (prepared) {
             is Ready.No -> {
-                mutableState.value = AdbSideloadState.Refused(prepared.detail)
+                finishUi(epoch, cancel, AdbSideloadState.Refused(prepared.detail))
                 // Отказ до передачи — это провал операции, а не неизвестность:
                 // устройство не тронуто, и сказать это можно уверенно.
                 handle?.finish(OperationOutcome.FAILED, REFUSED, Instant.now())
-                running = false
             }
 
             is Ready.Yes -> try {
-                transfer(connection, peerMode, prepared.size, prepared.access, handle)
+                transfer(connection, peerMode, prepared.size, prepared.access, handle, epoch, cancel)
             } finally {
                 prepared.release()
             }
@@ -237,7 +308,7 @@ public class AdbSideloadController(
      *
      * Проверка на подмену идёт первой: если файл уже не тот, остальное неважно.
      */
-    private fun ready(source: ArtifactSource, stagingDirectory: File): Ready {
+    private fun ready(source: ArtifactSource, stagingDirectory: File, epoch: Long): Ready {
         val stability = ArtifactStamps.compare(source.openedStamp, source.stamp())
         if (stability is ArtifactStability.Changed) {
             return Ready.No("выбранный файл изменился с момента выбора: ${stability.detail}")
@@ -257,7 +328,7 @@ public class AdbSideloadController(
             )
 
             is ArtifactStagingDecision.NotNeeded -> direct(source)
-            is ArtifactStagingDecision.Required -> staged(source, stagingDirectory)
+            is ArtifactStagingDecision.Required -> staged(source, stagingDirectory, epoch)
         }
     }
 
@@ -271,10 +342,10 @@ public class AdbSideloadController(
         }
     }
 
-    private fun staged(source: ArtifactSource, stagingDirectory: File): Ready {
-        mutableState.value = AdbSideloadState.Staging(0L, source.identity.name)
+    private fun staged(source: ArtifactSource, stagingDirectory: File, epoch: Long): Ready {
+        publish(epoch, AdbSideloadState.Staging(0L, source.identity.name))
         val outcome = StagedArtifactSource.stage(source, stagingDirectory) { bytes ->
-            mutableState.value = AdbSideloadState.Staging(bytes, source.identity.name)
+            publish(epoch, AdbSideloadState.Staging(bytes, source.identity.name))
         }
         return when (outcome) {
             is ArtifactStagingOutcome.Failed -> Ready.No(outcome.detail)
@@ -291,6 +362,8 @@ public class AdbSideloadController(
         peerMode: AdbPeerMode,
         sizeBytes: Long,
         handle: OperationHandle?,
+        epoch: Long,
+        cancel: AtomicBoolean,
     ) {
         val payload = GeneratedPayload(sizeBytes)
         transfer(
@@ -299,6 +372,8 @@ public class AdbSideloadController(
             sizeBytes = sizeBytes,
             access = { offset, length -> payload.read(offset, length) },
             handle = handle,
+            epoch = epoch,
+            cancel = cancel,
         )
     }
 
@@ -308,6 +383,8 @@ public class AdbSideloadController(
         sizeBytes: Long,
         access: ArtifactRandomAccess,
         handle: OperationHandle?,
+        epoch: Long,
+        cancel: AtomicBoolean,
     ) {
         handle?.state(SENDING)
         val outcome = runCatching {
@@ -316,8 +393,8 @@ public class AdbSideloadController(
                 totalBytes = sizeBytes,
                 transportConnected = true,
                 peerIsSideload = peerMode == AdbPeerMode.SIDELOAD,
-                listener = Watcher(handle),
-                cancelRequested = cancelling::get,
+                listener = Watcher(handle, epoch),
+                cancelRequested = cancel::get,
             )
         }.getOrElse { error ->
             AdbSideloadOutcome.Failed(
@@ -326,9 +403,8 @@ public class AdbSideloadController(
             )
         }
         val pending = AdbSideloadContract.requiresVerification(outcome)
-        mutableState.value = AdbSideloadState.Finished(outcome, pending)
+        finishUi(epoch, cancel, AdbSideloadState.Finished(outcome, pending))
         handle?.finish(outcomeOf(outcome, pending), outcome.javaClass.simpleName, Instant.now())
-        running = false
     }
 
     /**
@@ -357,13 +433,16 @@ public class AdbSideloadController(
     }
 
     /** Переносит события передачи в состояние экрана. */
-    private inner class Watcher(private val handle: OperationHandle?) : AdbSideloadListener {
+    private inner class Watcher(
+        private val handle: OperationHandle?,
+        private val epoch: Long,
+    ) : AdbSideloadListener {
         @Volatile
         private var cancellable = true
 
         override fun onProgress(progress: AdbSideloadProgress) {
-            mutableState.value = AdbSideloadState.Running(progress, cancellable)
-            handle?.progress(progress.servedBytes, progress.uniqueBytes, System.currentTimeMillis())
+            publish(epoch, AdbSideloadState.Running(progress, cancellable))
+            handle?.progress(progress.servedBytes, progress.uniqueBytes, System.nanoTime() / NANOS_IN_MILLI)
         }
 
         override fun onMutationBoundary() {
@@ -374,9 +453,13 @@ public class AdbSideloadController(
             // Кнопка гаснет сразу, а не со следующим подтверждением: между
             // границей и первым подтверждением проходит целый блок, и всё это
             // время отмена была бы обещанием, которого никто не сдержит.
-            val shown = mutableState.value
-            if (shown is AdbSideloadState.Running) {
-                mutableState.value = shown.copy(cancellable = false)
+            synchronized(lifecycleLock) {
+                if (lifecycleEpoch == epoch) {
+                    val shown = mutableState.value
+                    if (shown is AdbSideloadState.Running) {
+                        mutableState.value = shown.copy(cancellable = false)
+                    }
+                }
             }
         }
     }
@@ -385,6 +468,7 @@ public class AdbSideloadController(
         const val STAGING = "STAGING"
         const val SENDING = "SENDING"
         const val REFUSED = "REFUSED"
+        const val NANOS_IN_MILLI = 1_000_000L
     }
 
     private fun nothingYet(sizeBytes: Long): AdbSideloadProgress {

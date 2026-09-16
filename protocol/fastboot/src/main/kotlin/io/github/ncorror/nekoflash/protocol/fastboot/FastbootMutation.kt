@@ -207,6 +207,12 @@ public class FastbootMutation(
                 FastbootMutationOutcome.NotStarted(command, "полоса занята: ${exchange.state}")
 
             is FastbootExchange.NotSent -> FastbootMutationOutcome.NotStarted(command, exchange.reason)
+
+            is FastbootExchange.AmbiguousSend -> FastbootMutationOutcome.Unknown(
+                command = command,
+                mutation = mutation,
+                detail = exchange.reason,
+            )
         }
     }
 

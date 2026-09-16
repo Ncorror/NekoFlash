@@ -150,6 +150,12 @@ Navigation rail/drawer может показывать напрямую:
 
 Центр — workspace, справа при достаточной ширине — live details/transcript/supporting pane.
 
+### Текущее промежуточное состояние UI
+
+Финальная IA выше остаётся целевой и **не подменяется** текущей реализацией. В текущем snapshot рабочая навигация уже вынесена из одной длинной страницы, но пока состоит из четырёх разделов `Device / Terminal / Operations / Diagnostics`; разложение на `Home / Device / Tools / Operations` и отдельные typed workspaces остаётся дальнейшей эволюцией интерфейса.
+
+При нескольких USB-сессиях один `SessionGeneration` является контекстом **всего** workspace. Target Bar, Terminal, protocol cards и Command Palette не могут выбирать цель независимо друг от друга. Если глобально одновладельческий transport (сейчас ADB или Fastboot lane) занят другой целью, UI обязан это показать и не изображать кнопку новой цели исполнимой.
+
 ## 5. Persistent Target Bar
 
 На всех рабочих экранах видим:
@@ -164,7 +170,8 @@ POCO F3 · vayu · Serial 8A... · Recovery · ADB/USB · Connected
 - bootloader/fastbootd badge;
 - warning state.
 
-Если physical session меняется, UI обязан явно показать новый state. Нельзя незаметно продолжать работу на другом target/generation.
+Если physical session меняется, UI обязан явно показать новый state. Нельзя незаметно продолжать работу на другом target/generation. Target Bar является safety-context и поэтому остаётся **вне прокручиваемого содержимого**: выбранная цель видна и у нижних destructive controls.
+Выбранная generation сохраняется только на время **текущего процесса**: configuration change не должен сам переключать оператора на соседний телефон, но numeric `SessionGeneration` нельзя восстанавливать после process death — счётчик нового процесса начинается заново, и то же число уже может принадлежать другой physical session.
 
 ## 6. Home
 

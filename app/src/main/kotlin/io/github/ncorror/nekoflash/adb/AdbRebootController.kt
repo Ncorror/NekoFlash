@@ -21,6 +21,8 @@ import kotlinx.coroutines.flow.asStateFlow
  */
 public class AdbRebootController(private val executor: Executor) {
     private val mutableState = MutableStateFlow<AdbRebootState>(AdbRebootState.None)
+    private val lifecycleLock = Any()
+    private var lifecycleEpoch = 0L
 
     /** Состояние последнего запроса. */
     public val state: StateFlow<AdbRebootState> = mutableState.asStateFlow()
@@ -36,14 +38,31 @@ public class AdbRebootController(private val executor: Executor) {
      * существуют, знает устройство, и его отказ — это ответ, а не наша ошибка.
      */
     public fun request(connection: AdbConnection, target: String) {
-        if (active) return
         val trimmed = target.trim()
-        mutableState.value = AdbRebootState.Running(trimmed)
+        val epoch = synchronized(lifecycleLock) {
+            if (mutableState.value is AdbRebootState.Running) return
+            mutableState.value = AdbRebootState.Running(trimmed)
+            lifecycleEpoch
+        }
         executor.execute {
             // Журналом заведует само соединение: `reboot_requested`,
             // `reboot_accepted` и `reboot_failed` пишет `AdbReboot`.
             val attempt = runCatching { connection.reboot(trimmed) }
-            mutableState.value = finished(trimmed, attempt)
+            publish(epoch, finished(trimmed, attempt))
+        }
+    }
+
+    /** Инвалидирует UI-состояние вместе с транспортом, которому оно принадлежало. */
+    internal fun invalidate() {
+        synchronized(lifecycleLock) {
+            lifecycleEpoch += 1L
+            mutableState.value = AdbRebootState.None
+        }
+    }
+
+    private fun publish(epoch: Long, state: AdbRebootState) {
+        synchronized(lifecycleLock) {
+            if (lifecycleEpoch == epoch) mutableState.value = state
         }
     }
 

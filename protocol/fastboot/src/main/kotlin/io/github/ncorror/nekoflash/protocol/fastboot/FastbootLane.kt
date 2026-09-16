@@ -65,8 +65,23 @@ public sealed interface FastbootExchange {
     /** По этой полосе сейчас нельзя: она занята, закрыта или потеряла рамку. */
     public data class NotReady(val state: FastbootLaneState) : FastbootExchange
 
-    /** Команду не удалось отправить. Устройство её не видело. */
+    /**
+     * Команда точно не попала на провод.
+     *
+     * Этот исход разрешён только для отказов **до** вызова transport I/O:
+     * пустая/не-ASCII/слишком длинная команда. После вызова USB OUT верхний
+     * слой не имеет доказательства, что peer не получил ни одного байта.
+     */
     public data class NotSent(val reason: String) : FastbootExchange
+
+    /**
+     * Попытка отправки началась, но её wire-effect нельзя доказать.
+     *
+     * Даже если backend вернул failure без byte count, Android API не сообщает
+     * верхнему слою, сколько байт успело дойти до peer. Поэтому это `Unknown`,
+     * а полоса становится липко [FastbootLaneState.STALLED].
+     */
+    public data class AmbiguousSend(val reason: String) : FastbootExchange
 }
 
 /** Чем кончилась передача байтов в открытой фазе данных. */
@@ -148,7 +163,7 @@ public class FastbootLane(
      * обязана быть проверяемой: «сколько ждали» без возможности задать время в
      * тесте снова стало бы числом, которое никто не сверял.
      */
-    private val elapsedMillis: () -> Long = System::currentTimeMillis,
+    private val elapsedMillis: () -> Long = { System.nanoTime() / NANOS_IN_MILLI },
     /**
      * Пауза между пустыми чтениями.
      *
@@ -160,11 +175,9 @@ public class FastbootLane(
     /**
      * Монотонные часы для измерения **одного** чтения.
      *
-     * Отдельные от [elapsedMillis] не для симметрии: бюджет считается стенными
-     * часами (так в Legacy `readGetVarResponse`), а длительность одной передачи
-     * — монотонными наносекундами (так в Legacy `readPacket`). Сводить их к
-     * одним значило бы потерять либо бюджет при переводе времени, либо
-     * разрешение на мгновенном чтении.
+     * Отдельные от [elapsedMillis] не для симметрии: бюджет измеряется
+     * монотонными миллисекундами, а длительность одной передачи — монотонными
+     * наносекундами, чтобы не терять разрешение на мгновенных чтениях.
      */
     private val nanoTime: () -> Long = System::nanoTime,
     /** Куда писать замеры чтений. По умолчанию — никуда. */
@@ -508,54 +521,24 @@ public class FastbootLane(
     }
 
     /**
-     * Что помешало этому чтению, либо `null`.
+     * Чем кончился приём: обрывом либо дочитанным терминальным кадром.
      *
-     * Приём нулевой длины отделён от отказа намеренно: устройство, замолчавшее
-     * посреди раздела, и отказ на уровне транспорта — разные наблюдения, и по
-     * журналу их надо различать.
-     *
-     * **Объявленный объём называется в каждой из причин.** Без него «не
-     * состоялся на 0» не отличить от «устройство назвало бессмысленный объём»,
-     * а по выгрузке `07` §6.89 пришлось именно это и гадать. Смещение без того,
-     * от чего оно отсчитано, — половина наблюдения.
+     * Обрыв и конец фазы разделены не стилем, а состоянием полосы: после
+     * обрыва она липко `STALLED`, после принятых байт — ждёт ответа, и только
+     * ответ решает, засчитан ли приём.
      */
-    private fun receiveProblem(
-        result: UsbTransferResult,
-        wanted: Int,
-        received: Long,
-        expectedBytes: Long,
-    ): String? = when {
-        result is UsbTransferResult.Failed ->
-            "приём не состоялся на $received из $expectedBytes: ${result.reason}"
-
-        result is UsbTransferResult.Completed && result.bytes <= 0 ->
-            "устройство перестало слать на $received из $expectedBytes"
-
-        result is UsbTransferResult.Completed && result.bytes > wanted ->
-            "неоднозначный приём на $received из $expectedBytes: принято ${result.bytes} из $wanted"
-
-        else -> null
-    }
-
     private fun settle(
         received: Long,
         expectedBytes: Long,
         failure: String?,
         inactivityMillis: Long,
-    ): FastbootReceiveOutcome = when {
-        failure != null -> {
+    ): FastbootReceiveOutcome {
+        if (failure != null) {
             currentState = FastbootLaneState.STALLED
-            FastbootReceiveOutcome.Interrupted(received, expectedBytes, failure)
+            return FastbootReceiveOutcome.Interrupted(received, expectedBytes, failure)
         }
-
-        else -> {
-            currentState = FastbootLaneState.AWAITING_FINAL
-            receivedTerminal(received, inactivityMillis)
-        }
-    }
-
-    private fun receivedTerminal(received: Long, inactivityMillis: Long): FastbootReceiveOutcome =
-        when (val exchange = readUntilTerminal(inactivityMillis)) {
+        currentState = FastbootLaneState.AWAITING_FINAL
+        return when (val exchange = readUntilTerminal(inactivityMillis)) {
             is FastbootExchange.Completed ->
                 FastbootReceiveOutcome.Completed(exchange.reply, exchange.payload, exchange.info, received)
 
@@ -570,6 +553,7 @@ public class FastbootLane(
                 FastbootReceiveOutcome.Interrupted(received, received, "непредусмотренный ответ после данных")
             }
         }
+    }
 
     /**
      * Дочитывает терминальный кадр после **принятой** фазы данных.
@@ -618,13 +602,21 @@ public class FastbootLane(
     private fun write(bytes: ByteArray, writeTimeoutMillis: Int, inactivityMillis: Long): FastbootExchange {
         val written = transport.send(bytes, 0, bytes.size, writeTimeoutMillis)
         return when {
-            written is UsbTransferResult.Failed -> FastbootExchange.NotSent("запись не состоялась: ${written.reason}")
-
-            // Короткая запись — не «почти отправили». Устройство получило
-            // обрезанную команду, и что оно с ней сделало, мы не знаем.
-            written is UsbTransferResult.Completed && written.bytes < bytes.size -> {
+            written is UsbTransferResult.Failed -> {
+                // После вызова USB OUT backend не сообщает byte count. Поэтому
+                // «не отправлено» доказать нельзя: устройство могло получить
+                // часть команды до того, как Android вернул failure.
                 currentState = FastbootLaneState.STALLED
-                FastbootExchange.NotSent("отправлено ${written.bytes} из ${bytes.size} байт")
+                FastbootExchange.AmbiguousSend("запись не завершена: ${written.reason}")
+            }
+
+            // Любой byte count, отличный от запрошенного, нарушает обещание
+            // transport write. Короткая запись могла отдать peer часть команды;
+            // count больше запроса означает нарушение backend-контракта. В обоих
+            // случаях доказать wire-effect нельзя.
+            written is UsbTransferResult.Completed && written.bytes != bytes.size -> {
+                currentState = FastbootLaneState.STALLED
+                FastbootExchange.AmbiguousSend("transport сообщил ${written.bytes} из ${bytes.size} байт")
             }
 
             else -> {
@@ -662,17 +654,6 @@ public class FastbootLane(
         }
         return outcome
     }
-
-    /**
-     * Кадр из результата приёма, либо `null`, если кадра не было.
-     *
-     * Пустой успешный приём — тоже «кадра не было»: устройство молчит, а не
-     * прислало пустоту.
-     */
-    private fun packetOf(received: UsbTransferResult, buffer: ByteArray): FastbootPacket? =
-        (received as? UsbTransferResult.Completed)
-            ?.takeIf { it.bytes > 0 }
-            ?.let { FastbootPacketCodec.parse(buffer, it.bytes) }
 
     private fun classify(packet: FastbootPacket, info: MutableList<String>): FastbootExchange? = when {
         packet.terminal -> {
@@ -764,6 +745,9 @@ public class FastbootLane(
          * вхолостую, изображая ожидание.
          */
         internal const val EMPTY_READ_PAUSE_MS: Long = 100L
+
+        /** Наносекунд в миллисекунде. */
+        private const val NANOS_IN_MILLI: Long = 1_000_000L
 
         /** Наносекунд в микросекунде. */
         private const val NANOS_IN_MICRO: Long = 1_000L

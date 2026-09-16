@@ -160,6 +160,7 @@ public class FastbootFetch(
 
             is FastbootExchange.NotReady -> ChunkOutcome.NotStarted("полоса занята: ${opened.state}")
             is FastbootExchange.NotSent -> ChunkOutcome.NotStarted(opened.reason)
+            is FastbootExchange.AmbiguousSend -> ChunkOutcome.Broken(0L, opened.reason)
         }
 
     private fun transfer(opened: FastbootExchange.DataPhase, sink: OutputStream): ChunkOutcome {

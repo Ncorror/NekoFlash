@@ -11,7 +11,6 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,7 +27,11 @@ import io.github.ncorror.nekoflash.ui.NekoFlashApp
 import io.github.ncorror.nekoflash.ui.OperationsPanel
 import io.github.ncorror.nekoflash.ui.PaletteAction
 import io.github.ncorror.nekoflash.ui.RecentEvents
+import io.github.ncorror.nekoflash.adb.AdbCommandState
+import io.github.ncorror.nekoflash.adb.AdbFileState
+import io.github.ncorror.nekoflash.adb.AdbInstallState
 import io.github.ncorror.nekoflash.adb.AdbLinkController
+import io.github.ncorror.nekoflash.adb.AdbLinkState
 import io.github.ncorror.nekoflash.adb.AdbTerminalState
 import io.github.ncorror.nekoflash.adb.AdbTerminalTab
 import io.github.ncorror.nekoflash.fastboot.FastbootConsoleState
@@ -38,6 +41,7 @@ import io.github.ncorror.nekoflash.protocol.fastboot.FastbootMode
 import io.github.ncorror.nekoflash.ui.FastbootConsolePanel
 import io.github.ncorror.nekoflash.ui.FastbootPanel
 import io.github.ncorror.nekoflash.usb.api.UsbInterfaceKind
+import io.github.ncorror.nekoflash.usb.api.UsbScanSummary
 import io.github.ncorror.nekoflash.usb.api.UsbSession
 import io.github.ncorror.nekoflash.artifact.SafArtifactSink
 import io.github.ncorror.nekoflash.artifact.SafArtifactSource
@@ -127,19 +131,9 @@ class MainActivity : ComponentActivity() {
         adbLink: AdbLinkController,
         fastbootLink: FastbootLinkController,
     ) {
-        val sessions by coordinator.sessions.collectAsState()
-        val linkState by adbLink.state.collectAsState()
-        val scan by coordinator.lastScan.collectAsState()
-        val commandState by adbLink.command.collectAsState()
-        val terminalTabs by adbLink.terminalTabs.collectAsState()
-        val terminalSelected by adbLink.terminalSelected.collectAsState()
-        val terminalState = shownTerminalState(terminalTabs.firstOrNull { it.id == terminalSelected })
-        val fileState by adbLink.files.collectAsState()
-        val installState by adbLink.install.collectAsState()
-        val fastbootState by fastbootLink.state.collectAsState()
-        val fastbootConsole by fastbootLink.console.collectAsState()
         var exportStatus by remember { mutableStateOf<String?>(null) }
-
+        var selectedGeneration by remember { mutableStateOf(application.selectedUsbGeneration) }
+        val shown = shownState(coordinator, adbLink, fastbootLink, selectedGeneration)
         val claimFailedTemplate = stringResource(R.string.usb_claim_failed)
         val saveLauncher = diagnosticsSaveLauncher(application) { message -> exportStatus = message }
 
@@ -155,28 +149,25 @@ class MainActivity : ComponentActivity() {
         // соседний: устройство подключили при свёрнутом приложении.
         RescanOnResume(coordinator)
 
-        // Соединение Fastboot забывается вместе со своей сессией.
-        //
-        // Координатор закрывает сессию сам (отключение, перезагрузка, подмена
-        // аппарата), а контроллер об этом узнать неоткуда: он получает захват
-        // одним вызовом и наружу за ним не ходит. Без этой связки полоса и
-        // ручка отключённого телефона продолжают отвечать следующему
-        // (`07` §6.96), а экран показывает чужие роль и замок.
-        ForgetClosedFastbootSession(fastbootLink, fastbootState, sessions)
-
         NekoFlashApp(
-            sessions = sessions,
-            scan = scan,
+            sessions = shown.sessions,
+            selectedSession = shown.session,
+            onSelectTarget = { session ->
+                selectedGeneration = session.generation.value
+                application.selectedUsbGeneration = session.generation.value
+            },
+            scan = shown.scan,
             usbHostSupported = packageManager.hasSystemFeature(PackageManager.FEATURE_USB_HOST),
             exportStatus = exportStatus,
-            adbLink = linkState,
-            adbCommand = commandState,
-            terminal = terminalState,
-            terminalTabs = terminalTabs.map { tab -> TerminalTab(tab.id, tab.title) },
-            terminalSelected = terminalSelected,
+            adbLink = shown.adb,
+            adbConnectAvailable = shown.connectAvailable,
+            adbCommand = shown.owned.command,
+            terminal = shown.owned.terminal,
+            terminalTabs = shown.owned.terminalTabs,
+            terminalSelected = shown.owned.terminalSelected,
             terminalActions = terminalActions(adbLink),
-            files = fileState,
-            install = installState,
+            files = shown.owned.files,
+            install = shown.owned.install,
             fileActions = fileActions(adbLink),
             onRescanUsb = { coordinator.scanAttachedDevices() },
             onClaim = claimAction(coordinator, claimFailedTemplate) { exportStatus = it },
@@ -192,17 +183,150 @@ class MainActivity : ComponentActivity() {
             operations = operationsPanel(application),
             paletteActions = paletteActions(
                 adbLink = adbLink,
+                adbState = shown.adb,
                 fastbootLink = fastbootLink,
+                fastbootState = shown.fastboot,
                 coordinator = coordinator,
                 onExport = saveLauncher::launch,
                 application = application,
             ),
             recentEvents = RecentEvents { application.recentDiagnostics() },
-            fastboot = fastbootPanel(fastbootLink, fastbootState, sessions),
-            fastbootConsole = fastbootConsolePanel(fastbootLink, fastbootConsole, fastbootState, sessions),
+            fastboot = fastbootPanel(fastbootLink, shown.fastboot, shown.session),
+            fastbootConsole = fastbootConsolePanel(fastbootLink, shown.console, shown.fastboot, shown.session),
             onExportDiagnostics = { saveLauncher.launch(application.suggestedDiagnosticsFileName()) },
         )
     }
+}
+
+/**
+ * Что экран читает у владельцев — уже приведённое к **выбранной** цели.
+ *
+ * Держится одним объектом, а не десятком `val` в теле экрана, по существу, а не
+ * ради длины: маскировать чужое состояние приходится у каждого поля, и стоит
+ * забыть один — Terminal или Файлы покажут работу с телефоном, которого на
+ * Target Bar нет. Здесь это делается один раз и в одном месте.
+ */
+private class ShownState(
+    val sessions: List<UsbSession>,
+    val scan: UsbScanSummary,
+    val session: UsbSession?,
+    val adb: AdbLinkState,
+    val connectAvailable: Boolean,
+    val owned: OwnedByAdb,
+    val fastboot: FastbootLinkState,
+    val console: FastbootConsoleState,
+)
+
+/**
+ * То, что принадлежит **живому соединению ADB**, а не устройству вообще.
+ *
+ * Отдельной группой, потому что маскируется целиком и по одной причине: когда
+ * ADB принадлежит другой цели, каждое из этих полей относится к чужому
+ * телефону. Разложенные по одному, они и маскировались по одному, и забыть
+ * одно значило бы показать чужую оболочку в рабочем месте выбранной цели.
+ */
+private class OwnedByAdb(
+    val command: AdbCommandState,
+    val terminal: AdbTerminalState,
+    val terminalTabs: List<TerminalTab>,
+    val terminalSelected: Int?,
+    val files: AdbFileState,
+    val install: AdbInstallState,
+) {
+    companion object {
+        /** Соединение принадлежит не этой цели: показывать нечего. */
+        fun none(): OwnedByAdb = OwnedByAdb(
+            command = AdbCommandState.None,
+            terminal = AdbTerminalState(),
+            terminalTabs = emptyList(),
+            terminalSelected = null,
+            files = AdbFileState.None,
+            install = AdbInstallState.None,
+        )
+    }
+}
+
+/**
+ * Собирает состояние экрана вокруг одной [SessionGeneration].
+ *
+ * Глобальные владельцы — один ADB и одна полоса Fastboot — принадлежат какой-то
+ * одной цели, и показывать их содержимое рядом с другой значило бы утверждать
+ * про неё чужое. Поэтому всё, что принадлежит соединению, обнуляется, как
+ * только выбранная цель им не владеет.
+ */
+@Composable
+private fun shownState(
+    coordinator: UsbSessionCoordinator,
+    adbLink: AdbLinkController,
+    fastbootLink: FastbootLinkController,
+    selectedGeneration: Long?,
+): ShownState {
+    val sessions by coordinator.sessions.collectAsState()
+    val scan by coordinator.lastScan.collectAsState()
+    val linkState by adbLink.state.collectAsState()
+    val commandState by adbLink.command.collectAsState()
+    val tabs by adbLink.terminalTabs.collectAsState()
+    val selectedTab by adbLink.terminalSelected.collectAsState()
+    val fileState by adbLink.files.collectAsState()
+    val installState by adbLink.install.collectAsState()
+    val fastbootState by fastbootLink.state.collectAsState()
+    val console by fastbootLink.console.collectAsState()
+
+    val session = sessions.firstOrNull { it.generation.value == selectedGeneration } ?: sessions.firstOrNull()
+    val adb = linkState.forSession(session)
+    val fastboot = fastbootState.forSession(session)
+    val owns = adb is AdbLinkState.Connected
+    return ShownState(
+        sessions = sessions,
+        scan = scan,
+        session = session,
+        adb = adb,
+        // Кнопка подключения гаснет не по политике, а потому, что второй CNXN
+        // запрещён контрактом: ADB уже принадлежит другой цели, и нажатие
+        // ничего бы не сделало. Рядом сказано, чем именно оно занято.
+        connectAvailable = linkState is AdbLinkState.Idle ||
+            linkState is AdbLinkState.Failed ||
+            adb !is AdbLinkState.Idle,
+        owned = if (!owns) {
+            OwnedByAdb.none()
+        } else {
+            OwnedByAdb(
+                command = commandState,
+                terminal = shownTerminalState(tabs.firstOrNull { it.id == selectedTab }),
+                terminalTabs = tabs.map { tab -> TerminalTab(tab.id, tab.title) },
+                terminalSelected = selectedTab,
+                files = fileState,
+                install = installState,
+            )
+        },
+        fastboot = fastboot,
+        console = if (fastboot is FastbootLinkState.Connected) console else FastbootConsoleState.Idle,
+    )
+}
+
+private fun AdbLinkState.forSession(
+    session: UsbSession?,
+): AdbLinkState {
+    if (session == null) return AdbLinkState.Idle
+    val generation = when (this) {
+        AdbLinkState.Idle -> null
+        is AdbLinkState.Connecting -> generation
+        is AdbLinkState.WaitingForAuthorization -> generation
+        is AdbLinkState.Connected -> generation
+        is AdbLinkState.Failed -> generation
+    }
+    return if (generation == session.generation) this else AdbLinkState.Idle
+}
+
+private fun FastbootLinkState.forSession(session: UsbSession?): FastbootLinkState {
+    if (session == null) return FastbootLinkState.Idle
+    val generation = when (this) {
+        FastbootLinkState.Idle -> null
+        is FastbootLinkState.Probing -> generation
+        is FastbootLinkState.Connected -> generation
+        is FastbootLinkState.Failed -> generation
+    }
+    return if (generation == session.generation) this else FastbootLinkState.Idle
 }
 
 /**
@@ -251,51 +375,69 @@ private fun RescanOnResume(coordinator: UsbSessionCoordinator) {
 @Composable
 private fun paletteActions(
     adbLink: AdbLinkController,
+    adbState: AdbLinkState,
     fastbootLink: FastbootLinkController,
+    fastbootState: FastbootLinkState,
     coordinator: UsbSessionCoordinator,
     onExport: (String) -> Unit,
     application: NekoFlashApplication,
-): List<PaletteAction> = listOf(
-    PaletteAction(stringResource(R.string.action_rescan), "usb scan скан устройства") {
-        coordinator.scanAttachedDevices()
-    },
-    PaletteAction(stringResource(R.string.action_export), "diagnostics отчёт логи bundle") {
-        onExport(application.suggestedDiagnosticsFileName())
-    },
-    PaletteAction(stringResource(R.string.action_recovery_baseline), "baseline база журнал log") {
-        adbLink.recovery.captureBaseline()
-    },
-    PaletteAction(stringResource(R.string.action_recovery_verdict), "verdict вердикт install исход") {
-        adbLink.recovery.readVerdict()
-    },
-    PaletteAction(stringResource(R.string.action_sideload_small), "sideload пакет малый small") {
-        adbLink.recovery.sideload(SMALL_PACKAGE_BYTES)
-    },
-    PaletteAction(stringResource(R.string.action_sideload_large), "sideload пакет большой large") {
-        adbLink.recovery.sideload(LARGE_PACKAGE_BYTES)
-    },
-    PaletteAction(stringResource(R.string.action_reboot_system), "reboot перезагрузка система") {
-        adbLink.requestReboot("")
-    },
-    PaletteAction(stringResource(R.string.action_reboot_bootloader), "reboot bootloader загрузчик") {
-        adbLink.requestReboot("bootloader")
-    },
-    PaletteAction(stringResource(R.string.action_reboot_recovery), "reboot recovery рекавери") {
-        adbLink.requestReboot("recovery")
-    },
-    PaletteAction(stringResource(R.string.action_reboot_sideload), "reboot sideload сайдлоад") {
-        adbLink.requestReboot("sideload")
-    },
-    PaletteAction(stringResource(R.string.action_fastboot_getvar_all), "getvar all переменные") {
-        fastbootLink.readAllVariables()
-    },
-    PaletteAction(stringResource(R.string.action_fastboot_reboot_bootloader), "fastboot reboot загрузчик") {
-        fastbootLink.runCommand("reboot-bootloader")
-    },
-    PaletteAction(stringResource(R.string.action_fastboot_reboot_fastbootd), "fastbootd userspace") {
-        fastbootLink.runCommand("reboot fastboot")
-    },
-)
+): List<PaletteAction> {
+    val actions = mutableListOf(
+        PaletteAction(stringResource(R.string.action_rescan), "usb scan скан устройства") {
+            coordinator.scanAttachedDevices()
+        },
+        PaletteAction(stringResource(R.string.action_export), "diagnostics отчёт логи bundle") {
+            onExport(application.suggestedDiagnosticsFileName())
+        },
+    )
+
+    // Protocol actions появляются только когда выбранная цель и живой owner —
+    // одна и та же generation. Палитра не имеет права обходить Target Bar.
+    if (adbState is AdbLinkState.Connected) {
+        actions += listOf(
+            PaletteAction(stringResource(R.string.action_recovery_baseline), "baseline база журнал log") {
+                adbLink.recovery.captureBaseline()
+            },
+            PaletteAction(stringResource(R.string.action_recovery_verdict), "verdict вердикт install исход") {
+                adbLink.recovery.readVerdict()
+            },
+            PaletteAction(stringResource(R.string.action_sideload_small), "sideload пакет малый small") {
+                adbLink.recovery.sideload(SMALL_PACKAGE_BYTES)
+            },
+            PaletteAction(stringResource(R.string.action_sideload_large), "sideload пакет большой large") {
+                adbLink.recovery.sideload(LARGE_PACKAGE_BYTES)
+            },
+            PaletteAction(stringResource(R.string.action_reboot_system), "reboot перезагрузка система") {
+                adbLink.requestReboot("")
+            },
+            PaletteAction(stringResource(R.string.action_reboot_bootloader), "reboot bootloader загрузчик") {
+                adbLink.requestReboot("bootloader")
+            },
+            PaletteAction(stringResource(R.string.action_reboot_recovery), "reboot recovery рекавери") {
+                adbLink.requestReboot("recovery")
+            },
+            PaletteAction(stringResource(R.string.action_reboot_sideload), "reboot sideload сайдлоад") {
+                adbLink.requestReboot("sideload")
+            },
+        )
+    }
+
+    if (fastbootState is FastbootLinkState.Connected) {
+        actions += listOf(
+            PaletteAction(stringResource(R.string.action_fastboot_getvar_all), "getvar all переменные") {
+                fastbootLink.readAllVariables()
+            },
+            PaletteAction(stringResource(R.string.action_fastboot_reboot_bootloader), "fastboot reboot загрузчик") {
+                fastbootLink.runCommand("reboot-bootloader")
+            },
+            PaletteAction(stringResource(R.string.action_fastboot_reboot_fastbootd), "fastbootd userspace") {
+                fastbootLink.runCommand("reboot fastboot")
+            },
+        )
+    }
+
+    return actions
+}
 
 /**
  * Размеры пакетов для палитры — те же, что на кнопках Sideload.
@@ -391,42 +533,17 @@ private fun MainActivity.exportDiagnostics(
  * длины, а раздувать точку входа именно тем, что легко вынести, значит начинать
  * тот путь, которым `MainActivity` Legacy дошла до 3880 строк.
  */
-/**
- * Снимает соединение, чьей сессии больше нет.
- *
- * Живёт на экране, а не в контроллере, по той же причине, по которой контроллер
- * получает захват швом: зависеть от всего USB-слоя ради одного факта значило бы
- * тащить его в каждый тест. Факт здесь один — есть ли ещё живая сессия с этой
- * generation.
- */
-@Composable
-private fun ForgetClosedFastbootSession(
-    link: FastbootLinkController,
-    state: FastbootLinkState,
-    sessions: List<UsbSession>,
-) {
-    val generation = when (state) {
-        is FastbootLinkState.Connected -> state.generation
-        is FastbootLinkState.Probing -> state.generation
-        is FastbootLinkState.Failed -> state.generation
-        FastbootLinkState.Idle -> null
-    }
-    val alive = generation != null && sessions.any { it.generation == generation }
-    LaunchedEffect(generation, alive) {
-        if (generation != null && !alive) link.forget(generation)
-    }
-}
-
 private fun fastbootPanel(
     link: FastbootLinkController,
     state: FastbootLinkState,
-    sessions: List<UsbSession>,
+    selectedSession: UsbSession?,
 ): FastbootPanel = FastbootPanel(
     state = state,
     // Generation берётся из живой сессии: опрос принадлежит тому подключению,
     // в котором он начат.
     onProbe = {
-        sessions.firstOrNull { it.candidate.kind == UsbInterfaceKind.FASTBOOT }
+        selectedSession
+            ?.takeIf { it.candidate.kind == UsbInterfaceKind.FASTBOOT }
             ?.let { session -> link.connect(session.generation) }
     },
     onDisconnect = link::disconnect,
@@ -439,7 +556,7 @@ private fun fastbootConsolePanel(
     link: FastbootLinkController,
     state: FastbootConsoleState,
     linkState: FastbootLinkState,
-    sessions: List<UsbSession>,
+    selectedSession: UsbSession?,
 ): FastbootConsolePanel {
     val resolver = LocalContext.current.contentResolver
     val pendingFetch = remember { mutableStateOf<String?>(null) }
@@ -477,7 +594,8 @@ private fun fastbootConsolePanel(
         // принадлежит тому подключению, которое есть сейчас.
         onReclaim = {
             link.disconnect()
-            sessions.firstOrNull { it.candidate.kind == UsbInterfaceKind.FASTBOOT }
+            selectedSession
+                ?.takeIf { it.candidate.kind == UsbInterfaceKind.FASTBOOT }
                 ?.let { session -> link.connect(session.generation) }
         },
         // Роль берётся из той же связи, что и в шапке, а не из отдельной

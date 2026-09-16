@@ -41,7 +41,7 @@ public data class RestoredOperation(
 public class OperationEngine(
     private val journal: OperationJournal,
     private val clock: () -> Instant = { Instant.now() },
-    private val elapsedMillis: () -> Long = { System.currentTimeMillis() },
+    private val elapsedMillis: () -> Long = { System.nanoTime() / NANOS_IN_MILLI },
 ) {
     private val counter = AtomicLong()
     private val records = ConcurrentHashMap<OperationId, OperationRecord>()
@@ -112,12 +112,15 @@ public class OperationEngine(
     }
 
     private fun store(record: OperationRecord, persist: Boolean) {
+        // Для durable state порядок принципиален: сначала подтверждаем запись,
+        // только потом публикуем её как факт в памяти. Особенно это важно для
+        // MutationBoundary.Crossed — продолжать wire mutation после failure
+        // журнала нельзя, иначе recovery сможет увидеть старое NotCrossed.
+        if (persist) journal.save(record)
+
         if (record.finished) records.remove(record.id) else records[record.id] = record
         mutableLive.value = records.values.sortedBy { it.createdAt }
-        if (persist) {
-            runCatching { journal.save(record) }
-            mutableHistory.value = journal.history().records
-        }
+        if (persist) mutableHistory.value = journal.history().records
     }
 
     private fun outcomeOf(restoration: OperationRestoration): OperationOutcome = when (restoration) {
@@ -132,6 +135,7 @@ public class OperationEngine(
     private companion object {
         const val STARTED = "STARTED"
         const val INTERRUPTED = "INTERRUPTED"
+        const val NANOS_IN_MILLI: Long = 1_000_000L
     }
 }
 

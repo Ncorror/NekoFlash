@@ -58,10 +58,13 @@ private fun NekoFlashTopBar() {
 @Composable
 fun NekoFlashApp(
     sessions: List<UsbSession> = emptyList(),
+    selectedSession: UsbSession? = sessions.firstOrNull(),
+    onSelectTarget: (UsbSession) -> Unit = {},
     scan: UsbScanSummary = UsbScanSummary.NEVER_SCANNED,
     usbHostSupported: Boolean = true,
     exportStatus: String? = null,
     adbLink: AdbLinkState = AdbLinkState.Idle,
+    adbConnectAvailable: Boolean = true,
     adbCommand: AdbCommandState = AdbCommandState.None,
     terminal: AdbTerminalState = AdbTerminalState(),
     terminalTabs: List<TerminalTab> = emptyList(),
@@ -94,10 +97,13 @@ fun NekoFlashApp(
     val workspace: @Composable (Modifier, WorkspaceDestination) -> Unit = { modifier, shown ->
         Workspace(
             sessions = sessions,
+            selectedSession = selectedSession,
+            onSelectTarget = onSelectTarget,
             scan = scan,
             usbHostSupported = usbHostSupported,
             exportStatus = exportStatus,
             adbLink = adbLink,
+            adbConnectAvailable = adbConnectAvailable,
             adbCommand = adbCommand,
             terminal = terminal,
             terminalTabs = terminalTabs,
@@ -187,10 +193,13 @@ private val RAIL_WIDTH = 240.dp
 @Composable
 private fun Workspace(
     sessions: List<UsbSession>,
+    selectedSession: UsbSession?,
+    onSelectTarget: (UsbSession) -> Unit,
     scan: UsbScanSummary,
     usbHostSupported: Boolean,
     exportStatus: String?,
     adbLink: AdbLinkState,
+    adbConnectAvailable: Boolean,
     adbCommand: AdbCommandState,
     terminal: AdbTerminalState,
     terminalTabs: List<TerminalTab>,
@@ -219,57 +228,56 @@ private fun Workspace(
     destination: WorkspaceDestination,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier = modifier
-            .verticalScroll(rememberScrollState())
-            .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp),
-    ) {
-        when (destination) {
-            WorkspaceDestination.DEVICE -> {
-                SectionHeading(
-                    text = stringResource(R.string.sessions_title),
-                    style = MaterialTheme.typography.headlineMedium,
-                )
-                // Палитра стоит над списком, а не под ним: она существует
-                // ровно затем, чтобы до знакомого действия не листать.
-                CommandPalette(actions = paletteActions)
-            }
-
-            WorkspaceDestination.TERMINAL ->
-                TerminalWorkspace(adbLink, terminal, terminalTabs, terminalSelected, terminalActions)
-            WorkspaceDestination.OPERATIONS -> OperationsSection(panel = operations)
-            WorkspaceDestination.DIAGNOSTICS -> DiagnosticsWorkspace(
+    Column(modifier = modifier) {
+        PinnedTargetBar(sessions, selectedSession, onSelectTarget)
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+        ) {
+            DestinationSection(
+                destination = destination,
                 exportStatus = exportStatus,
+                adbLink = adbLink,
+                terminal = terminal,
+                terminalTabs = terminalTabs,
+                terminalSelected = terminalSelected,
+                terminalActions = terminalActions,
+                operations = operations,
+                paletteActions = paletteActions,
                 recentEvents = recentEvents,
                 onRescanUsb = onRescanUsb,
                 onExportDiagnostics = onExportDiagnostics,
             )
+            if (destination == WorkspaceDestination.DEVICE) {
+                SessionList(
+                    sessions = sessions,
+                    scan = scan,
+                    usbHostSupported = usbHostSupported,
+                    adbLink = adbLink,
+                    adbConnectAvailable = adbConnectAvailable,
+                    adbCommand = adbCommand,
+                    files = files,
+                    install = install,
+                    fileActions = fileActions,
+                    onClaim = onClaim,
+                    onRelease = onRelease,
+                    onAdbConnect = onAdbConnect,
+                    onAdbDisconnect = onAdbDisconnect,
+                    onRunCommand = onRunCommand,
+                    reboot = reboot,
+                    rawService = rawService,
+                    forward = forward,
+                    reverse = reverse,
+                    sideload = sideload,
+                    fastboot = fastboot,
+                    fastbootConsole = fastbootConsole,
+                    selectedSession = selectedSession,
+                )
+            }
         }
-        if (destination != WorkspaceDestination.DEVICE) return@Column
-
-        SessionList(
-            sessions = sessions,
-            scan = scan,
-            usbHostSupported = usbHostSupported,
-            adbLink = adbLink,
-            adbCommand = adbCommand,
-            files = files,
-            install = install,
-            fileActions = fileActions,
-            onClaim = onClaim,
-            onRelease = onRelease,
-            onAdbConnect = onAdbConnect,
-            onAdbDisconnect = onAdbDisconnect,
-            onRunCommand = onRunCommand,
-            reboot = reboot,
-            rawService = rawService,
-            forward = forward,
-            reverse = reverse,
-            sideload = sideload,
-            fastboot = fastboot,
-            fastbootConsole = fastbootConsole,
-        )
     }
 }
 
@@ -325,12 +333,82 @@ private fun DiagnosticsWorkspace(
     BuildBaselineCard()
 }
 
+/**
+ * Target Bar **вне** прокручиваемого содержимого.
+ *
+ * Выбранная цель — safety-context, а не заголовок секции: у нижних destructive
+ * кнопок она обязана быть видна так же, как у верхних, и в Terminal, Operations
+ * и Diagnostics — тоже. Уехавшая за край строка «работаем с» означала бы, что
+ * подтверждать разрушающую команду приходится по памяти.
+ */
+@Composable
+private fun PinnedTargetBar(
+    sessions: List<UsbSession>,
+    selected: UsbSession?,
+    onSelect: (UsbSession) -> Unit,
+) {
+    if (selected == null) return
+    TargetBar(
+        sessions = sessions,
+        selected = selected,
+        onSelect = onSelect,
+        modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+    )
+}
+
+/**
+ * Верх выбранного раздела: то, что принадлежит самому разделу, а не устройству.
+ *
+ * Список устройств остаётся снаружи: он показывается только в `DEVICE` и живёт
+ * ниже по странице, а собирать его сюда значило бы завести второе место, где
+ * решается, что видно в каком разделе.
+ */
+@Composable
+private fun DestinationSection(
+    destination: WorkspaceDestination,
+    exportStatus: String?,
+    adbLink: AdbLinkState,
+    terminal: AdbTerminalState,
+    terminalTabs: List<TerminalTab>,
+    terminalSelected: Int?,
+    terminalActions: TerminalActions,
+    operations: OperationsPanel,
+    paletteActions: List<PaletteAction>,
+    recentEvents: RecentEvents,
+    onRescanUsb: () -> Unit,
+    onExportDiagnostics: () -> Unit,
+) {
+    when (destination) {
+        WorkspaceDestination.DEVICE -> {
+            SectionHeading(
+                text = stringResource(R.string.sessions_title),
+                style = MaterialTheme.typography.headlineMedium,
+            )
+            // Палитра стоит над списком, а не под ним: она существует ровно
+            // затем, чтобы до знакомого действия не листать.
+            CommandPalette(actions = paletteActions)
+        }
+
+        WorkspaceDestination.TERMINAL ->
+            TerminalWorkspace(adbLink, terminal, terminalTabs, terminalSelected, terminalActions)
+
+        WorkspaceDestination.OPERATIONS -> OperationsSection(panel = operations)
+        WorkspaceDestination.DIAGNOSTICS -> DiagnosticsWorkspace(
+            exportStatus = exportStatus,
+            recentEvents = recentEvents,
+            onRescanUsb = onRescanUsb,
+            onExportDiagnostics = onExportDiagnostics,
+        )
+    }
+}
+
 @Composable
 private fun SessionList(
     sessions: List<UsbSession>,
     scan: UsbScanSummary,
     usbHostSupported: Boolean,
     adbLink: AdbLinkState,
+    adbConnectAvailable: Boolean,
     adbCommand: AdbCommandState,
     files: AdbFileState,
     install: AdbInstallState,
@@ -347,6 +425,7 @@ private fun SessionList(
     sideload: SideloadPanel,
     fastboot: FastbootPanel,
     fastbootConsole: FastbootConsolePanel,
+    selectedSession: UsbSession?,
 ) {
     if (sessions.isEmpty()) {
         Text(
@@ -362,22 +441,14 @@ private fun SessionList(
         )
         return
     }
-    // Рабочее место принадлежит одному устройству: соединение ADB одно, полоса
-    // Fastboot одна, и операция ведётся с одной целью. Показывать рядом то, что
-    // относится к разным целям, значило бы заставлять соотносить их глазами.
-    val chosen = rememberSaveable { mutableStateOf(sessions.first().generation.value) }
-    // Выбранное устройство могли отключить: тогда берём то, что есть, а не
-    // показываем пустоту на месте существующей цели.
-    val session = sessions.firstOrNull { it.generation.value == chosen.value } ?: sessions.first()
+    // Выбор цели живёт выше scroll/destination, поэтому все workspaces и
+    // callback wiring видят одну и ту же SessionGeneration.
+    val session = selectedSession ?: sessions.first()
 
-    TargetBar(
-        sessions = sessions,
-        selected = session,
-        onSelect = { other -> chosen.value = other.generation.value },
-    )
     SessionCard(
         session = session,
         adbLink = adbLink,
+        adbConnectAvailable = adbConnectAvailable,
         adbCommand = adbCommand,
         files = files,
         install = install,
@@ -422,6 +493,10 @@ private fun ActionsCard(
             Button(onClick = onExportDiagnostics) {
                 Text(stringResource(R.string.diagnostics_export))
             }
+            Text(
+                text = stringResource(R.string.diagnostics_export_sensitive),
+                style = MaterialTheme.typography.bodySmall,
+            )
             if (exportStatus != null) {
                 Text(text = exportStatus, style = MaterialTheme.typography.bodyMedium)
             }
@@ -482,6 +557,7 @@ private fun SessionIdentity(session: UsbSession) {
 private fun SessionCard(
     session: UsbSession,
     adbLink: AdbLinkState,
+    adbConnectAvailable: Boolean,
     adbCommand: AdbCommandState,
     files: AdbFileState,
     install: AdbInstallState,
@@ -521,6 +597,7 @@ private fun SessionCard(
                     AdbLinkSection(
                         session = session,
                         adbLink = adbLink,
+                        connectAvailable = adbConnectAvailable,
                         adbCommand = adbCommand,
                         files = files,
                         install = install,

@@ -156,6 +156,16 @@ public class AdbLinkController(
     )
 
     /**
+     * Epoch ADB ownership.
+     *
+     * Рукопожатие и shell-команда завершаются асинхронно. После disconnect или
+     * смены generation их поздний результат не имеет права снова публиковать
+     * Connected/Finished для уже несуществующего владельца.
+     */
+    private val lifecycleLock = Any()
+    private var lifecycleEpoch: Long = 0L
+
+    /**
      * Живое соединение.
      *
      * Хранится, потому что после рукопожатия оно продолжает быть нужным: через
@@ -347,7 +357,10 @@ public class AdbLinkController(
         public fun install(name: String, options: List<String>, origin: () -> ArtifactSource) {
             val live = connection ?: return
             if (installs.active || fileOperations.active) return
-            holdProcess()
+            // Install пока не заведен в OperationEngine, поэтому поднимать
+            // OperationService здесь было ложной защитой: сервис видел пустой
+            // live-list и немедленно останавливался. Foreground ownership для
+            // install остаётся отдельным незакрытым lifecycle-пунктом Phase 8.
             installs.install(live, name, options, origin)
         }
 
@@ -520,18 +533,22 @@ public class AdbLinkController(
      */
     public fun runCommand(command: String) {
         val trimmed = command.trim()
-        val live = connection
-        // Пустая команда, отсутствующее соединение и уже занятый слот
-        // результата — три разные причины ничего не делать, и ни одна из них
-        // не ошибка.
-        if (trimmed.isEmpty() || live == null || mutableCommand.value is AdbCommandState.Running) {
-            return
-        }
+        val request = synchronized(lifecycleLock) {
+            val live = connection
+            // Пустая команда, отсутствующее соединение и уже занятый слот
+            // результата — три разные причины ничего не делать, и ни одна из
+            // них не ошибка.
+            if (trimmed.isEmpty() || live == null || mutableCommand.value is AdbCommandState.Running) {
+                null
+            } else {
+                mutableCommand.value = AdbCommandState.Running(trimmed)
+                AdbCommandRequest(live, lifecycleEpoch)
+            }
+        } ?: return
 
-        mutableCommand.value = AdbCommandState.Running(trimmed)
         executor.execute {
-            val outcome = runCatching { live.shell(trimmed) }
-            mutableCommand.value = when (val result = outcome.getOrNull()) {
+            val outcome = runCatching { request.connection.shell(trimmed) }
+            val finished = when (val result = outcome.getOrNull()) {
                 is AdbShellOutcome.Finished -> AdbCommandState.Finished(
                     command = trimmed,
                     output = result.output.stdout.trimEnd('\n', '\r'),
@@ -549,8 +566,22 @@ public class AdbLinkController(
                     outcome.exceptionOrNull()?.let { it.message ?: it.javaClass.simpleName } ?: "unknown",
                 )
             }
+            synchronized(lifecycleLock) {
+                if (
+                    lifecycleEpoch == request.epoch &&
+                    connection === request.connection &&
+                    mutableCommand.value is AdbCommandState.Running
+                ) {
+                    mutableCommand.value = finished
+                }
+            }
         }
     }
+
+    private data class AdbCommandRequest(
+        val connection: AdbConnection,
+        val epoch: Long,
+    )
 
     /**
      * Захватывает интерфейс сессии и проводит рукопожатие.
@@ -560,25 +591,32 @@ public class AdbLinkController(
      * экран.
      */
     public fun connect(generation: SessionGeneration) {
-        // Второе подключение поверх живого — это второй CNXN и второй читатель.
-        // Оба запрещены контрактом, поэтому отказ здесь, а не попытка.
-        if (mutableState.value !is AdbLinkState.Idle && mutableState.value !is AdbLinkState.Failed) {
-            return
+        val epoch = synchronized(lifecycleLock) {
+            // Второе подключение поверх живого — это второй CNXN и второй
+            // читатель. Оба запрещены контрактом.
+            if (mutableState.value !is AdbLinkState.Idle && mutableState.value !is AdbLinkState.Failed) {
+                return
+            }
+            lifecycleEpoch += 1L
+            handled.add(generation.value)
+            mutableCommand.value = AdbCommandState.None
+            mutableState.value = AdbLinkState.Connecting(generation)
+            lifecycleEpoch
         }
-        handled.add(generation.value)
-        mutableState.value = AdbLinkState.Connecting(generation)
 
         when (val claim = coordinator.claim(generation)) {
-            is UsbClaimResult.Failed -> {
-                mutableState.value = AdbLinkState.Failed(
-                    generation = generation,
-                    reason = AdbHandshakeFailure.TRANSPORT_CLOSED,
-                    detail = claim.reason.name,
-                )
+            is UsbClaimResult.Failed -> synchronized(lifecycleLock) {
+                if (isCurrent(generation, epoch)) {
+                    mutableState.value = AdbLinkState.Failed(
+                        generation = generation,
+                        reason = AdbHandshakeFailure.TRANSPORT_CLOSED,
+                        detail = claim.reason.name,
+                    )
+                }
             }
 
             is UsbClaimResult.Claimed -> executor.execute {
-                runHandshake(generation, claim)
+                runHandshake(generation, claim, epoch)
             }
         }
     }
@@ -592,8 +630,11 @@ public class AdbLinkController(
      */
     public fun disconnect(generation: SessionGeneration) {
         handled.add(generation.value)
-        coordinator.release(generation)
-        forgetConnection()
+        // Чужая generation не имеет права сбросить текущую связь. Это важно
+        // при нескольких USB-сессиях и при позднем UI callback.
+        if (forgetConnection(generation)) {
+            coordinator.release(generation)
+        }
     }
 
     /**
@@ -613,71 +654,144 @@ public class AdbLinkController(
     private fun targetOf(generation: SessionGeneration): TargetId? =
         coordinator.sessions.value.firstOrNull { session -> session.generation == generation }?.targetId
 
-    private fun forgetConnection() {
-        // Вкладки принадлежат соединению и пережить его не могут: оболочки
-        // устройства, которого нет, показывать нечего.
+    private fun forgetConnection(expectedGeneration: SessionGeneration? = null): Boolean {
+        val oldConnection = synchronized(lifecycleLock) {
+            if (expectedGeneration != null && generationOf(mutableState.value) != expectedGeneration) {
+                return false
+            }
+            lifecycleEpoch += 1L
+            val previous = connection
+            connection = null
+            mutableCommand.value = AdbCommandState.None
+            mutableState.value = AdbLinkState.Idle
+            previous
+        }
+
+        // Дочерние transport-owned контроллеры инвалидируются до закрытия
+        // соединения. Их старые worker могут ещё выходить из I/O, но epoch
+        // больше не позволит приписать поздний результат следующей generation.
+        fileOperations.invalidate()
+        installs.invalidate()
+        reboots.invalidate()
+        rawServices.invalidate()
+        sideloads.invalidate()
         shellTabs.closeAll()
-        // Слушатели переживают отдельную команду, но не транспорт: проброс
-        // поверх мёртвого соединения принимал бы клиентов в никуда, а ожидание
-        // обратного — поток, идти по которому уже некуда.
         forwardController.stopAll("transport is gone")
         reverseController.bind(null)
-        // Цикл раскладки принадлежит соединению и обязан кончиться вместе с
-        // ним: иначе он пережил бы SessionGeneration и продолжил читать
-        // отпущенный интерфейс (ADR-0003 §2, ADR-0004 §4).
-        connection?.close()
-        connection = null
-        mutableCommand.value = AdbCommandState.None
-        mutableState.value = AdbLinkState.Idle
+        oldConnection?.close()
+        return true
     }
 
-    private fun runHandshake(generation: SessionGeneration, claim: UsbClaimResult.Claimed) {
-        val connection = AdbConnection(
+    private fun generationOf(state: AdbLinkState): SessionGeneration? = when (state) {
+        AdbLinkState.Idle -> null
+        is AdbLinkState.Connecting -> state.generation
+        is AdbLinkState.WaitingForAuthorization -> state.generation
+        is AdbLinkState.Connected -> state.generation
+        is AdbLinkState.Failed -> state.generation
+    }
+
+    private fun isCurrent(generation: SessionGeneration, epoch: Long): Boolean =
+        lifecycleEpoch == epoch && generationOf(mutableState.value) == generation
+
+    /** Куда пришло рукопожатие, пока его ждали. */
+    private enum class Handshake {
+        /** Опоздало: владельца сменили, и публиковать нечего. */
+        STALE,
+
+        /** Устройство отказало либо связь оборвалась. */
+        REFUSED,
+
+        /** Соединение принято и стало текущим. */
+        KEPT,
+    }
+
+    /**
+     * Публикует исход рукопожатия, если владелец за это время не сменился.
+     *
+     * Проверка и публикация — под одним замком: между ними успевает пройти
+     * `disconnect`, и тогда результат старой попытки объявил бы `Connected`
+     * поверх уже отпущенного транспорта.
+     */
+    private fun publish(
+        generation: SessionGeneration,
+        opened: AdbConnection,
+        attempt: Result<AdbHandshakeOutcome>,
+        epoch: Long,
+    ): Handshake = synchronized(lifecycleLock) {
+        if (!isCurrent(generation, epoch)) {
+            Handshake.STALE
+        } else {
+            when (val result = attempt.getOrNull()) {
+                is AdbHandshakeOutcome.Connected -> {
+                    connection = opened
+                    // Право принимать потоки отдаётся сразу после рукопожатия:
+                    // reverse может существовать на peer ещё до первого
+                    // действия UI.
+                    reverseController.bind(opened.reverseSource(diagnostics))
+                    opened.acceptInboundStreams(reverseController)
+                    mutableState.value = AdbLinkState.Connected(
+                        generation = generation,
+                        peerMode = result.banner.peerMode,
+                        banner = result.banner.banner,
+                        features = result.banner.features,
+                    )
+                    Handshake.KEPT
+                }
+
+                is AdbHandshakeOutcome.Failed -> {
+                    mutableState.value = AdbLinkState.Failed(generation, result.reason, result.detail)
+                    Handshake.REFUSED
+                }
+
+                null -> {
+                    mutableState.value = AdbLinkState.Failed(
+                        generation = generation,
+                        reason = AdbHandshakeFailure.TRANSPORT_CLOSED,
+                        detail = attempt.exceptionOrNull()?.let { error ->
+                            error.message ?: error.javaClass.simpleName
+                        } ?: "unknown",
+                    )
+                    Handshake.REFUSED
+                }
+            }
+        }
+    }
+
+    private fun runHandshake(
+        generation: SessionGeneration,
+        claim: UsbClaimResult.Claimed,
+        epoch: Long,
+    ) {
+        val opened = AdbConnection(
             handle = claim.handle,
             keyStore = keyStore,
             apiLevel = apiLevel,
             diagnostics = diagnostics,
             onPublicKeySent = {
-                val current = mutableState.value
-                if (current is AdbLinkState.Connecting && current.generation == generation) {
-                    mutableState.value = AdbLinkState.WaitingForAuthorization(generation)
+                synchronized(lifecycleLock) {
+                    val current = mutableState.value
+                    if (
+                        lifecycleEpoch == epoch &&
+                        current is AdbLinkState.Connecting &&
+                        current.generation == generation
+                    ) {
+                        mutableState.value = AdbLinkState.WaitingForAuthorization(generation)
+                    }
                 }
             },
         )
 
-        val outcome = runCatching { connection.connect() }
-        mutableState.value = when (val result = outcome.getOrNull()) {
-            is AdbHandshakeOutcome.Connected -> {
-                this.connection = connection
-                // Право принимать потоки отдаётся сразу после рукопожатия, а не
-                // при первом запросе: устройство может слушать с прошлого раза —
-                // `reverse` переживает переподключение, — и тогда поток придёт
-                // раньше, чем оператор о чём-нибудь попросит.
-                reverseController.bind(connection.reverseSource(diagnostics))
-                connection.acceptInboundStreams(reverseController)
-                AdbLinkState.Connected(
-                    generation = generation,
-                    peerMode = result.banner.peerMode,
-                    banner = result.banner.banner,
-                    features = result.banner.features,
-                )
-            }
+        val landed = publish(generation, opened, runCatching { opened.connect() }, epoch)
 
-            is AdbHandshakeOutcome.Failed -> {
-                releaseAfterFailure(generation)
-                AdbLinkState.Failed(generation, result.reason, result.detail)
-            }
-
-            null -> {
-                releaseAfterFailure(generation)
-                AdbLinkState.Failed(
-                    generation = generation,
-                    reason = AdbHandshakeFailure.TRANSPORT_CLOSED,
-                    detail = outcome.exceptionOrNull()?.let { error ->
-                        error.message ?: error.javaClass.simpleName
-                    } ?: "unknown",
-                )
-            }
+        if (landed == Handshake.STALE) {
+            // Disconnect/reconnect победил гонку. Закрываем **именно этот**
+            // старый handle напрямую. `coordinator.release(generation)` здесь
+            // запрещён: та же generation могла быть уже вручную захвачена
+            // заново, и release по номеру убил бы новый handle.
+            opened.close()
+        } else if (landed == Handshake.REFUSED) {
+            opened.close()
+            releaseAfterFailure(generation)
         }
     }
 
@@ -722,7 +836,7 @@ public class AdbLinkController(
         alive: (UsbSession) -> Boolean,
     ) {
         if (sessions.none { it.generation == generation && alive(it) }) {
-            forgetConnection()
+            forgetConnection(generation)
         }
     }
 

@@ -88,6 +88,8 @@ Inbound USB framing policy из A2 принята после PASS hardware gate 
 - Для DATA OUT source не меняется во время передачи.
 - Для DATA IN sink использует partial/commit semantics, когда возможно.
 - Mid-DATA transport ambiguity после возможной mutation не ретраится автоматически.
+- Для **командного OUT** `NotSent` допустим только для отказа, доказанно случившегося до первого USB I/O (например, локальная валидация пустой/не-ASCII/слишком длинной команды). Любой transport failure после вызова USB write и любой возвращённый byte count, не равный точной длине команды, считаются **ambiguous**: lane переходит в `STALLED`, auto-retry запрещён, а mutating-команда даёт `Unknown`, потому что host backend не доказывает «на провод ушло ровно 0 байт».
+- `download:` объявляет длину восемью hex-цифрами; корректно представим только диапазон `0..0xFFFF_FFFF`. Больший источник отвергается до первого USB I/O, а не обрезается/переполняется на проводе.
 - `max-download-size` и `partition-size` — diagnostics/advisories, а не host authorization, кроме случая, когда конкретный wire request физически невозможно корректно представить. Bootloader lock state — тоже diagnostics/advisory: он влияет на предупреждение и форму подтверждения, но не отменяет команду на стороне хоста.
 
 ### 5.1 Verified Bootloader Lock — advisory и typed confirmation

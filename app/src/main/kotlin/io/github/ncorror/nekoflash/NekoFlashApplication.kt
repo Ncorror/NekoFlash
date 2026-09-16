@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Build
 import io.github.ncorror.nekoflash.core.diagnostics.DiagnosticBundle
 import io.github.ncorror.nekoflash.core.diagnostics.DiagnosticBundleResult
+import io.github.ncorror.nekoflash.core.diagnostics.DiagnosticBundleSection
 import io.github.ncorror.nekoflash.core.diagnostics.DiagnosticEvent
 import io.github.ncorror.nekoflash.core.diagnostics.InMemoryDiagnosticSink
 import io.github.ncorror.nekoflash.core.model.SessionGeneration
@@ -73,6 +74,18 @@ public class NekoFlashApplication : Application() {
      */
     public val recentDiagnostics: () -> List<DiagnosticEvent> = { events.snapshot() }
 
+    /**
+     * Выбранная physical session на время жизни процесса.
+     *
+     * Это UI-context, но хранить только numeric generation через
+     * `rememberSaveable` опасно: после process death счётчик generation
+     * начинается заново, и восстановленное число могло бы указать уже на другой
+     * телефон. Application переживает configuration change, но не process
+     * death, то есть даёт ровно нужное время жизни без ложного восстановления.
+     */
+    @Volatile
+    public var selectedUsbGeneration: Long? = null
+
     /** Состояние сессий USB. Экран подписывается на него и ничего не опрашивает. */
     public val usbSessions: UsbSessionCoordinator by lazy {
         UsbSessionCoordinator(
@@ -119,6 +132,15 @@ public class NekoFlashApplication : Application() {
     }
 
     /**
+     * Fastboot физически имеет одну командную полосу, поэтому его executor тоже
+     * последовательный. Контроллер дополнительно защищает invariant своим lock:
+     * этот executor — второй рубеж, а не единственная гарантия.
+     */
+    private val fastbootOperationThread by lazy {
+        Executors.newSingleThreadExecutor { runnable -> Thread(runnable, "nekoflash-fastboot-operation") }
+    }
+
+    /**
      * Владелец длительных операций.
      *
      * Живёт на уровне приложения, а не экрана: `06` §1 требует, чтобы
@@ -159,7 +181,7 @@ public class NekoFlashApplication : Application() {
     public val fastbootLink: FastbootLinkController by lazy {
         FastbootLinkController(
             claim = usbSessions::claim,
-            executor = adbOperationThreads,
+            executor = fastbootOperationThread,
             diagnostics = events,
         )
     }
@@ -179,7 +201,18 @@ public class NekoFlashApplication : Application() {
         // Незавершённые и недавно завершённые вместе: отключение устройства
         // перед выгрузкой — обычное дело, и без закрытых сессий отчёт был бы
         // пустым именно в самом интересном случае.
-        val sections = UsbDiagnosticReport.sections(
+        val sections = listOf(
+            DiagnosticBundleSection(
+                name = "privacy.txt",
+                content = buildString {
+                    appendLine("sanitized=false")
+                    appendLine("purpose=raw_hardware_and_protocol_evidence")
+                    append("mayContain=host_identifiers,device_identifiers,serials,")
+                    appendLine("paths,command_text,protocol_responses")
+                    appendLine("sharing=review_before_sharing_with_third_parties")
+                },
+            ),
+        ) + UsbDiagnosticReport.sections(
             host = HostFacts.collect(this),
             sessions = usbSessions.sessions.value + usbSessions.recentlyClosedSessions(),
             events = events.snapshot(),
@@ -207,7 +240,10 @@ public class NekoFlashApplication : Application() {
         // заведено здесь, а не внутри контроллера: владелец USB живёт на уровне
         // приложения, и подписываться на него должен тот, кто им владеет.
         scope.launch {
-            usbSessions.sessions.collect { sessions -> adbLink.onUsbSessionsChanged(sessions) }
+            usbSessions.sessions.collect { sessions ->
+                adbLink.onUsbSessionsChanged(sessions)
+                fastbootLink.onUsbSessionsChanged(sessions)
+            }
         }
     }
 

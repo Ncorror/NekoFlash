@@ -182,21 +182,39 @@ class FastbootLaneTest {
 
         val exchange = lane.run("getvar:product")
 
-        assertTrue(exchange is FastbootExchange.NotSent)
+        assertTrue(exchange is FastbootExchange.AmbiguousSend)
         assertEquals(FastbootLaneState.STALLED, lane.state)
     }
 
-    /** Не состоявшаяся запись рамку не теряет: устройство команды не видело. */
+    /**
+     * Failure USB OUT не доказывает нулевой wire effect.
+     *
+     * Android не возвращает byte count вместе с отрицательным результатом, так
+     * что верхний слой не вправе объявлять команду «не отправленной».
+     */
     @Test
-    fun aFailedWriteLeavesTheLaneUsable() {
+    fun aFailedWriteIsAmbiguousAndStallsTheLane() {
         val transport = FakeFastbootTransport().willReply("OKAY")
         transport.failWrite = true
         val lane = FastbootLane(transport)
 
         val exchange = lane.run("getvar:product")
 
-        assertTrue(exchange is FastbootExchange.NotSent)
-        assertEquals("команда не ушла — рамка цела", FastbootLaneState.IDLE, lane.state)
+        assertTrue(exchange is FastbootExchange.AmbiguousSend)
+        assertEquals("wire effect неизвестен — повтор запрещён", FastbootLaneState.STALLED, lane.state)
+    }
+
+    @Test
+    fun anImpossibleOverReportedCommandWriteIsAmbiguousAndStallsTheLane() {
+        val command = "getvar:product"
+        val transport = FakeFastbootTransport().willReply("OKAY")
+        transport.shortWriteAfter = command.length + 1
+        val lane = FastbootLane(transport)
+
+        val exchange = lane.run(command)
+
+        assertTrue(exchange is FastbootExchange.AmbiguousSend)
+        assertEquals(FastbootLaneState.STALLED, lane.state)
     }
 
     /**

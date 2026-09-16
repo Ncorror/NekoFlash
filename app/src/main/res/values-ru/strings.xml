@@ -22,6 +22,7 @@
     <string name="usb_rescan">Пересканировать USB</string>
     <string name="usb_rescan_hint">Заново разбирает подключённые устройства и повторно запрашивает разрешение там, где его нет.</string>
     <string name="diagnostics_export">Выгрузить диагностику</string>
+    <string name="diagnostics_export_sensitive">Экспортируемый ZIP — сырой evidence. Он может содержать идентификаторы хоста и устройства, серийные номера, пути, текст команд и ответы протокола. Проверьте архив перед передачей третьим лицам.</string>
     <string name="diagnostics_export_done">Диагностика сохранена (разделов: %1$d)</string>
     <string name="diagnostics_export_failed">Не удалось сохранить диагностику: %1$s</string>
     <string name="sessions_empty">Устройство не подключено. Подключите его по USB.</string>
@@ -48,6 +49,7 @@
     <string name="adb_connect">Подключиться по ADB</string>
     <string name="adb_disconnect">Отключиться</string>
     <string name="adb_connect_hint">Распознанное устройство подключается само: интерфейс захватывается и проводится рукопожатие ADB. Устройство может спросить, разрешить ли отладку с этого хоста. Отключение действует до повторного подключения устройства.</string>
+    <string name="adb_owned_by_other_target">ADB уже занят другой подключённой целью. Выберите её или отключите ADB перед подключением этой цели.</string>
     <string name="adb_state_label">Соединение ADB</string>
     <string name="adb_state_idle">Не подключено</string>
     <string name="adb_state_connecting">Идёт рукопожатие</string>
@@ -337,5 +339,6 @@
     <string name="target_bar_label">Работаем с</string>
     <string name="target_bar_state">%1$s · %2$s</string>
     <string name="target_bar_others">Подключено ещё устройств: %1$d. Всё ниже относится к тому, что названо выше, — выберите другое, чтобы работать с ним.</string>
+    <string name="target_bar_switch_to">%1$s · %2$s · %3$s</string>
     <string name="operations_empty">В этой установке операций ещё не было. Длительная передача — sideload, чтение или запись файла — появится здесь, пока идёт, и останется после конца, в том числе если кончилась неизвестностью.</string>
 </resources>

@@ -25,6 +25,8 @@ import kotlinx.coroutines.flow.asStateFlow
  */
 public class AdbRawServiceController(private val executor: Executor) {
     private val mutableState = MutableStateFlow<AdbRawServiceState>(AdbRawServiceState.None)
+    private val lifecycleLock = Any()
+    private var lifecycleEpoch = 0L
 
     /** Состояние последнего вызова. */
     public val state: StateFlow<AdbRawServiceState> = mutableState.asStateFlow()
@@ -36,11 +38,30 @@ public class AdbRawServiceController(private val executor: Executor) {
     /** Вызывает сервис. Пустое имя — не ошибка, а нечего делать. */
     public fun call(connection: AdbConnection, service: String) {
         val trimmed = service.trim()
-        if (trimmed.isEmpty() || active) return
-        mutableState.value = AdbRawServiceState.Running(trimmed)
+        if (trimmed.isEmpty()) return
+        val epoch = synchronized(lifecycleLock) {
+            if (mutableState.value is AdbRawServiceState.Running) return
+            mutableState.value = AdbRawServiceState.Running(trimmed)
+            lifecycleEpoch
+        }
         executor.execute {
-            mutableState.value = runCatching { invoke(connection, trimmed) }
+            val result = runCatching { invoke(connection, trimmed) }
                 .getOrElse { failure -> crashed(trimmed, failure) }
+            publish(epoch, result)
+        }
+    }
+
+    /** Инвалидирует результат вызова, относящийся к уже закрытому транспорту. */
+    internal fun invalidate() {
+        synchronized(lifecycleLock) {
+            lifecycleEpoch += 1L
+            mutableState.value = AdbRawServiceState.None
+        }
+    }
+
+    private fun publish(epoch: Long, state: AdbRawServiceState) {
+        synchronized(lifecycleLock) {
+            if (lifecycleEpoch == epoch) mutableState.value = state
         }
     }
 

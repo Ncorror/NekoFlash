@@ -86,7 +86,9 @@ public class FastbootDownload(private val lane: FastbootLane) {
         sizeBytes: Long,
         inactivityMillis: Long = FastbootLane.DEFAULT_INACTIVITY_MS,
     ): FastbootDownloadOutcome {
-        require(sizeBytes >= 0L) { "объём не может быть отрицательным" }
+        require(sizeBytes in 0L..MAX_DOWNLOAD_BYTES) {
+            "объём download должен помещаться в uint32: $sizeBytes"
+        }
         return when (val opened = lane.run(command(sizeBytes), inactivityMillis)) {
             is FastbootExchange.DataPhase -> transfer(source, sizeBytes, opened, inactivityMillis)
 
@@ -105,6 +107,11 @@ public class FastbootDownload(private val lane: FastbootLane) {
 
             is FastbootExchange.NotReady -> FastbootDownloadOutcome.NotStarted("полоса занята: ${opened.state}")
             is FastbootExchange.NotSent -> FastbootDownloadOutcome.NotStarted(opened.reason)
+            is FastbootExchange.AmbiguousSend -> FastbootDownloadOutcome.Unknown(
+                bytesSent = 0L,
+                expectedBytes = sizeBytes,
+                detail = opened.reason,
+            )
         }
     }
 
@@ -125,11 +132,11 @@ public class FastbootDownload(private val lane: FastbootLane) {
                 detail = "устройство ждёт $declared байт, а объявлено было $sizeBytes",
             )
         } else {
-            outcomeOf(lane.sendData(source, sizeBytes, inactivityMillis), sizeBytes)
+            outcomeOf(lane.sendData(source, sizeBytes, inactivityMillis))
         }
     }
 
-    private fun outcomeOf(data: FastbootDataOutcome, sizeBytes: Long): FastbootDownloadOutcome = when (data) {
+    private fun outcomeOf(data: FastbootDataOutcome): FastbootDownloadOutcome = when (data) {
         is FastbootDataOutcome.Completed ->
             FastbootDownloadOutcome.Answered(data.reply, data.payload, data.info, data.bytesSent)
 
@@ -141,9 +148,15 @@ public class FastbootDownload(private val lane: FastbootLane) {
     }
 
     /** `download:` с восьмизначным шестнадцатеричным объёмом — как в Legacy. */
-    internal fun command(sizeBytes: Long): String = PREFIX + "%08x".format(sizeBytes)
+    internal fun command(sizeBytes: Long): String {
+        require(sizeBytes in 0L..MAX_DOWNLOAD_BYTES) {
+            "объём download должен помещаться в uint32: $sizeBytes"
+        }
+        return PREFIX + "%08x".format(sizeBytes)
+    }
 
     private companion object {
         const val PREFIX = "download:"
+        const val MAX_DOWNLOAD_BYTES: Long = 0xFFFF_FFFFL
     }
 }
