@@ -32,6 +32,8 @@ Bootstrap verification on 2026-09-16: repository hygiene, EN/RU parity and docum
 
 GitHub Actions run `95185983331` for commit `99bfee22be8f821c404fa64654580881c2b1c902` reached the Android SDK setup but stopped before Gradle because the workflow requested the obsolete API-37 package identifier `platforms;android-37`. The runner's `sdkmanager` requires the minor-aware package `platforms;android-37.0`. This is a CI provisioning defect; no project build/test/lint result is inferred from that failed run.
 
+GitHub Actions run `95189797254` for commit `61d9b3a692d0c85105ec3b0c8d3fe345d004b24d` successfully provisioned the Android SDK, passed the repository/localization/documentation gates, downloaded Gradle 9.5.0 and entered `test lint assembleDebug`. It then failed at `:app:extractDebugSupportedLocales` because automatic locale-config generation was enabled without the required `app/src/main/res/resources.properties` default-locale declaration. This is a Phase 1 bootstrap configuration defect; no complete Gradle PASS is claimed. The corrective changeset adds `unqualifiedResLocale=en` and makes the localization gate enforce that invariant.
+
 ## Next minimal step
 
-Fix only the API-37 SDK package provisioning in CI, rerun the authoritative `production-reset` workflow for the resulting commit, then close only any concrete build/lint/test defects without adding protocol code. Record the exact rerun result in this file and `04_HARDWARE_EVIDENCE.md`.
+Rerun the authoritative `production-reset` workflow after the default-locale fix, then close only any concrete build/lint/test defect that remains. Do not add ADB/Fastboot implementation until the full Phase 1 bootstrap gates are green and recorded in this file and `04_HARDWARE_EVIDENCE.md`.
