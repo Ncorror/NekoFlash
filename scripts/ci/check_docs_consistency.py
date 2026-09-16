@@ -79,8 +79,11 @@ def main() -> int:
         return fail(f'CI/status contract drifted: missing {missing_workflow}')
 
     roadmap = (ROOT / 'docs/03_ROADMAP.md').read_text(encoding='utf-8')
-    if '## Phase 1 — IN PROGRESS' not in roadmap:
-        return fail('roadmap must identify Phase 1 as IN PROGRESS until the final closeout gate closes')
+    if '## Phase 1 — DONE' not in roadmap:
+        return fail('roadmap must identify the audited bootstrap as Phase 1 DONE')
+
+    if '## Phase 2 — NEXT' not in roadmap:
+        return fail('roadmap must identify Phase 2 as the next phase after Phase 1 closeout')
 
     for relative, expected in EXPECTED_HASHES.items():
         actual = sha256(ROOT / relative)

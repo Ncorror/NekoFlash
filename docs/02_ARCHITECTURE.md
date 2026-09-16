@@ -1,12 +1,12 @@
 # Architecture
 
-Phase 1 owns only three real boundaries:
+Phase 1 closed with only three real production boundaries:
 
 - `:app` — Android presentation/bootstrap shell.
 - `:core:model` — target/session identity and cross-feature outcome vocabulary.
 - `:core:diagnostics` — structured local evidence primitives.
 
-No USB, ADB, Fastboot, Recovery or vendor production modules exist yet. They will be added only when their implementation phase begins and a real ownership boundary exists.
+No USB, ADB, Fastboot, Recovery or vendor production modules existed at Phase 1 closeout. Phase 2 may introduce a transport boundary only when executable ownership begins; placeholder modules remain forbidden.
 
 Conceptual direction for later phases:
 

@@ -1,6 +1,6 @@
 # Hardware and Evidence Ledger
 
-No new hardware claim is made by the Phase 1 bootstrap changeset.
+Phase 1 is closed. The closeout adds no protocol or device-capability claim; it records build/test/lint evidence and owner-observed UI behavior only.
 
 ## Exact evidence snapshots
 
@@ -26,7 +26,7 @@ The rewrite branch `production-reset` was created from that exact commit before 
 - Native USBFS for the rewrite does not exist yet and requires fresh validation when implemented.
 - Successful destructive Fastboot mutation for the rewrite requires an owner-approved unlocked target.
 - Rebuilt Mi Unlock requires fresh end-to-end validation.
-- Phase 1 functional Welcome/Continue visual verification passed; only the closeout scrim-removal changeset still requires CI plus a quick visual smoke before Phase 1 is marked DONE.
+- Phase 1 has no open bootstrap build or visual gate. Remaining open evidence belongs to later transport/protocol/vendor phases.
 
 ## Phase 1 verification history
 
@@ -46,6 +46,9 @@ The rewrite branch `production-reset` was created from that exact commit before 
 - Follow-up Android visual check on 2026-09-17 for commit `f759e25f7f8d465056678d52ddab8248d3e54d7f`: Welcome full-viewport crop PASS; title/subtitle visibility PASS; navigation-bar-safe Continue control PASS; Continue transition to the explicit Phase 1-ready shell PASS. Functional visual gate: PASS. The remaining dark bottom scrim was classified by the owner as cosmetic polish and selected for removal; JPEG integrity remains unchanged.
 - Verification artifact `NekoFlash-phase1-verification-f759e25f7f8d465056678d52ddab8248d3e54d7f.zip`: `OutcomeTest` 1/1 PASS, `TargetTest` 2/2 PASS, `InMemoryDiagnosticSinkTest` 1/1 PASS; total 4 tests, 0 failures, 0 errors, 0 skipped. Android lint: 0 errors, 8 warnings. Warning classes are baseline/version advisories (`OldTargetApi`, Gradle/AGP/Compose/Kotlin newer-version notices), `DataExtractionRules`, and `MissingApplicationIcon`. The launcher warning is consistent with the Phase 1 rule that launcher artwork stays reference-only until owner review; no warning is promoted to a capability restriction or protocol claim.
 - Documentation audit on 2026-09-17 found one real drift: roadmap/evidence still described the earlier visual FAIL after the corrected APK had passed. The closeout changeset reconciles that history, adds an explicit repository-resident new-chat recovery contract, and removes the cosmetic Welcome scrim. No architecture/module/protocol boundary drift was found.
+- Final Android owner smoke check on 2026-09-17 for commit `713c542f5524f19744b4e18ea7e97bf78f3aa75a`: Welcome full-viewport presentation PASS; app-owned bottom scrim removal PASS; title/subtitle/control visibility PASS; Continue transition to the Phase 1-ready shell PASS. The black strip containing Android navigation controls is system UI, not an app-owned overlay.
+- Verification artifact `NekoFlash-phase1-verification-713c542f5524f19744b4e18ea7e97bf78f3aa75a.zip`: `OutcomeTest` 1/1 PASS, `TargetTest` 2/2 PASS, `InMemoryDiagnosticSinkTest` 1/1 PASS; total 4 tests, 0 failures, 0 errors, 0 skipped. Android lint: 0 errors, 8 warnings. The warning classes remain `OldTargetApi`, tool/dependency newer-version advisories, `DataExtractionRules`, and `MissingApplicationIcon`; they are evidence for later maintenance/launcher review, not protocol restrictions.
+- Final Phase 1 code/tests/docs/evidence audit on 2026-09-17: repository hygiene PASS; localization/default-locale PASS; documentation consistency PASS; exactly `:app`, `:core:model`, `:core:diagnostics` present; `protocol/` and `usb/` absent; immutable Welcome and launcher-reference hashes exact; new-session recovery contract present; roadmap and evidence reconciled to Phase 1 `DONE`.
 
 ## Deferred hardware observations for the future ADB phase
 
