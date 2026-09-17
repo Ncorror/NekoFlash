@@ -6,8 +6,9 @@ This file records capability/evidence direction, not current implementation stat
 |---|---|---|
 | Target/session identity | A2/current tests and hardware observations | Separate `TargetId`, `SessionGeneration`, `TargetMode` and transport ownership |
 | Diagnostics | A2/current source/tests | Structured evidence first; redact secrets in shareable bundles |
+| Android USB | Legacy/A2 descriptors, permission and hardware observations | Phase 2 evidence owner now implemented for discovery, permission, descriptors/endpoints and reversible open/claim probing; protocol bytes still absent |
 | ADB | Legacy breadth, A2 framing tests, current multi-stream evidence | Future single production engine; one physical reader; generic services; no artificial whitelist |
-| Fastboot | Legacy breadth, A2 transaction/DATA tests, current device-authority evidence | Future single transaction lane; peer `FAIL` preserved; exact byte accounting; DATA IN still open |
+| Fastboot | Legacy breadth + ~42 MB/s Native USBFS hardware flashes; A2 128 MiB / ~4.437 s Java UsbRequest baseline; A2 transaction/DATA tests | Future single transaction lane; peer `FAIL` preserved; exact byte accounting; preselected `ASYNC_USB_REQUEST` + required `NATIVE_USBFS` + bounded `SYNC_BULK`; DATA IN still open |
 | Recovery/Sideload | Legacy behavior, A2 mutation/correlation tests, current evidence | Distinguish transfer completion from installation success; retain `Unknown` semantics |
 | Quick Flash | Legacy behavior/evidence | Future use case over the same Fastboot engine |
 | Mi Unlock | Legacy source/historical evidence | Future vendor use case over generic Fastboot core; fresh final verification required |

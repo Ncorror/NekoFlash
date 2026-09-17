@@ -37,13 +37,13 @@ jobs:
         with:
           cache-provider: basic
 
-      - name: Phase 1 gates
+      - name: Phase 2 gates
         run: ./scripts/ci/check_all.sh
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v7
         with:
-          name: NekoFlash-phase1-debug-${{ github.sha }}
+          name: NekoFlash-phase2-debug-${{ github.sha }}
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 7
@@ -51,12 +51,15 @@ jobs:
       - name: Upload verification reports
         uses: actions/upload-artifact@v7
         with:
-          name: NekoFlash-phase1-verification-${{ github.sha }}
+          name: NekoFlash-phase2-verification-${{ github.sha }}
           path: |
             core/model/build/test-results/test/
             core/model/build/reports/tests/test/
             core/diagnostics/build/test-results/test/
             core/diagnostics/build/reports/tests/test/
+            transport/usb-android/build/test-results/
+            transport/usb-android/build/reports/tests/
+            transport/usb-android/build/reports/lint-results-*.*
             app/build/reports/lint-results-debug.*
           if-no-files-found: error
           retention-days: 7

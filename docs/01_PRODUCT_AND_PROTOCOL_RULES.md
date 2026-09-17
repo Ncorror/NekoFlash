@@ -15,3 +15,14 @@
 ## Product policy boundary
 
 Warnings and explicit user-intent confirmation belong in guided UI. They are not protocol permissions. Raw protocol surfaces must not be arbitrarily narrower than typed surfaces.
+
+## Fastboot DATA backend retention rule
+
+The clean rewrite must not erase hardware-proven transport capability merely because the implementation is being replaced.
+When the Fastboot DATA phase is introduced, its architecture must preserve explicit backend selection with at least:
+
+- Java `ASYNC_USB_REQUEST` as the hardware-proven A2 fallback baseline;
+- `NATIVE_USBFS` as a required high-throughput capability to be reimplemented and freshly validated;
+- a bounded synchronous bulk path only as an explicitly selected fallback/diagnostic mode, never as a silent retry after DATA negotiation.
+
+Native-vs-Java selection is resolved before `download:`. Once DATA negotiation starts, an ambiguous native transfer must not be retried inline on another backend. Native USBFS must preserve confirmed-byte accounting, two-URB ownership, adaptive ENOMEM reduction, `DISCARDURB -> REAP` before memory release, and fail-closed poisoned-backend semantics when drain cannot be proven. These are correctness requirements, not optional performance polish.

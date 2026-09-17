@@ -15,7 +15,7 @@ REQUIRED_DOCS = [
     'docs/04_HARDWARE_EVIDENCE.md',
     'docs/05_CAPABILITY_MATRIX.md',
 ]
-EXPECTED_MODULES = {':app', ':core:model', ':core:diagnostics'}
+EXPECTED_MODULES = {':app', ':core:model', ':core:diagnostics', ':transport:usb-android'}
 EXPECTED_HASHES = {
     'app/src/main/res/drawable-nodpi/bg_welcome.jpg': 'd16195d6ab022a4ec8f9686a1d750a4dd83595140e68f718c992df8a0a60a8f7',
     'reference/brand/nekoflash-launcher-reference.png': 'fc098f5bea87aea9c2ad0dbddb74ea8277c94145403fb4d76032f36bb0ce1832',
@@ -50,10 +50,10 @@ def main() -> int:
     settings = (ROOT / 'settings.gradle.kts').read_text(encoding='utf-8')
     modules = set(re.findall(r'include\("([^"]+)"\)', settings))
     if modules != EXPECTED_MODULES:
-        return fail(f'Phase 1 modules drifted: expected {sorted(EXPECTED_MODULES)}, got {sorted(modules)}')
+        return fail(f'production modules drifted: expected {sorted(EXPECTED_MODULES)}, got {sorted(modules)}')
 
     if (ROOT / 'protocol').exists() or (ROOT / 'usb').exists():
-        return fail('protocol/usb production trees must not exist in Phase 1 bootstrap')
+        return fail('legacy-style top-level protocol/usb trees must not be transplanted into the rewrite')
 
     start_here = (ROOT / 'docs/00_START_HERE.md').read_text(encoding='utf-8')
     handoff_tokens = [
@@ -71,8 +71,8 @@ def main() -> int:
     workflow_tokens = [
         'branches: [production-reset]',
         './scripts/ci/check_all.sh',
-        'NekoFlash-phase1-debug-${{ github.sha }}',
-        'NekoFlash-phase1-verification-${{ github.sha }}',
+        'NekoFlash-phase2-debug-${{ github.sha }}',
+        'NekoFlash-phase2-verification-${{ github.sha }}',
     ]
     missing_workflow = [token for token in workflow_tokens if token not in workflow]
     if missing_workflow:
@@ -82,8 +82,13 @@ def main() -> int:
     if '## Phase 1 — DONE' not in roadmap:
         return fail('roadmap must identify the audited bootstrap as Phase 1 DONE')
 
-    if '## Phase 2 — NEXT' not in roadmap:
-        return fail('roadmap must identify Phase 2 as the next phase after Phase 1 closeout')
+    if '## Phase 2 — IN PROGRESS' not in roadmap:
+        return fail('roadmap must identify Phase 2 as IN PROGRESS')
+
+    retention_tokens = ['NATIVE_USBFS', 'ASYNC_USB_REQUEST', 'no backend switch/retry']
+    missing_retention = [token for token in retention_tokens if token not in roadmap]
+    if missing_retention:
+        return fail(f'Fastboot DATA retention contract drifted: missing {missing_retention}')
 
     for relative, expected in EXPECTED_HASHES.items():
         actual = sha256(ROOT / relative)
@@ -95,7 +100,7 @@ def main() -> int:
         if '/src/test/' in path.as_posix():
             tests += len(re.findall(r'^\s*@Test\b', path.read_text(encoding='utf-8'), flags=re.MULTILINE))
 
-    print(f'docs consistency: PASS (one status source; 3 modules; brand hashes exact; {tests} @Test methods)')
+    print(f'docs consistency: PASS (one status source; 4 modules; Phase 2 USB boundary; Native USBFS retained; brand hashes exact; {tests} @Test methods)')
     return 0
 
 

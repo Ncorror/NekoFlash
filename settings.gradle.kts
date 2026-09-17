@@ -19,3 +19,5 @@ rootProject.name = "NekoFlash"
 include(":app")
 include(":core:model")
 include(":core:diagnostics")
+
+include(":transport:usb-android")

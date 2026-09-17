@@ -42,6 +42,7 @@ kotlin {
 dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:diagnostics"))
+    implementation(project(":transport:usb-android"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

@@ -3,8 +3,15 @@
     <string name="app_name">NekoFlash</string>
     <string name="welcome_title">NekoFlash</string>
     <string name="welcome_subtitle">Профессиональный Android host toolkit</string>
-    <string name="welcome_phase">Чистая реализация · bootstrap Phase 1</string>
+    <string name="welcome_phase">Чистая реализация · Phase 2 USB evidence</string>
     <string name="welcome_continue">Продолжить</string>
     <string name="phase1_ready_title">Основа Phase 1 готова</string>
-    <string name="phase1_ready_body">Чистая production-оболочка запущена. USB, ADB и Fastboot намеренно ещё не реализованы.</string>
+    <string name="phase1_ready_body">Чистая production-оболочка запущена.</string>
+    <string name="phase2_usb_title">Phase 2 · USB evidence</string>
+    <string name="phase2_usb_body">Диагностический USB probe: дескрипторы, разрешение, open и claim. Байты ADB/Fastboot не отправляются.</string>
+    <string name="usb_scan">Сканировать USB</string>
+    <string name="usb_permission">Разрешение</string>
+    <string name="usb_probe_open_claim">Проверить open + claim</string>
+    <string name="usb_refresh_evidence">Обновить журнал evidence</string>
+    <string name="usb_evidence_log">Последние USB evidence</string>
 </resources>

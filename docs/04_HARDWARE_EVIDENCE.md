@@ -13,6 +13,7 @@ Phase 1 is closed. The closeout adds no protocol or device-capability claim; it 
 The exact current snapshot archive identifies commit `e89d61e405ac3c5059d0cf8bc420879cc508de9f`. Public GitHub was checked only for post-snapshot drift; it is not used as the rewrite evidence base.
 
 The rewrite branch `production-reset` was created from that exact commit before applying the Phase 1 bootstrap; `main` remains a reference line.
+The Phase 2 work recorded below started from the supplied GitHub source snapshot whose archive comment identifies `production-reset` commit `921c124a59626e2b179e94daa81c510f76a699fd`. This is a historical starting point; the current Git HEAD remains authoritative after the changeset is applied.
 
 ## Brand evidence
 
@@ -57,3 +58,29 @@ The rewrite branch `production-reset` was created from that exact commit before 
 - Root cause is `UNKNOWN`. These observations must be reproduced later with descriptor, permission, interface-claim, bulk-transfer and ADB-handshake tracing. They do not justify a host-side Xiaomi/Poco/HyperOS capability ban. Device/peer protocol behavior remains authoritative.
 
 Public GitHub check on 2026-09-16 found the snapshot commit page for `e89d61e405ac3c5059d0cf8bc420879cc508de9f` and the public `main` page still showed the same Phase 5-era tree/status. No visible post-snapshot drift was found; the exact snapshots remain the evidence authority.
+
+## Phase 2 retained Fastboot DATA performance evidence
+
+Native USBFS is now a protected rewrite capability because the reference trees contain real hardware value that must not be lost during architectural cleanup:
+
+- Legacy POCO X3 Pro (`vayu`): real `recovery.img` flash, 128 MiB, Native USBFS, application-observed throughput approximately 42 MB/s, final `flash:recovery` success.
+- Legacy POCO X7 Pro (`rodin`): real `vendor_boot_a` and `vendor_boot_b` flashes, 64 MiB each, Native USBFS, approximately 42 MB/s for each payload, both flash operations successful.
+- A2 POCO X3 Pro (`vayu`) fallback baseline at commit `3863cbc407052b177d82889714491ef0de03de97`: Java `ASYNC_USB_REQUEST` transferred exactly 134217728 confirmed bytes in about 4.437 s; download terminal `OKAY`; `flash:recovery` terminal `OKAY`; session remained uncorrupted.
+
+These are retained evidence, not a claim that the rewrite's future Native USBFS implementation is already verified. The A2 Native USBFS two-URB overlay still required exact CI and a fresh real-device native run at freeze time. The rewrite must therefore reimplement and validate the backend while preserving the documented correctness invariants.
+
+## Phase 2 USB evidence slice
+
+Code now exists for an Application-scoped evidence-only Android USB probe, so Activity recreation does not own or replace the permission receiver. It records physical device inventory, VID/PID, interface class/subclass/protocol, endpoint address/direction/type/max-packet-size, Android permission state/callback, `openDevice` outcome, and each `claimInterface(false)` result for interfaces containing both bulk IN and bulk OUT. A successful claim is immediately released and the connection is closed; no ADB/Fastboot bytes are transmitted.
+
+Hardware result for this new rewrite slice: **PENDING**. The known Poco/Xiaomi observations remain the first target. Root cause remains `UNKNOWN` until this probe is exercised and the result is recorded here.
+
+### Phase 2 local pre-CI verification — 2026-09-17
+
+- Repository hygiene: PASS.
+- EN/RU localization parity/default locale: PASS (`14` translatable strings per locale, default `en`).
+- Documentation consistency: PASS (one status source; four production modules; Phase 2 USB boundary present; Native USBFS retention contract present; immutable brand hashes exact; seven `@Test` methods detected).
+- Pure USB evidence model smoke compilation: PASS; known `18D1:4EE7` descriptor shape produced bulk-pair interface index `0`.
+- Kotlin syntax/type compilation of `:core:model`, `:core:diagnostics`, all `:transport:usb-android` production sources, their JVM tests, and `NekoFlashApplication` against minimal Android/JUnit API stubs: PASS. This checks the new source boundary without claiming a real Android SDK/AGP build.
+- `./gradlew test lint assembleDebug --no-daemon --stacktrace`: DID NOT REACH PROJECT CONFIGURATION because this environment could not resolve `services.gradle.org` while fetching Gradle 9.5.0 (`UnknownHostException`). No Gradle/CI PASS is claimed from this local attempt.
+- New Phase 2 hardware run: PENDING.

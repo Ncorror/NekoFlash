@@ -18,7 +18,7 @@ icon_hash="$(sha256sum reference/brand/nekoflash-launcher-reference.png | awk '{
 [[ "$icon_hash" == 'fc098f5bea87aea9c2ad0dbddb74ea8277c94145403fb4d76032f36bb0ce1832' ]] || fail 'launcher reference hash drifted'
 
 if find . -maxdepth 2 -type d \( -path './protocol*' -o -path './usb*' \) | grep -q .; then
-  fail 'Phase 1 must not contain protocol or USB production modules'
+  fail 'legacy-style top-level protocol/usb production trees must not be transplanted into the rewrite'
 fi
 
 printf 'repository hygiene: PASS\n'

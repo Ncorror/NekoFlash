@@ -51,20 +51,29 @@ Final owner device smoke verification against commit `713c542f5524f19744b4e18ea7
 
 The supplied verification artifact `NekoFlash-phase1-verification-713c542f5524f19744b4e18ea7e97bf78f3aa75a.zip` contains 4 passing JVM tests with 0 failures/errors/skips and Android lint with 0 errors and 8 recorded warnings. Warning classes remain version/API advisories, `DataExtractionRules`, and `MissingApplicationIcon` while launcher artwork stays reference-only pending owner review.
 
-## Phase 2 — NEXT
+## Phase 2 — IN PROGRESS
 
-Phase 2 has not started in this closeout changeset. Its first responsibility is transport evidence and ownership, not ADB/Fastboot feature breadth.
+Phase 2 started on 2026-09-17 after the pre-change code/tests/docs/evidence audit. The first production slice is intentionally evidence-only.
 
-Starting constraints:
+Implemented in the first slice:
 
-- perform the pre-change code/tests/docs/evidence audit first;
-- begin with the smallest concrete Android USB discovery/permission/open/claim/descriptor/endpoint boundary needed for real evidence;
-- instrument diagnostics so descriptor, permission, claim and transfer outcomes can be distinguished instead of collapsed into "ADB failed";
-- reproduce the known Poco/Xiaomi observations, including Poco F5 + HyperOS, and keep root cause `UNKNOWN` until the failing layer is proven;
-- do not add Xiaomi/Poco/HyperOS host-side bans;
-- do not create placeholder modules without an executable ownership boundary;
-- do not implement ADB framing/handshake or Fastboot transactions before the transport boundary and evidence path are technically credible.
+- [x] executable `:transport:usb-android` ownership boundary with Application-scoped permission receiver lifetime;
+- [x] Android USB enumeration with VID/PID and complete interface/endpoint evidence;
+- [x] Android USB permission request/callback evidence;
+- [x] reversible `openDevice -> claimInterface(false) -> release -> close` probe;
+- [x] claim candidates require only a bulk IN+OUT pair; no Xiaomi/Poco/HyperOS host-side ban or protocol whitelist;
+- [x] unit coverage for the known `18D1:4EE7`, `FF/42/01`, bulk `0x01/0x81` shape and vendor-neutral bulk-pair selection;
+- [x] repository rules/ADR retain Native USBFS as a required future Fastboot DATA backend rather than an optional optimization.
+
+Still open before ADB framing/handshake:
+
+- [ ] run the new evidence probe on known Poco/Xiaomi hardware, including the problematic HyperOS case;
+- [ ] record permission/open/claim results and descriptor snapshots in `04_HARDWARE_EVIDENCE.md`;
+- [ ] determine the failing layer from evidence; root cause remains `UNKNOWN` until then;
+- [ ] obtain authoritative CI `test lint assembleDebug` PASS for this Phase 2 changeset.
+
+Fastboot DATA retention is now an explicit requirement for later Phase 2/3 protocol work: `ASYNC_USB_REQUEST` remains the A2 hardware-proven Java fallback; `NATIVE_USBFS` must return as a freshly validated high-throughput backend; a bounded `SYNC_BULK` path may exist as an explicitly preselected fallback/diagnostic mode. Native selection occurs before `download:` and no backend switch/retry is allowed after DATA negotiation starts.
 
 ## Next minimal step
 
-Run the Phase 2 pre-audit, then implement only the smallest evidence-first Android USB discovery/permission/descriptor tracing boundary needed to distinguish device visibility, permission, interface/endpoints and open/claim outcomes on real hardware. Exercise it first against the known Poco/Xiaomi cases and record the result in `04_HARDWARE_EVIDENCE.md` in the same changeset. No ADB/Fastboot protocol engine belongs in that first Phase 2 step.
+Build the Phase 2 APK in CI and run the evidence screen on the known Poco/Xiaomi targets. Capture the exact VID/PID, interface class/subclass/protocol, endpoint addresses/max packet sizes, permission result, `openDevice` result, and each `claimInterface(false)` result. Update `04_HARDWARE_EVIDENCE.md` in the same changeset. Do not add ADB framing/handshake until those results make the transport boundary technically credible.

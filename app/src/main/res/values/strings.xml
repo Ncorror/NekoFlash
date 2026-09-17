@@ -3,8 +3,15 @@
     <string name="app_name">NekoFlash</string>
     <string name="welcome_title">NekoFlash</string>
     <string name="welcome_subtitle">Professional Android host toolkit</string>
-    <string name="welcome_phase">Clean rebuild · Phase 1 bootstrap</string>
+    <string name="welcome_phase">Clean rebuild · Phase 2 USB evidence</string>
     <string name="welcome_continue">Continue</string>
     <string name="phase1_ready_title">Phase 1 foundation ready</string>
-    <string name="phase1_ready_body">The clean production shell is running. USB, ADB and Fastboot are intentionally not implemented yet.</string>
+    <string name="phase1_ready_body">The clean production shell is running.</string>
+    <string name="phase2_usb_title">Phase 2 · USB evidence</string>
+    <string name="phase2_usb_body">Evidence-only USB probe: descriptors, permission, open and claim. No ADB or Fastboot bytes are sent.</string>
+    <string name="usb_scan">Scan USB</string>
+    <string name="usb_permission">Permission</string>
+    <string name="usb_probe_open_claim">Probe open + claim</string>
+    <string name="usb_refresh_evidence">Refresh evidence log</string>
+    <string name="usb_evidence_log">Recent USB evidence</string>
 </resources>
