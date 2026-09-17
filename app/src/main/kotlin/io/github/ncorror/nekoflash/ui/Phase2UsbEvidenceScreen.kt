@@ -1,6 +1,8 @@
 package io.github.ncorror.nekoflash.ui
 
 import android.content.Intent
+import android.os.Handler
+import android.os.Looper
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -26,8 +28,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.github.ncorror.nekoflash.R
+import io.github.ncorror.nekoflash.core.diagnostics.DiagnosticBundle
 import io.github.ncorror.nekoflash.core.diagnostics.InMemoryDiagnosticSink
 import io.github.ncorror.nekoflash.core.diagnostics.formatDiagnosticEvidence
+import io.github.ncorror.nekoflash.diagnostics.EvidenceBundleFactory
+import io.github.ncorror.nekoflash.diagnostics.EvidenceBundleIo
 import io.github.ncorror.nekoflash.transport.usb.android.UsbDeviceEvidence
 import io.github.ncorror.nekoflash.transport.usb.android.UsbEvidenceProbe
 import java.time.Instant
@@ -42,16 +47,23 @@ private val evidenceFileTimestamp = DateTimeFormatter
 fun Phase2UsbEvidenceScreen(
     probe: UsbEvidenceProbe,
     diagnostics: InMemoryDiagnosticSink,
+    runId: String,
 ) {
     val context = LocalContext.current
     val evidenceSaveCancelled = stringResource(R.string.usb_evidence_save_cancelled)
     val evidenceSaved = stringResource(R.string.usb_evidence_saved)
     val evidenceSaveFailed = stringResource(R.string.usb_evidence_save_failed)
     val evidenceShareTitle = stringResource(R.string.usb_share_full_evidence)
+    val zipSaved = stringResource(R.string.usb_evidence_zip_saved)
+    val zipSaveFailed = stringResource(R.string.usb_evidence_zip_save_failed)
+    val zipPreparing = stringResource(R.string.usb_evidence_zip_preparing)
+    val zipShareFailed = stringResource(R.string.usb_evidence_zip_share_failed)
+    val zipShareTitle = stringResource(R.string.usb_share_evidence_zip)
     var devices by remember { mutableStateOf<List<UsbDeviceEvidence>>(emptyList()) }
     var status by remember { mutableStateOf("") }
     var evidenceLines by remember { mutableStateOf<List<String>>(emptyList()) }
     var pendingExportText by remember { mutableStateOf("") }
+    var pendingZipSnapshot by remember { mutableStateOf<EvidenceBundleFactory.Snapshot?>(null) }
 
     fun refreshEvidence() {
         evidenceLines = diagnostics.snapshot().takeLast(30).map { event ->
@@ -70,6 +82,13 @@ fun Phase2UsbEvidenceScreen(
         generatedAtEpochMillis = System.currentTimeMillis(),
     )
 
+    fun captureZip(): EvidenceBundleFactory.Snapshot = EvidenceBundleFactory.capture(
+        context = context,
+        runId = runId,
+        events = diagnostics.snapshot(),
+        devices = devices,
+    )
+
     val saveEvidence = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("text/plain"),
     ) { uri ->
@@ -83,6 +102,25 @@ fun Phase2UsbEvidenceScreen(
                     ?: error("Content resolver returned no output stream")
             }.isSuccess
             status = if (saved) evidenceSaved else evidenceSaveFailed
+        }
+    }
+
+    val saveEvidenceZip = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/zip"),
+    ) { uri ->
+        val snapshot = pendingZipSnapshot
+        if (uri == null || snapshot == null) {
+            status = evidenceSaveCancelled
+        } else {
+            status = zipPreparing
+            Thread {
+                val saved = runCatching {
+                    EvidenceBundleIo.writeDocument(context, uri, snapshot)
+                }.isSuccess
+                Handler(Looper.getMainLooper()).post {
+                    status = if (saved) zipSaved else zipSaveFailed
+                }
+            }.start()
         }
     }
 
@@ -177,6 +215,41 @@ fun Phase2UsbEvidenceScreen(
         ) {
             Text(stringResource(R.string.usb_refresh_evidence))
         }
+        Button(
+            onClick = {
+                val snapshot = captureZip()
+                pendingZipSnapshot = snapshot
+                saveEvidenceZip.launch(DiagnosticBundle.suggestedFileName(snapshot.exportedAt))
+            },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(stringResource(R.string.usb_save_evidence_zip))
+        }
+        OutlinedButton(
+            onClick = {
+                val snapshot = captureZip()
+                status = zipPreparing
+                Thread {
+                    val uri = runCatching { EvidenceBundleIo.writeShareCache(context, snapshot) }.getOrNull()
+                    Handler(Looper.getMainLooper()).post {
+                        if (uri == null) {
+                            status = zipShareFailed
+                        } else {
+                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                type = "application/zip"
+                                putExtra(Intent.EXTRA_SUBJECT, DiagnosticBundle.suggestedFileName(snapshot.exportedAt))
+                                putExtra(Intent.EXTRA_STREAM, uri)
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            }
+                            context.startActivity(Intent.createChooser(shareIntent, zipShareTitle))
+                        }
+                    }
+                }.start()
+            },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(stringResource(R.string.usb_share_evidence_zip))
+        }
         OutlinedButton(
             onClick = {
                 pendingExportText = fullEvidenceText()
@@ -196,12 +269,7 @@ fun Phase2UsbEvidenceScreen(
                     putExtra(Intent.EXTRA_SUBJECT, "NekoFlash USB evidence")
                     putExtra(Intent.EXTRA_TEXT, text)
                 }
-                context.startActivity(
-                    Intent.createChooser(
-                        shareIntent,
-                        evidenceShareTitle,
-                    ),
-                )
+                context.startActivity(Intent.createChooser(shareIntent, evidenceShareTitle))
             },
             modifier = Modifier.fillMaxWidth(),
         ) {

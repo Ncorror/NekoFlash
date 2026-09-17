@@ -101,6 +101,27 @@ def main() -> int:
     if missing_screen_export:
         return fail(f'USB evidence export UI drifted: missing {missing_screen_export}')
 
+    evidence_bundle_tokens = [
+        'export-manifest.txt',
+        'summary.txt',
+        'usb-events.txt',
+        'usb-descriptors.txt',
+        'device-info.txt',
+        'app-build.txt',
+        'session-info.txt',
+    ]
+    missing_bundle = [token for token in evidence_bundle_tokens if token not in roadmap]
+    if missing_bundle:
+        return fail(f'evidence ZIP contract drifted: missing {missing_bundle}')
+
+    bundle_source = ROOT / 'core/diagnostics/src/main/kotlin/io/github/ncorror/nekoflash/core/diagnostics/DiagnosticBundle.kt'
+    if not bundle_source.is_file():
+        return fail('deterministic DiagnosticBundle writer is missing')
+
+    manifest = (ROOT / 'app/src/main/AndroidManifest.xml').read_text(encoding='utf-8')
+    if '.evidence-files' not in manifest or '@xml/evidence_file_paths' not in manifest:
+        return fail('evidence ZIP FileProvider wiring is missing')
+
     for relative, expected in EXPECTED_HASHES.items():
         actual = sha256(ROOT / relative)
         if actual != expected:
@@ -111,7 +132,7 @@ def main() -> int:
         if '/src/test/' in path.as_posix():
             tests += len(re.findall(r'^\s*@Test\b', path.read_text(encoding='utf-8'), flags=re.MULTILINE))
 
-    print(f'docs consistency: PASS (one status source; 4 modules; Phase 2 USB boundary; full evidence export; Native USBFS retained; brand hashes exact; {tests} @Test methods)')
+    print(f'docs consistency: PASS (one status source; 4 modules; Phase 2 USB boundary; full evidence export; multi-file evidence ZIP; Native USBFS retained; brand hashes exact; {tests} @Test methods)')
     return 0
 
 

@@ -19,4 +19,10 @@
     <string name="usb_evidence_saved">Файл evidence сохранён</string>
     <string name="usb_evidence_save_cancelled">Сохранение evidence отменено</string>
     <string name="usb_evidence_save_failed">Не удалось сохранить evidence</string>
+    <string name="usb_save_evidence_zip">Собрать evidence ZIP</string>
+    <string name="usb_share_evidence_zip">Поделиться evidence ZIP</string>
+    <string name="usb_evidence_zip_saved">Evidence ZIP сохранён</string>
+    <string name="usb_evidence_zip_save_failed">Не удалось сохранить evidence ZIP</string>
+    <string name="usb_evidence_zip_preparing">Подготовка evidence ZIP…</string>
+    <string name="usb_evidence_zip_share_failed">Не удалось поделиться evidence ZIP</string>
 </resources>

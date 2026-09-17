@@ -12,6 +12,8 @@ Phase 2 has started with one additional executable boundary:
 
 The USB evidence boundary deliberately sends no ADB/Fastboot bytes. It classifies a claim candidate only by the concrete transport need for both bulk IN and bulk OUT; vendor, product, class, subclass and protocol are recorded as evidence rather than used as Xiaomi/Poco bans.
 
+Shareable evidence now has a separate serialization boundary in `:core:diagnostics`: a deterministic, manifest-first multi-file ZIP writer accepts only explicit UTF-8 sections. Android-specific host/app/USB section construction and document/share integration remain in `:app`; the diagnostics core does not enumerate files or depend on Android storage. This preserves the useful A2 multi-file archive behavior without reviving its old ownership graph.
+
 Current flow:
 
 ```text

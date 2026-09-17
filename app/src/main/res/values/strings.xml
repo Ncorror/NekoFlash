@@ -19,4 +19,10 @@
     <string name="usb_evidence_saved">Evidence file saved</string>
     <string name="usb_evidence_save_cancelled">Evidence save cancelled</string>
     <string name="usb_evidence_save_failed">Evidence file save failed</string>
+    <string name="usb_save_evidence_zip">Collect evidence ZIP</string>
+    <string name="usb_share_evidence_zip">Share evidence ZIP</string>
+    <string name="usb_evidence_zip_saved">Evidence ZIP saved</string>
+    <string name="usb_evidence_zip_save_failed">Evidence ZIP save failed</string>
+    <string name="usb_evidence_zip_preparing">Preparing evidence ZIP…</string>
+    <string name="usb_evidence_zip_share_failed">Evidence ZIP share failed</string>
 </resources>

@@ -77,10 +77,15 @@ Evidence usability follow-up:
 - [x] full in-memory diagnostics can be saved through Android's document picker as a UTF-8 `.txt` file;
 - [x] full diagnostics can be shared through the system share sheet;
 - [x] exported structured fields defensively redact likely secret/raw protocol material;
-- [x] the on-screen `bulk-pair` label now identifies interface indexes explicitly instead of looking like a count.
+- [x] the on-screen `bulk-pair` label now identifies interface indexes explicitly instead of looking like a count;
+- [x] CI verification for commit `d340424f5879c457c0ee441a6561b848b3b6f326`: 8/8 JVM tests PASS, USB lint 0 issues, app lint 0 errors / 11 warnings;
+- [x] multi-file evidence ZIP code restores the useful A2 archive principle without copying the old architecture: explicit allowlisted sections, deterministic ZIP entry timestamps, manifest-first layout, caller-owned output streams, Android document-picker save and FileProvider-backed share;
+- [ ] owner-device validation of the new multi-file ZIP: save/share a real archive and verify its manifest plus all expected files can be opened after a Poco/Xiaomi run.
+
+Current ZIP payload is intentionally small and extensible: `summary.txt`, `usb-events.txt`, `usb-descriptors.txt`, `device-info.txt`, `app-build.txt`, and `session-info.txt`, preceded by `export-manifest.txt`. Future ADB/Fastboot/USBFS evidence gets additional named sections rather than being flattened into one giant text file.
 
 Fastboot DATA retention is now an explicit requirement for later Phase 2/3 protocol work: `ASYNC_USB_REQUEST` remains the A2 hardware-proven Java fallback; `NATIVE_USBFS` must return as a freshly validated high-throughput backend; a bounded `SYNC_BULK` path may exist as an explicitly preselected fallback/diagnostic mode. Native selection occurs before `download:` and no backend switch/retry is allowed after DATA negotiation starts.
 
 ## Next minimal step
 
-Add the smallest evidence-first ADB handshake probe on top of the now hardware-proven USB claim boundary: transmit/receive only enough ADB framing for `CNXN`/`AUTH`, record packet types, byte counts, timing and terminal outcome, and keep credentials/raw authentication material out of diagnostics. Do not add shell/push services, Fastboot protocol execution, or Native USBFS implementation in that handshake slice.
+Close the evidence-bundle usability gate first: run authoritative CI for the ZIP changeset, install it on the Android host, repeat the proven Poco/Xiaomi USB scan/permission/open/claim sequence, save/share the resulting ZIP, and inspect the manifest/sections. Once that passes, add the smallest evidence-first ADB handshake probe: only `CNXN`/`AUTH`, packet types/byte counts/timing/terminal outcome, with credentials and raw authentication material excluded from diagnostics.
