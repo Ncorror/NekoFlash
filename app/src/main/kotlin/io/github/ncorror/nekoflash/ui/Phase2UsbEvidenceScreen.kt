@@ -44,6 +44,10 @@ fun Phase2UsbEvidenceScreen(
     diagnostics: InMemoryDiagnosticSink,
 ) {
     val context = LocalContext.current
+    val evidenceSaveCancelled = stringResource(R.string.usb_evidence_save_cancelled)
+    val evidenceSaved = stringResource(R.string.usb_evidence_saved)
+    val evidenceSaveFailed = stringResource(R.string.usb_evidence_save_failed)
+    val evidenceShareTitle = stringResource(R.string.usb_share_full_evidence)
     var devices by remember { mutableStateOf<List<UsbDeviceEvidence>>(emptyList()) }
     var status by remember { mutableStateOf("") }
     var evidenceLines by remember { mutableStateOf<List<String>>(emptyList()) }
@@ -70,7 +74,7 @@ fun Phase2UsbEvidenceScreen(
         contract = ActivityResultContracts.CreateDocument("text/plain"),
     ) { uri ->
         if (uri == null) {
-            status = context.getString(R.string.usb_evidence_save_cancelled)
+            status = evidenceSaveCancelled
         } else {
             val saved = runCatching {
                 context.contentResolver.openOutputStream(uri, "wt")
@@ -78,9 +82,7 @@ fun Phase2UsbEvidenceScreen(
                     ?.use { writer -> writer.write(pendingExportText) }
                     ?: error("Content resolver returned no output stream")
             }.isSuccess
-            status = context.getString(
-                if (saved) R.string.usb_evidence_saved else R.string.usb_evidence_save_failed,
-            )
+            status = if (saved) evidenceSaved else evidenceSaveFailed
         }
     }
 
@@ -197,7 +199,7 @@ fun Phase2UsbEvidenceScreen(
                 context.startActivity(
                     Intent.createChooser(
                         shareIntent,
-                        context.getString(R.string.usb_share_full_evidence),
+                        evidenceShareTitle,
                     ),
                 )
             },
