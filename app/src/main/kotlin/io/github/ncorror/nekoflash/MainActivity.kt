@@ -22,7 +22,8 @@ class MainActivity : ComponentActivity() {
                     Phase2UsbEvidenceScreen(
                         probe = app.usbEvidenceProbe,
                         diagnostics = app.diagnostics,
-                        runId = app.evidenceRunId,
+                        initialSessionId = app.evidenceSessionId,
+                        beginNewSession = app::beginEvidenceSession,
                     )
                 } else {
                     WelcomeScreen(onContinue = { welcomeCompleted = true })

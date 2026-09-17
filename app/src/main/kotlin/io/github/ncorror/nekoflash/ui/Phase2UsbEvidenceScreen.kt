@@ -17,6 +17,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -47,7 +48,8 @@ private val evidenceFileTimestamp = DateTimeFormatter
 fun Phase2UsbEvidenceScreen(
     probe: UsbEvidenceProbe,
     diagnostics: InMemoryDiagnosticSink,
-    runId: String,
+    initialSessionId: String,
+    beginNewSession: () -> String,
 ) {
     val context = LocalContext.current
     val evidenceSaveCancelled = stringResource(R.string.usb_evidence_save_cancelled)
@@ -59,6 +61,9 @@ fun Phase2UsbEvidenceScreen(
     val zipPreparing = stringResource(R.string.usb_evidence_zip_preparing)
     val zipShareFailed = stringResource(R.string.usb_evidence_zip_share_failed)
     val zipShareTitle = stringResource(R.string.usb_share_evidence_zip)
+    val newSessionStarted = stringResource(R.string.usb_evidence_session_started)
+    var sessionId by remember { mutableStateOf(initialSessionId) }
+    var targetLabel by remember { mutableStateOf("") }
     var devices by remember { mutableStateOf<List<UsbDeviceEvidence>>(emptyList()) }
     var status by remember { mutableStateOf("") }
     var evidenceLines by remember { mutableStateOf<List<String>>(emptyList()) }
@@ -77,17 +82,32 @@ fun Phase2UsbEvidenceScreen(
         }
     }
 
-    fun fullEvidenceText(): String = formatDiagnosticEvidence(
-        events = diagnostics.snapshot(),
-        generatedAtEpochMillis = System.currentTimeMillis(),
-    )
+    /** Re-read UsbManager immediately before export so permission/device state cannot be stale UI state. */
+    fun refreshDevicesForExport(): List<UsbDeviceEvidence> {
+        val freshDevices = probe.scan()
+        devices = freshDevices
+        refreshEvidence()
+        return freshDevices
+    }
 
-    fun captureZip(): EvidenceBundleFactory.Snapshot = EvidenceBundleFactory.capture(
-        context = context,
-        runId = runId,
-        events = diagnostics.snapshot(),
-        devices = devices,
-    )
+    fun fullEvidenceText(): String {
+        refreshDevicesForExport()
+        return formatDiagnosticEvidence(
+            events = diagnostics.snapshot(),
+            generatedAtEpochMillis = System.currentTimeMillis(),
+        )
+    }
+
+    fun captureZip(): EvidenceBundleFactory.Snapshot {
+        val freshDevices = refreshDevicesForExport()
+        return EvidenceBundleFactory.capture(
+            context = context,
+            sessionId = sessionId,
+            targetLabel = targetLabel,
+            events = diagnostics.snapshot(),
+            devices = freshDevices,
+        )
+    }
 
     val saveEvidence = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("text/plain"),
@@ -142,6 +162,37 @@ fun Phase2UsbEvidenceScreen(
             text = stringResource(R.string.phase2_usb_body),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onBackground,
+        )
+        Text(
+            text = stringResource(R.string.usb_evidence_session_id, sessionId),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        OutlinedTextField(
+            value = targetLabel,
+            onValueChange = { targetLabel = it },
+            label = { Text(stringResource(R.string.usb_target_label)) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        OutlinedButton(
+            onClick = {
+                sessionId = beginNewSession()
+                targetLabel = ""
+                devices = emptyList()
+                pendingExportText = ""
+                pendingZipSnapshot = null
+                status = newSessionStarted
+                refreshEvidence()
+            },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(stringResource(R.string.usb_new_evidence_session))
+        }
+        Text(
+            text = stringResource(R.string.usb_new_evidence_session_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Button(
             onClick = {

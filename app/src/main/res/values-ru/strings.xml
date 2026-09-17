@@ -25,4 +25,9 @@
     <string name="usb_evidence_zip_save_failed">Не удалось сохранить evidence ZIP</string>
     <string name="usb_evidence_zip_preparing">Подготовка evidence ZIP…</string>
     <string name="usb_evidence_zip_share_failed">Не удалось поделиться evidence ZIP</string>
+    <string name="usb_evidence_session_id">Сессия evidence: %1$s</string>
+    <string name="usb_target_label">Метка устройства (например, POCO F5)</string>
+    <string name="usb_new_evidence_session">Новая сессия evidence</string>
+    <string name="usb_new_evidence_session_hint">Перед каждым новым устройством запускайте новую сессию. Старые evidence очищаются из памяти без перезапуска USB owner.</string>
+    <string name="usb_evidence_session_started">Новая чистая сессия evidence запущена</string>
 </resources>

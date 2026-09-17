@@ -25,4 +25,9 @@
     <string name="usb_evidence_zip_save_failed">Evidence ZIP save failed</string>
     <string name="usb_evidence_zip_preparing">Preparing evidence ZIP…</string>
     <string name="usb_evidence_zip_share_failed">Evidence ZIP share failed</string>
+    <string name="usb_evidence_session_id">Evidence session: %1$s</string>
+    <string name="usb_target_label">Target label (for example, POCO F5)</string>
+    <string name="usb_new_evidence_session">New evidence session</string>
+    <string name="usb_new_evidence_session_hint">Start a new session before each target device. This clears previous in-memory evidence without restarting the USB owner.</string>
+    <string name="usb_evidence_session_started">New clean evidence session started</string>
 </resources>

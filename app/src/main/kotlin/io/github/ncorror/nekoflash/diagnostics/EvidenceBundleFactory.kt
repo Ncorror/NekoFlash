@@ -10,7 +10,7 @@ import io.github.ncorror.nekoflash.core.diagnostics.formatDiagnosticEvidence
 import io.github.ncorror.nekoflash.transport.usb.android.UsbDeviceEvidence
 import java.time.Instant
 
-/** Builds the current Phase 2 multi-file evidence payload without reading arbitrary filesystem content. */
+/** Builds one explicit per-target Phase 2 evidence payload without reading arbitrary filesystem content. */
 object EvidenceBundleFactory {
     data class Snapshot(
         val exportedAt: Instant,
@@ -19,20 +19,22 @@ object EvidenceBundleFactory {
 
     fun capture(
         context: Context,
-        runId: String,
+        sessionId: String,
+        targetLabel: String,
         events: List<DiagnosticEvent>,
         devices: List<UsbDeviceEvidence>,
         exportedAt: Instant = Instant.now(),
     ): Snapshot {
         val exportedAtEpochMillis = exportedAt.toEpochMilli()
         val usbEvents = events.filter { it.category == USB_CATEGORY }
+        val cleanTargetLabel = singleLine(targetLabel).trim()
 
         return Snapshot(
             exportedAt = exportedAt,
             sections = listOf(
                 DiagnosticBundleSection(
                     "summary.txt",
-                    summaryText(runId, events, usbEvents, devices, exportedAt),
+                    summaryText(sessionId, cleanTargetLabel, events, usbEvents, devices, exportedAt),
                 ),
                 DiagnosticBundleSection(
                     "usb-events.txt",
@@ -52,22 +54,24 @@ object EvidenceBundleFactory {
                 ),
                 DiagnosticBundleSection(
                     "session-info.txt",
-                    sessionInfoText(runId, events, exportedAt),
+                    sessionInfoText(sessionId, cleanTargetLabel, events, exportedAt),
                 ),
             ),
         )
     }
 
     private fun summaryText(
-        runId: String,
+        sessionId: String,
+        targetLabel: String,
         events: List<DiagnosticEvent>,
         usbEvents: List<DiagnosticEvent>,
         devices: List<UsbDeviceEvidence>,
         exportedAt: Instant,
     ): String = buildString {
-        appendLine("schema=io.github.ncorror.nekoflash.phase2-usb-summary.v1")
+        appendLine("schema=io.github.ncorror.nekoflash.phase2-usb-summary.v2")
         appendLine("scope=phase2-usb-evidence")
-        appendLine("runId=$runId")
+        appendLine("sessionId=$sessionId")
+        appendLine("targetLabel=${targetLabel.ifBlank { "<unset>" }}")
         appendLine("exportedAt=$exportedAt")
         appendLine("protocolBytesSent=false")
         appendLine("eventCount=${events.size}")
@@ -154,12 +158,14 @@ object EvidenceBundleFactory {
     }
 
     private fun sessionInfoText(
-        runId: String,
+        sessionId: String,
+        targetLabel: String,
         events: List<DiagnosticEvent>,
         exportedAt: Instant,
     ): String = buildString {
-        appendLine("schema=io.github.ncorror.nekoflash.evidence-session.v1")
-        appendLine("runId=$runId")
+        appendLine("schema=io.github.ncorror.nekoflash.evidence-session.v2")
+        appendLine("sessionId=$sessionId")
+        appendLine("targetLabel=${targetLabel.ifBlank { "<unset>" }}")
         appendLine("exportedAt=$exportedAt")
         appendLine("processElapsedRealtimeMillis=${SystemClock.elapsedRealtime()}")
         appendLine("eventCount=${events.size}")

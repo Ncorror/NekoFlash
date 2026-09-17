@@ -27,4 +27,11 @@ class InMemoryDiagnosticSink : DiagnosticSink {
     }
 
     fun snapshot(): List<DiagnosticEvent> = synchronized(events) { events.toList() }
+
+    /** Starts a new evidence scope without replacing the sink object owned by Application/probes. */
+    fun clear() {
+        synchronized(events) {
+            events.clear()
+        }
+    }
 }

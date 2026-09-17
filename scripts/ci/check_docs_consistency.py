@@ -114,6 +114,33 @@ def main() -> int:
     if missing_bundle:
         return fail(f'evidence ZIP contract drifted: missing {missing_bundle}')
 
+    session_tokens = [
+        'New evidence session',
+        'target label',
+        'fresh `UsbManager` scan',
+        'POCO X3 Pro',
+        'POCO F5',
+    ]
+    missing_session = [token for token in session_tokens if token not in roadmap]
+    if missing_session:
+        return fail(f'per-target evidence session contract drifted: missing {missing_session}')
+
+    diagnostics_source = (ROOT / 'core/diagnostics/src/main/kotlin/io/github/ncorror/nekoflash/core/diagnostics/Diagnostics.kt').read_text(encoding='utf-8')
+    if 'fun clear()' not in diagnostics_source:
+        return fail('per-target evidence reset requires InMemoryDiagnosticSink.clear()')
+
+    app_source = (ROOT / 'app/src/main/kotlin/io/github/ncorror/nekoflash/NekoFlashApplication.kt').read_text(encoding='utf-8')
+    if 'beginEvidenceSession' not in app_source or 'evidenceSessionId' not in app_source:
+        return fail('Application-scoped evidence session owner is missing')
+
+    screen_source = (ROOT / 'app/src/main/kotlin/io/github/ncorror/nekoflash/ui/Phase2UsbEvidenceScreen.kt').read_text(encoding='utf-8')
+    if 'refreshDevicesForExport' not in screen_source or 'usb_new_evidence_session' not in screen_source:
+        return fail('fresh export scan / new-session UI contract is missing')
+
+    factory_source = (ROOT / 'app/src/main/kotlin/io/github/ncorror/nekoflash/diagnostics/EvidenceBundleFactory.kt').read_text(encoding='utf-8')
+    if 'targetLabel' not in factory_source or 'sessionId' not in factory_source:
+        return fail('bundle target/session identity fields are missing')
+
     bundle_source = ROOT / 'core/diagnostics/src/main/kotlin/io/github/ncorror/nekoflash/core/diagnostics/DiagnosticBundle.kt'
     if not bundle_source.is_file():
         return fail('deterministic DiagnosticBundle writer is missing')

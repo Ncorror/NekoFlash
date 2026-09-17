@@ -14,6 +14,8 @@ The USB evidence boundary deliberately sends no ADB/Fastboot bytes. It classifie
 
 Shareable evidence now has a separate serialization boundary in `:core:diagnostics`: a deterministic, manifest-first multi-file ZIP writer accepts only explicit UTF-8 sections. Android-specific host/app/USB section construction and document/share integration remain in `:app`; the diagnostics core does not enumerate files or depend on Android storage. This preserves the useful A2 multi-file archive behavior without reviving its old ownership graph.
 
+Evidence collection is scoped per target run. `NekoFlashApplication` keeps the USB permission receiver/Application owner alive while a manual **new evidence session** clears only the in-memory event sink and rotates a `sessionId`. The UI also records an owner-supplied target label because USB enumeration alone cannot reliably identify a model, especially when `UsbManager` reports zero devices. Immediately before TXT/ZIP export, the app performs a fresh `UsbManager` scan so `permissionGranted`, descriptors and device count are captured from live state rather than a stale Compose snapshot.
+
 Current flow:
 
 ```text
