@@ -9,6 +9,7 @@
     <string name="phase1_ready_body">Чистая production-оболочка запущена.</string>
     <string name="phase2_usb_title">Phase 2 · USB + ADB evidence</string>
     <string name="phase2_usb_body">Evidence-first transport probe: USB-дескрипторы, разрешение, open/claim и минимальный ADB CNXN/AUTH handshake. ADB-сервисы, shell, push, прошивка и байты Fastboot не отправляются.</string>
+    <string name="usb_auto_flow_hint">Обычный сценарий автоматический: после Welcome NekoFlash сам сканирует при запуске/подключении USB, запрашивает USB-разрешение, затем делает open/claim и ограниченный ADB CNXN/AUTH handshake. Кнопки ниже — диагностический/retry fallback.</string>
     <string name="usb_scan">Сканировать USB</string>
     <string name="usb_permission">Разрешение</string>
     <string name="usb_probe_open_claim">Проверить open + claim</string>

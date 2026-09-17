@@ -9,6 +9,7 @@
     <string name="phase1_ready_body">The clean production shell is running.</string>
     <string name="phase2_usb_title">Phase 2 · USB + ADB evidence</string>
     <string name="phase2_usb_body">Evidence-first transport probe: USB descriptors/permission/open/claim plus a minimal ADB CNXN/AUTH handshake. No ADB services, shell, push, flashing, or Fastboot bytes are sent.</string>
+    <string name="usb_auto_flow_hint">Normal flow is automatic: after Welcome, NekoFlash scans on startup/USB attach, requests USB permission, then opens/claims and runs the bounded ADB CNXN/AUTH handshake. The buttons below are diagnostic/retry fallbacks.</string>
     <string name="usb_scan">Scan USB</string>
     <string name="usb_permission">Permission</string>
     <string name="usb_probe_open_claim">Probe open + claim</string>

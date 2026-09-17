@@ -5,6 +5,7 @@ import android.os.SystemClock
 import io.github.ncorror.nekoflash.core.diagnostics.DiagnosticEvent
 import io.github.ncorror.nekoflash.core.diagnostics.InMemoryDiagnosticSink
 import io.github.ncorror.nekoflash.transport.usb.android.AdbUsbHandshakeProbe
+import io.github.ncorror.nekoflash.transport.usb.android.UsbAdbAutoFlow
 import io.github.ncorror.nekoflash.transport.usb.android.UsbEvidenceProbe
 import java.util.UUID
 
@@ -20,10 +21,20 @@ class NekoFlashApplication : Application() {
     lateinit var adbUsbHandshakeProbe: AdbUsbHandshakeProbe
         private set
 
+    lateinit var usbAdbAutoFlow: UsbAdbAutoFlow
+        private set
+
     override fun onCreate() {
         super.onCreate()
-        usbEvidenceProbe = UsbEvidenceProbe(this, diagnostics).also { it.start() }
+        usbEvidenceProbe = UsbEvidenceProbe(this, diagnostics)
         adbUsbHandshakeProbe = AdbUsbHandshakeProbe(this, diagnostics)
+        usbAdbAutoFlow = UsbAdbAutoFlow(
+            context = this,
+            usbProbe = usbEvidenceProbe,
+            adbProbe = adbUsbHandshakeProbe,
+            diagnostics = diagnostics,
+        )
+        usbEvidenceProbe.start(usbAdbAutoFlow::onPermissionResult)
         emitSessionStarted(reason = "process_start")
     }
 
@@ -36,6 +47,7 @@ class NekoFlashApplication : Application() {
         diagnostics.clear()
         evidenceSessionId = newEvidenceSessionId()
         emitSessionStarted(reason = "manual_reset")
+        usbAdbAutoFlow.rearmForEvidenceSession()
         return evidenceSessionId
     }
 

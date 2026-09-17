@@ -169,6 +169,11 @@ fun Phase2UsbEvidenceScreen(
             color = MaterialTheme.colorScheme.onBackground,
         )
         Text(
+            text = stringResource(R.string.usb_auto_flow_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
             text = stringResource(R.string.usb_evidence_session_id, sessionId),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,

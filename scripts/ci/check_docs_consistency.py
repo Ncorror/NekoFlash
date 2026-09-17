@@ -146,6 +146,42 @@ def main() -> int:
     if 'adb_probe_handshake' not in screen_source or 'adbProbe.probe' not in screen_source:
         return fail('minimal ADB CNXN/AUTH probe UI wiring is missing')
 
+    auto_adr = ROOT / 'docs/adr/0004_USB_ADB_AUTO_FIRST_ENTRY.md'
+    if not auto_adr.is_file():
+        return fail('auto-first USB/ADB entry ADR is missing')
+    auto_adr_text = auto_adr.read_text(encoding='utf-8')
+    auto_adr_tokens = ['auto-first', '350 ms', 'manual', 'Fastboot']
+    missing_auto_adr = [token for token in auto_adr_tokens if token not in auto_adr_text]
+    if missing_auto_adr:
+        return fail(f'auto-first ADR drifted: missing {missing_auto_adr}')
+
+    auto_flow_source = (ROOT / 'transport/usb-android/src/main/kotlin/io/github/ncorror/nekoflash/transport/usb/android/UsbAdbAutoFlow.kt').read_text(encoding='utf-8')
+    auto_policy_source = (ROOT / 'transport/usb-android/src/main/kotlin/io/github/ncorror/nekoflash/transport/usb/android/UsbAdbAutoFlowPolicy.kt').read_text(encoding='utf-8')
+    auto_tokens = [
+        'STARTUP_SCAN_DELAY_MS = 350L',
+        'UsbManager.ACTION_USB_DEVICE_ATTACHED',
+        'auto_permission_granted',
+        'adbProbe.probe',
+        'rearmForEvidenceSession',
+    ]
+    missing_auto = [token for token in auto_tokens if token not in auto_flow_source]
+    if missing_auto:
+        return fail(f'auto-first USB/ADB flow drifted: missing {missing_auto}')
+    policy_tokens = ['adbDevices.size != 1', 'totalInterfaces != 1', 'adbInterfaceIndexes.single()']
+    missing_policy = [token for token in policy_tokens if token not in auto_policy_source]
+    if missing_policy:
+        return fail(f'conservative auto-selection policy drifted: missing {missing_policy}')
+
+    auto_roadmap_tokens = [
+        'auto-first ordinary USB/ADB entry',
+        '350 ms',
+        'diagnostic/retry fallback controls',
+        'future Fastboot implementation',
+    ]
+    missing_auto_roadmap = [token for token in auto_roadmap_tokens if token not in roadmap]
+    if missing_auto_roadmap:
+        return fail(f'auto-first roadmap acceptance drifted: missing {missing_auto_roadmap}')
+
     factory_source = (ROOT / 'app/src/main/kotlin/io/github/ncorror/nekoflash/diagnostics/EvidenceBundleFactory.kt').read_text(encoding='utf-8')
     if 'targetLabel' not in factory_source or 'sessionId' not in factory_source:
         return fail('bundle target/session identity fields are missing')
@@ -168,6 +204,19 @@ def main() -> int:
     if '.evidence-files' not in manifest or '@xml/evidence_file_paths' not in manifest:
         return fail('evidence ZIP FileProvider wiring is missing')
 
+    attach_tokens = [
+        'android.hardware.usb.host',
+        'android.hardware.usb.action.USB_DEVICE_ATTACHED',
+        '@xml/device_filter',
+        'android:launchMode="singleTop"',
+    ]
+    missing_attach = [token for token in attach_tokens if token not in manifest]
+    if missing_attach:
+        return fail(f'USB attach delivery contract drifted: missing {missing_attach}')
+    device_filter = (ROOT / 'app/src/main/res/xml/device_filter.xml').read_text(encoding='utf-8')
+    if '<usb-device class="255" />' not in device_filter:
+        return fail('USB attach device filter must remain class-255 delivery-only wildcard')
+
     for relative, expected in EXPECTED_HASHES.items():
         actual = sha256(ROOT / relative)
         if actual != expected:
@@ -178,7 +227,7 @@ def main() -> int:
         if '/src/test/' in path.as_posix():
             tests += len(re.findall(r'^\s*@Test\b', path.read_text(encoding='utf-8'), flags=re.MULTILINE))
 
-    print(f'docs consistency: PASS (one status source; 5 modules; Phase 2 USB + ADB handshake boundaries; full evidence export; multi-file evidence ZIP; Native USBFS retained; brand hashes exact; {tests} @Test methods)')
+    print(f'docs consistency: PASS (one status source; 5 modules; auto-first USB/ADB entry; ADB handshake boundary; full evidence export; multi-file evidence ZIP; Native USBFS retained; brand hashes exact; {tests} @Test methods)')
     return 0
 
 

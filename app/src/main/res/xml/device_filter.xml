@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        Attach delivery only. A class=255 wildcard reaches canonical ADB/Fastboot and OEM
+        vendor-specific interfaces without a VID/PID allowlist. Automatic protocol selection stays
+        narrower in code: Phase 2 currently auto-advances only one unambiguous FF/42/01 ADB
+        interface with bulk IN+OUT. Generic vendor bulk and ambiguity remain manual evidence cases.
+    -->
+    <usb-device class="255" />
+</resources>

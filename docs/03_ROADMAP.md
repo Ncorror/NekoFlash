@@ -110,3 +110,19 @@ The POCO F5 Android-mode enumeration quirk is deliberately not used to block thi
 ## Next minimal step
 
 Run authoritative CI for the minimal ADB handshake changeset, install the APK, create a clean `POCO X3 Pro` evidence session, then run `Scan -> Permission -> ADB CNXN/AUTH probe -> ZIP`. If the target asks for RSA authorization, approve it and let the probe terminate on `CNXN` or an explicit transfer/protocol failure. Review `adb-events.txt` before adding any ADB service command.
+## Phase 2 ADB handshake verification and auto-first entry follow-up
+
+Commit `d8c39d5f7000e0b7b01af96f45007e7595b3e480` has authoritative GitHub Actions verification for the bounded ADB handshake slice: **26/26 JVM tests PASS**, `:transport:usb-android` lint reports no issues, and app lint reports 0 errors with 11 non-blocking warnings. The owner hardware archive `NekoFlash-evidence-20260917-231324Z.zip` then proved the first real POCO X3 Pro (`targetLabel=poco x3pro`) ADB run end-to-end through this boundary: `18D1:4EE7`, permission granted, open success, `claimInterface(false)=true`, `CNXN -> AUTH TOKEN -> AUTH SIGNATURE -> AUTH TOKEN -> AUTH RSAPUBLICKEY -> CNXN`, terminal `CONNECTED`, `authPath=PUBLIC_KEY`, with the connection released/closed after approximately 1.8 s. This is a USB + ADB-handshake PASS only; it does not claim shell/sync/reboot/Fastboot support.
+
+Owner review of Legacy, A2 and the previous `main` identified a product-flow regression in the diagnostic rewrite: scan, permission, open/claim and ADB handshake had become four required button presses even though Legacy/A2 performed ordinary attach/startup progression automatically. The retained acceptance contract is now:
+
+- [ ] **auto-first ordinary USB/ADB entry** after the Welcome gate: startup/attach -> scan -> permission -> open/claim -> bounded CNXN/AUTH without requiring the diagnostic buttons;
+- [ ] Legacy-equivalent one-shot startup settle delay of **350 ms** for a device already connected when the authorized UI entry begins;
+- [ ] Android USB attach intent delivery restored with a class-255 wildcard that is delivery-only, never a VID/PID support allowlist;
+- [ ] automatic selection only when there is exactly one physical device with exactly one canonical ADB `FF/42/01` bulk IN+OUT interface; ambiguity/generic vendor bulk remains manual;
+- [ ] USB permission and target RSA dialogs remain explicit user/platform approvals, with the host flow continuing automatically after permission callback;
+- [ ] terminal transport/protocol/auth failure is not silently retried in the same attachment generation; detach or **New evidence session** explicitly re-arms;
+- [ ] `Scan USB`, `Permission`, `Open + claim`, and `ADB CNXN/AUTH` remain diagnostic/retry fallback controls, not the normal workflow;
+- [ ] the same auto-first product contract is retained for future Fastboot implementation, including explicit re-enumeration evidence, without introducing Fastboot bytes in this slice.
+
+ADR `docs/adr/0004_USB_ADB_AUTO_FIRST_ENTRY.md` makes this behavior a repository-resident architecture/acceptance decision so it cannot be silently lost in another cleanup.

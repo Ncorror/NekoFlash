@@ -22,6 +22,12 @@ The first ADB slice is diagnostic, not a general ADB client. It may send exactly
 
 Handshake diagnostics may record command/type names, byte counts, endpoint addresses, call timing/result codes, peer protocol/max-payload metadata and a coarse peer kind (`DEVICE`/`RECOVERY`/`SIDELOAD`/`UNKNOWN`). They must not record AUTH tokens, RSA signatures, public-key material, private-key paths/content, or raw connection banners. A failed USB transfer is terminal for the probe: no automatic second `CNXN`, reconnect, `clearEndpointHalt`, or service command is allowed to hide the first failure.
 
+## USB/ADB auto-first entry rule
+
+The normal product path is not a sequence of diagnostic button presses. After the Welcome/entry gate, NekoFlash automatically performs the safe chain `startup/USB attach -> scan -> unique canonical ADB candidate -> USB permission when required -> open/claim -> bounded CNXN/AUTH handshake`. Android USB permission and target-side RSA authorization remain explicit platform/user approvals; once they are granted, the host flow resumes automatically.
+
+Automatic selection is intentionally conservative: exactly one physical device with exactly one canonical ADB `FF/42/01` interface and bulk IN+OUT may advance. Generic vendor bulk interfaces, multiple devices, or multiple canonical ADB interfaces remain manual evidence cases. The manual Scan/Permission/Open+claim/ADB controls remain available for diagnostics and retry, but they are not the expected happy path. A terminal handshake/transport failure is not silently retried in the same attachment generation; detach or an explicit New evidence session re-arms automation. This behavior is an acceptance contract, not temporary UI polish, and future Fastboot entry must follow the same auto-first principle when its new engine exists.
+
 ## Fastboot DATA backend retention rule
 
 The clean rewrite must not erase hardware-proven transport capability merely because the implementation is being replaced.
