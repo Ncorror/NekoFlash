@@ -15,7 +15,7 @@ REQUIRED_DOCS = [
     'docs/04_HARDWARE_EVIDENCE.md',
     'docs/05_CAPABILITY_MATRIX.md',
 ]
-EXPECTED_MODULES = {':app', ':core:model', ':core:diagnostics', ':transport:usb-android'}
+EXPECTED_MODULES = {':app', ':core:model', ':core:diagnostics', ':protocol:adb', ':transport:usb-android'}
 EXPECTED_HASHES = {
     'app/src/main/res/drawable-nodpi/bg_welcome.jpg': 'd16195d6ab022a4ec8f9686a1d750a4dd83595140e68f718c992df8a0a60a8f7',
     'reference/brand/nekoflash-launcher-reference.png': 'fc098f5bea87aea9c2ad0dbddb74ea8277c94145403fb4d76032f36bb0ce1832',
@@ -52,8 +52,14 @@ def main() -> int:
     if modules != EXPECTED_MODULES:
         return fail(f'production modules drifted: expected {sorted(EXPECTED_MODULES)}, got {sorted(modules)}')
 
-    if (ROOT / 'protocol').exists() or (ROOT / 'usb').exists():
-        return fail('legacy-style top-level protocol/usb trees must not be transplanted into the rewrite')
+    if (ROOT / 'usb').exists():
+        return fail('legacy-style top-level usb tree must not be transplanted into the rewrite')
+
+    protocol_root = ROOT / 'protocol'
+    if protocol_root.exists():
+        protocol_children = {p.name for p in protocol_root.iterdir() if p.is_dir()}
+        if protocol_children != {'adb'}:
+            return fail(f'protocol tree drifted: expected only protocol/adb, got {sorted(protocol_children)}')
 
     start_here = (ROOT / 'docs/00_START_HERE.md').read_text(encoding='utf-8')
     handoff_tokens = [
@@ -105,6 +111,7 @@ def main() -> int:
         'export-manifest.txt',
         'summary.txt',
         'usb-events.txt',
+        'adb-events.txt',
         'usb-descriptors.txt',
         'device-info.txt',
         'app-build.txt',
@@ -136,10 +143,22 @@ def main() -> int:
     screen_source = (ROOT / 'app/src/main/kotlin/io/github/ncorror/nekoflash/ui/Phase2UsbEvidenceScreen.kt').read_text(encoding='utf-8')
     if 'refreshDevicesForExport' not in screen_source or 'usb_new_evidence_session' not in screen_source:
         return fail('fresh export scan / new-session UI contract is missing')
+    if 'adb_probe_handshake' not in screen_source or 'adbProbe.probe' not in screen_source:
+        return fail('minimal ADB CNXN/AUTH probe UI wiring is missing')
 
     factory_source = (ROOT / 'app/src/main/kotlin/io/github/ncorror/nekoflash/diagnostics/EvidenceBundleFactory.kt').read_text(encoding='utf-8')
     if 'targetLabel' not in factory_source or 'sessionId' not in factory_source:
         return fail('bundle target/session identity fields are missing')
+
+    adb_engine = ROOT / 'protocol/adb/src/main/kotlin/io/github/ncorror/nekoflash/protocol/adb/AdbHandshake.kt'
+    if not adb_engine.is_file():
+        return fail('minimal protocol/adb handshake boundary is missing')
+    adb_text = adb_engine.read_text(encoding='utf-8')
+    for forbidden in ['A_OPEN', 'A_WRTE', 'shell:', 'sync:', 'push:']:
+        if forbidden in adb_text:
+            return fail(f'Phase 2 ADB handshake slice must not contain service traffic: {forbidden}')
+    if 'A_CNXN' not in adb_text or 'A_AUTH' not in adb_text:
+        return fail('Phase 2 ADB handshake boundary must contain CNXN/AUTH only')
 
     bundle_source = ROOT / 'core/diagnostics/src/main/kotlin/io/github/ncorror/nekoflash/core/diagnostics/DiagnosticBundle.kt'
     if not bundle_source.is_file():
@@ -159,7 +178,7 @@ def main() -> int:
         if '/src/test/' in path.as_posix():
             tests += len(re.findall(r'^\s*@Test\b', path.read_text(encoding='utf-8'), flags=re.MULTILINE))
 
-    print(f'docs consistency: PASS (one status source; 4 modules; Phase 2 USB boundary; full evidence export; multi-file evidence ZIP; Native USBFS retained; brand hashes exact; {tests} @Test methods)')
+    print(f'docs consistency: PASS (one status source; 5 modules; Phase 2 USB + ADB handshake boundaries; full evidence export; multi-file evidence ZIP; Native USBFS retained; brand hashes exact; {tests} @Test methods)')
     return 0
 
 

@@ -4,6 +4,7 @@ import android.app.Application
 import android.os.SystemClock
 import io.github.ncorror.nekoflash.core.diagnostics.DiagnosticEvent
 import io.github.ncorror.nekoflash.core.diagnostics.InMemoryDiagnosticSink
+import io.github.ncorror.nekoflash.transport.usb.android.AdbUsbHandshakeProbe
 import io.github.ncorror.nekoflash.transport.usb.android.UsbEvidenceProbe
 import java.util.UUID
 
@@ -16,9 +17,13 @@ class NekoFlashApplication : Application() {
     lateinit var usbEvidenceProbe: UsbEvidenceProbe
         private set
 
+    lateinit var adbUsbHandshakeProbe: AdbUsbHandshakeProbe
+        private set
+
     override fun onCreate() {
         super.onCreate()
         usbEvidenceProbe = UsbEvidenceProbe(this, diagnostics).also { it.start() }
+        adbUsbHandshakeProbe = AdbUsbHandshakeProbe(this, diagnostics)
         emitSessionStarted(reason = "process_start")
     }
 
@@ -27,6 +32,7 @@ class NekoFlashApplication : Application() {
      * Call this before switching the target device so archives cannot silently mix two phones.
      */
     fun beginEvidenceSession(): String {
+        check(!adbUsbHandshakeProbe.isRunning) { "ADB handshake probe is running" }
         diagnostics.clear()
         evidenceSessionId = newEvidenceSessionId()
         emitSessionStarted(reason = "manual_reset")

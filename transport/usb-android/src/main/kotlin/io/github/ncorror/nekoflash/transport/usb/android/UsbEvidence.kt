@@ -38,6 +38,9 @@ data class UsbInterfaceEvidence(
 
     val hasBulkPair: Boolean
         get() = hasBulkIn && hasBulkOut
+
+    val isAdbInterfaceShape: Boolean
+        get() = hasBulkPair && interfaceClass == 0xFF && interfaceSubclass == 0x42 && interfaceProtocol == 0x01
 }
 
 data class UsbDeviceEvidence(
@@ -53,6 +56,9 @@ data class UsbDeviceEvidence(
 ) {
     val bulkPairInterfaceIndexes: List<Int>
         get() = interfaces.filter { it.hasBulkPair }.map { it.index }
+
+    val adbInterfaceIndexes: List<Int>
+        get() = interfaces.filter { it.isAdbInterfaceShape }.map { it.index }
 
     fun vidPid(): String = "%04X:%04X".format(vendorId, productId)
 }

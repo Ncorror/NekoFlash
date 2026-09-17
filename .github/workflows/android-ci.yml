@@ -57,6 +57,8 @@ jobs:
             core/model/build/reports/tests/test/
             core/diagnostics/build/test-results/test/
             core/diagnostics/build/reports/tests/test/
+            protocol/adb/build/test-results/test/
+            protocol/adb/build/reports/tests/test/
             transport/usb-android/build/test-results/
             transport/usb-android/build/reports/tests/
             transport/usb-android/build/reports/lint-results-*.*

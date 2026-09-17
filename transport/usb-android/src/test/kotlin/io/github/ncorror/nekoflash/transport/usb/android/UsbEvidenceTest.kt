@@ -33,6 +33,28 @@ class UsbEvidenceTest {
         assertEquals(listOf(0), evidence.bulkPairInterfaceIndexes)
     }
 
+
+    @Test
+    fun adbInterfaceShapeRequiresProtocolTripletButNotVendorId() {
+        val googleVid = device(
+            vendorId = 0x18D1,
+            productId = 0x4EE7,
+            interfaceClass = 0xFF,
+            interfaceSubclass = 0x42,
+            interfaceProtocol = 0x01,
+        )
+        val xiaomiVid = device(
+            vendorId = 0x2717,
+            productId = 0xFF48,
+            interfaceClass = 0xFF,
+            interfaceSubclass = 0x42,
+            interfaceProtocol = 0x01,
+        )
+
+        assertEquals(listOf(0), googleVid.adbInterfaceIndexes)
+        assertEquals(listOf(0), xiaomiVid.adbInterfaceIndexes)
+    }
+
     @Test
     fun interfaceWithoutBothBulkDirectionsIsNotClaimCandidate() {
         val oneWay = UsbInterfaceEvidence(

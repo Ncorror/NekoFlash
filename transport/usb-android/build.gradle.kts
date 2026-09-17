@@ -27,5 +27,6 @@ kotlin {
 dependencies {
     api(project(":core:model"))
     api(project(":core:diagnostics"))
+    api(project(":protocol:adb"))
     testImplementation(libs.junit4)
 }

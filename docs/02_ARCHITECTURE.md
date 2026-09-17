@@ -6,11 +6,12 @@ Phase 1 closed with three production boundaries:
 - `:core:model` — target/session identity and cross-feature outcome vocabulary.
 - `:core:diagnostics` — structured local evidence primitives.
 
-Phase 2 has started with one additional executable boundary:
+Phase 2 has added two executable transport/protocol boundaries:
 
-- `:transport:usb-android` — Application-scoped Android USB evidence owner for discovery, permission callbacks, descriptor/interface/endpoint snapshots, and a reversible `openDevice -> claimInterface(false) -> release -> close` probe.
+- `:transport:usb-android` — Application-scoped Android USB evidence owner for discovery, permission callbacks, descriptor/interface/endpoint snapshots, reversible open/claim probing, and the Android USB adapter used by the ADB handshake evidence probe.
+- `:protocol:adb` — pure JVM ADB aprotocol framing plus the smallest `CNXN`/`AUTH` handshake state machine and persistent app-private RSA host-key formatting/signing. It owns no ADB service traffic.
 
-The USB evidence boundary deliberately sends no ADB/Fastboot bytes. It classifies a claim candidate only by the concrete transport need for both bulk IN and bulk OUT; vendor, product, class, subclass and protocol are recorded as evidence rather than used as Xiaomi/Poco bans.
+The original USB evidence probe still sends no protocol bytes. The new ADB probe is a separate explicit action and sends only one `CNXN` plus the minimum `AUTH` response sequence required by the peer; it never sends `OPEN`, `WRTE`, shell, sync/push, reboot or Fastboot bytes. It classifies a claim candidate only by the concrete transport need for both bulk IN and bulk OUT; vendor, product, class, subclass and protocol are recorded as evidence rather than used as Xiaomi/Poco bans.
 
 Shareable evidence now has a separate serialization boundary in `:core:diagnostics`: a deterministic, manifest-first multi-file ZIP writer accepts only explicit UTF-8 sections. Android-specific host/app/USB section construction and document/share integration remain in `:app`; the diagnostics core does not enumerate files or depend on Android storage. This preserves the useful A2 multi-file archive behavior without reviving its old ownership graph.
 
@@ -21,12 +22,15 @@ Current flow:
 ```text
 Phase 2 evidence UI
         ↓
-:transport:usb-android
-        ↓
-Android UsbManager / UsbDeviceConnection
-        ↓
-structured :core:diagnostics evidence
+USB evidence action ─────────────→ :transport:usb-android
+ADB handshake action → :protocol:adb → :transport:usb-android USB adapter
+                                      ↓
+                           Android UsbManager / UsbDeviceConnection
+                                      ↓
+                           structured :core:diagnostics evidence
 ```
+
+The ADB probe is single-flight, uses the protocol-defined `FF/42/01` interface shape rather than a vendor whitelist, claims with `force=false`, performs no hidden reconnect or endpoint-halt recovery, and closes/releases after the terminal handshake outcome. Diagnostics record packet type, byte counts, individual USB call timing/results and terminal outcome, but never AUTH token/signature/public-key bytes or the raw peer banner.
 
 Conceptual direction for later phases:
 

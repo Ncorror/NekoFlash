@@ -27,6 +27,7 @@ object EvidenceBundleFactory {
     ): Snapshot {
         val exportedAtEpochMillis = exportedAt.toEpochMilli()
         val usbEvents = events.filter { it.category == USB_CATEGORY }
+        val adbEvents = events.filter { it.category == ADB_CATEGORY }
         val cleanTargetLabel = singleLine(targetLabel).trim()
 
         return Snapshot(
@@ -34,11 +35,15 @@ object EvidenceBundleFactory {
             sections = listOf(
                 DiagnosticBundleSection(
                     "summary.txt",
-                    summaryText(sessionId, cleanTargetLabel, events, usbEvents, devices, exportedAt),
+                    summaryText(sessionId, cleanTargetLabel, events, usbEvents, adbEvents, devices, exportedAt),
                 ),
                 DiagnosticBundleSection(
                     "usb-events.txt",
                     formatDiagnosticEvidence(usbEvents, exportedAtEpochMillis),
+                ),
+                DiagnosticBundleSection(
+                    "adb-events.txt",
+                    formatDiagnosticEvidence(adbEvents, exportedAtEpochMillis),
                 ),
                 DiagnosticBundleSection(
                     "usb-descriptors.txt",
@@ -65,17 +70,21 @@ object EvidenceBundleFactory {
         targetLabel: String,
         events: List<DiagnosticEvent>,
         usbEvents: List<DiagnosticEvent>,
+        adbEvents: List<DiagnosticEvent>,
         devices: List<UsbDeviceEvidence>,
         exportedAt: Instant,
     ): String = buildString {
-        appendLine("schema=io.github.ncorror.nekoflash.phase2-usb-summary.v2")
-        appendLine("scope=phase2-usb-evidence")
+        appendLine("schema=io.github.ncorror.nekoflash.phase2-transport-summary.v3")
+        appendLine("scope=phase2-usb-adb-handshake-evidence")
         appendLine("sessionId=$sessionId")
         appendLine("targetLabel=${targetLabel.ifBlank { "<unset>" }}")
         appendLine("exportedAt=$exportedAt")
-        appendLine("protocolBytesSent=false")
+        appendLine("protocolBytesSent=${adbEvents.any { it.code == "packet_tx_attempt" }}")
         appendLine("eventCount=${events.size}")
         appendLine("usbEventCount=${usbEvents.size}")
+        appendLine("adbEventCount=${adbEvents.size}")
+        appendLine("adbPacketTxAttemptCount=${adbEvents.count { it.code == "packet_tx_attempt" }}")
+        appendLine("adbPacketRxCount=${adbEvents.count { it.code == "packet_rx" }}")
         appendLine("deviceCount=${devices.size}")
         appendLine("permissionGrantedDeviceCount=${devices.count { it.permissionGranted }}")
         appendLine("bulkPairDeviceCount=${devices.count { it.bulkPairInterfaceIndexes.isNotEmpty() }}")
@@ -86,10 +95,14 @@ object EvidenceBundleFactory {
             }}",
         )
         usbEvents.lastOrNull()?.let { event -> appendLine("latestUsbEvent=${singleLine(event.code)}") }
+        adbEvents.lastOrNull { it.code == "handshake_finished" }?.let { event ->
+            appendLine("latestAdbOutcome=${singleLine(event.fields["outcome"] ?: "unknown")}")
+        }
         devices.forEachIndexed { index, device ->
             appendLine("device[$index].vidPid=${device.vidPid()}")
             appendLine("device[$index].permissionGranted=${device.permissionGranted}")
             appendLine("device[$index].bulkPairInterfaces=${device.bulkPairInterfaceIndexes.joinToString(",")}")
+            appendLine("device[$index].adbInterfaces=${device.adbInterfaceIndexes.joinToString(",")}")
         }
     }
 
@@ -106,6 +119,7 @@ object EvidenceBundleFactory {
             appendLine("device[$deviceIndex].permissionGranted=${device.permissionGranted}")
             appendLine("device[$deviceIndex].interfaceCount=${device.interfaces.size}")
             appendLine("device[$deviceIndex].bulkPairInterfaces=${device.bulkPairInterfaceIndexes.joinToString(",")}")
+            appendLine("device[$deviceIndex].adbInterfaces=${device.adbInterfaceIndexes.joinToString(",")}")
             device.interfaces.forEachIndexed { interfaceIndex, usbInterface ->
                 val prefix = "device[$deviceIndex].interface[$interfaceIndex]"
                 appendLine("$prefix.index=${usbInterface.index}")
@@ -154,7 +168,7 @@ object EvidenceBundleFactory {
             appendLine("versionCode=${versionCode(packageInfo)}")
         }
         appendLine("phase=2")
-        appendLine("scope=usb-evidence")
+        appendLine("scope=usb-adb-handshake-evidence")
     }
 
     private fun sessionInfoText(
@@ -184,4 +198,5 @@ object EvidenceBundleFactory {
     private fun singleLine(value: String): String = value.replace('\n', ' ').replace('\r', ' ')
 
     private const val USB_CATEGORY = "usb_evidence"
+    private const val ADB_CATEGORY = "adb_handshake"
 }

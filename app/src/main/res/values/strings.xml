@@ -3,12 +3,12 @@
     <string name="app_name">NekoFlash</string>
     <string name="welcome_title">NekoFlash</string>
     <string name="welcome_subtitle">Professional Android host toolkit</string>
-    <string name="welcome_phase">Clean rebuild · Phase 2 USB evidence</string>
+    <string name="welcome_phase">Clean rebuild · Phase 2 transport evidence</string>
     <string name="welcome_continue">Continue</string>
     <string name="phase1_ready_title">Phase 1 foundation ready</string>
     <string name="phase1_ready_body">The clean production shell is running.</string>
-    <string name="phase2_usb_title">Phase 2 · USB evidence</string>
-    <string name="phase2_usb_body">Evidence-only USB probe: descriptors, permission, open and claim. No ADB or Fastboot bytes are sent.</string>
+    <string name="phase2_usb_title">Phase 2 · USB + ADB evidence</string>
+    <string name="phase2_usb_body">Evidence-first transport probe: USB descriptors/permission/open/claim plus a minimal ADB CNXN/AUTH handshake. No ADB services, shell, push, flashing, or Fastboot bytes are sent.</string>
     <string name="usb_scan">Scan USB</string>
     <string name="usb_permission">Permission</string>
     <string name="usb_probe_open_claim">Probe open + claim</string>
@@ -30,4 +30,7 @@
     <string name="usb_new_evidence_session">New evidence session</string>
     <string name="usb_new_evidence_session_hint">Start a new session before each target device. This clears previous in-memory evidence without restarting the USB owner.</string>
     <string name="usb_evidence_session_started">New clean evidence session started</string>
+    <string name="adb_probe_handshake">Probe ADB CNXN/AUTH</string>
+    <string name="adb_probe_hint">If Android shows an RSA authorization dialog on the target, confirm it. The probe sends only CNXN/AUTH and then closes the USB connection.</string>
+    <string name="adb_probe_running">ADB handshake probe running… confirm the RSA dialog on the target if it appears.</string>
 </resources>

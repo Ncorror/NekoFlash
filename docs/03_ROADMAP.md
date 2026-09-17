@@ -83,13 +83,30 @@ Evidence usability follow-up:
 - [x] authoritative CI verification for ZIP commit `cf7da5fa7d9357600b778bb76fa9f6f178cf8e98`: 14/14 JVM tests PASS, USB lint 0 issues, app lint 0 errors / 11 warnings;
 - [x] owner-device save validation: four real ZIPs opened successfully and contained `export-manifest.txt` plus all six expected sections;
 - [x] those two-device runs exposed a semantics gap before ADB work: one process-wide run ID and cumulative event sink mixed target histories, while export could serialize stale pre-permission UI descriptors;
-- [x] per-target evidence session fix: manual **new evidence session** rotates `sessionId`, clears prior in-memory events without restarting the Application-scoped USB owner, records an owner-supplied target label, and performs a fresh `UsbManager` scan immediately before TXT/ZIP export;
-- [ ] owner rerun on POCO X3 Pro and POCO F5 with one clean labeled session per phone, including `Scan -> Permission -> Open/Claim -> ZIP`.
+- [x] per-target evidence session fix: manual **New evidence session** rotates `sessionId`, clears prior in-memory events without restarting the Application-scoped USB owner, records an owner-supplied target label, and performs a fresh `UsbManager` scan immediately before TXT/ZIP export;
+- [x] authoritative CI verification for the per-target session fix on commit `23c82b1028ae0cda23a68e8bd31b0497dff0ef72`: 15/15 JVM tests PASS, USB lint 0 issues, app lint 0 errors / 11 warnings;
+- [ ] fresh owner rerun on both phones remains useful evidence, but it is no longer a blocker for the next ADB slice: POCO X3 Pro is an enumerating ADB target, while the POCO F5 Android-mode `deviceCount=0` observation is tracked separately and Fastboot remains historically/currently observable.
 
-Current ZIP payload is intentionally small and extensible: `summary.txt`, `usb-events.txt`, `usb-descriptors.txt`, `device-info.txt`, `app-build.txt`, and `session-info.txt`, preceded by `export-manifest.txt`. `summary.txt` and `session-info.txt` now carry the per-target `sessionId` and owner-supplied `targetLabel`. Future ADB/Fastboot/USBFS evidence gets additional named sections rather than being flattened into one giant text file.
+Current ZIP payload is intentionally small and extensible: `summary.txt`, `usb-events.txt`, `adb-events.txt`, `usb-descriptors.txt`, `device-info.txt`, `app-build.txt`, and `session-info.txt`, preceded by `export-manifest.txt`. `adb-events.txt` is empty before the explicit ADB probe and then contains only safe handshake metadata/timing, never AUTH material or raw banners. `summary.txt` and `session-info.txt` now carry the per-target `sessionId` and owner-supplied `targetLabel`. Future ADB/Fastboot/USBFS evidence gets additional named sections rather than being flattened into one giant text file.
 
 Fastboot DATA retention is now an explicit requirement for later Phase 2/3 protocol work: `ASYNC_USB_REQUEST` remains the A2 hardware-proven Java fallback; `NATIVE_USBFS` must return as a freshly validated high-throughput backend; a bounded `SYNC_BULK` path may exist as an explicitly preselected fallback/diagnostic mode. Native selection occurs before `download:` and no backend switch/retry is allowed after DATA negotiation starts.
 
+### Minimal ADB CNXN/AUTH evidence slice
+
+This changeset starts the next boundary without turning NekoFlash into a general ADB client:
+
+- [x] add executable pure-JVM `:protocol:adb` framing/handshake ownership;
+- [x] exactly one outbound `CNXN`; handle peer `AUTH TOKEN` with persistent app-private RSA signature and, only after a repeated token, the mincrypt public-key payload;
+- [x] no `OPEN`, `WRTE`, shell, sync/push, reboot or other ADB service traffic;
+- [x] Android adapter selects `FF/42/01` + bulk IN/OUT without a VID/PID whitelist, opens and claims with `force=false`, then releases/closes after the terminal handshake outcome;
+- [x] no hidden reconnect, second `CNXN`, endpoint-halt clear or retry after a failed transfer;
+- [x] evidence records safe packet semantics, payload byte counts, individual USB read/write requested/result bytes and timing, and terminal outcome; AUTH token/signature/public-key bytes and raw banners are never logged;
+- [x] `adb-events.txt` becomes a first-class evidence ZIP section;
+- [ ] authoritative CI for this changeset;
+- [ ] owner hardware run on an enumerating target, starting with POCO X3 Pro.
+
+The POCO F5 Android-mode enumeration quirk is deliberately not used to block this slice. Reference evidence already proves `marble` as a real Fastboot peer, including `18D1:D00D`, `getvar:product -> marble`, bootloader/fastbootd traffic, and a historical recovery case where leaving/re-entering Fastboot caused the re-enumeration that restored writes. That observation is retained for the later Fastboot/lifecycle phase rather than turned into a hidden recovery policy now.
+
 ## Next minimal step
 
-Run authoritative CI for the per-target session fix, install that APK, and capture exactly one clean labeled ZIP for POCO X3 Pro and one for POCO F5 using `New evidence session -> target label -> Scan -> Permission -> Open/Claim -> ZIP`. If POCO F5 still produces a fresh `deviceCount=0` archive, investigate USB enumeration/role/cable/OTG below ADB instead of masking it with protocol code. Once clean per-target evidence is proven, add the smallest evidence-first ADB handshake probe on an enumerating target: only `CNXN`/`AUTH`, packet types/byte counts/timing/terminal outcome, with credentials and raw authentication material excluded from diagnostics.
+Run authoritative CI for the minimal ADB handshake changeset, install the APK, create a clean `POCO X3 Pro` evidence session, then run `Scan -> Permission -> ADB CNXN/AUTH probe -> ZIP`. If the target asks for RSA authorization, approve it and let the probe terminate on `CNXN` or an explicit transfer/protocol failure. Review `adb-events.txt` before adding any ADB service command.

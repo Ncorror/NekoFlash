@@ -34,6 +34,7 @@ import io.github.ncorror.nekoflash.core.diagnostics.InMemoryDiagnosticSink
 import io.github.ncorror.nekoflash.core.diagnostics.formatDiagnosticEvidence
 import io.github.ncorror.nekoflash.diagnostics.EvidenceBundleFactory
 import io.github.ncorror.nekoflash.diagnostics.EvidenceBundleIo
+import io.github.ncorror.nekoflash.transport.usb.android.AdbUsbHandshakeProbe
 import io.github.ncorror.nekoflash.transport.usb.android.UsbDeviceEvidence
 import io.github.ncorror.nekoflash.transport.usb.android.UsbEvidenceProbe
 import java.time.Instant
@@ -47,6 +48,7 @@ private val evidenceFileTimestamp = DateTimeFormatter
 @Composable
 fun Phase2UsbEvidenceScreen(
     probe: UsbEvidenceProbe,
+    adbProbe: AdbUsbHandshakeProbe,
     diagnostics: InMemoryDiagnosticSink,
     initialSessionId: String,
     beginNewSession: () -> String,
@@ -62,6 +64,7 @@ fun Phase2UsbEvidenceScreen(
     val zipShareFailed = stringResource(R.string.usb_evidence_zip_share_failed)
     val zipShareTitle = stringResource(R.string.usb_share_evidence_zip)
     val newSessionStarted = stringResource(R.string.usb_evidence_session_started)
+    val adbProbeRunningText = stringResource(R.string.adb_probe_running)
     var sessionId by remember { mutableStateOf(initialSessionId) }
     var targetLabel by remember { mutableStateOf("") }
     var devices by remember { mutableStateOf<List<UsbDeviceEvidence>>(emptyList()) }
@@ -69,6 +72,8 @@ fun Phase2UsbEvidenceScreen(
     var evidenceLines by remember { mutableStateOf<List<String>>(emptyList()) }
     var pendingExportText by remember { mutableStateOf("") }
     var pendingZipSnapshot by remember { mutableStateOf<EvidenceBundleFactory.Snapshot?>(null) }
+    var adbBusy by remember { mutableStateOf(false) }
+    val controlsLocked = adbBusy || adbProbe.isRunning
 
     fun refreshEvidence() {
         evidenceLines = diagnostics.snapshot().takeLast(30).map { event ->
@@ -174,6 +179,7 @@ fun Phase2UsbEvidenceScreen(
             label = { Text(stringResource(R.string.usb_target_label)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
+            enabled = !controlsLocked,
         )
         OutlinedButton(
             onClick = {
@@ -186,6 +192,7 @@ fun Phase2UsbEvidenceScreen(
                 refreshEvidence()
             },
             modifier = Modifier.fillMaxWidth(),
+            enabled = !controlsLocked,
         ) {
             Text(stringResource(R.string.usb_new_evidence_session))
         }
@@ -201,6 +208,7 @@ fun Phase2UsbEvidenceScreen(
                 refreshEvidence()
             },
             modifier = Modifier.fillMaxWidth(),
+            enabled = !controlsLocked,
         ) {
             Text(stringResource(R.string.usb_scan))
         }
@@ -244,6 +252,7 @@ fun Phase2UsbEvidenceScreen(
                         refreshEvidence()
                     },
                     modifier = Modifier.fillMaxWidth(),
+                    enabled = !controlsLocked,
                 ) {
                     Text(stringResource(R.string.usb_permission))
                 }
@@ -254,8 +263,35 @@ fun Phase2UsbEvidenceScreen(
                         refreshEvidence()
                     },
                     modifier = Modifier.fillMaxWidth(),
+                    enabled = !controlsLocked,
                 ) {
                     Text(stringResource(R.string.usb_probe_open_claim))
+                }
+                if (device.adbInterfaceIndexes.isNotEmpty()) {
+                    Text(
+                        text = stringResource(R.string.adb_probe_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Button(
+                        onClick = {
+                            adbBusy = true
+                            status = adbProbeRunningText
+                            Thread {
+                                val result = adbProbe.probe(device.deviceName)
+                                Handler(Looper.getMainLooper()).post {
+                                    adbBusy = false
+                                    status = result.toString()
+                                    devices = probe.scan()
+                                    refreshEvidence()
+                                }
+                            }.start()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !controlsLocked,
+                    ) {
+                        Text(stringResource(R.string.adb_probe_handshake))
+                    }
                 }
             }
         }
@@ -273,6 +309,7 @@ fun Phase2UsbEvidenceScreen(
                 saveEvidenceZip.launch(DiagnosticBundle.suggestedFileName(snapshot.exportedAt))
             },
             modifier = Modifier.fillMaxWidth(),
+            enabled = !controlsLocked,
         ) {
             Text(stringResource(R.string.usb_save_evidence_zip))
         }
@@ -298,6 +335,7 @@ fun Phase2UsbEvidenceScreen(
                 }.start()
             },
             modifier = Modifier.fillMaxWidth(),
+            enabled = !controlsLocked,
         ) {
             Text(stringResource(R.string.usb_share_evidence_zip))
         }
@@ -309,6 +347,7 @@ fun Phase2UsbEvidenceScreen(
                 )
             },
             modifier = Modifier.fillMaxWidth(),
+            enabled = !controlsLocked,
         ) {
             Text(stringResource(R.string.usb_save_full_evidence))
         }
@@ -323,6 +362,7 @@ fun Phase2UsbEvidenceScreen(
                 context.startActivity(Intent.createChooser(shareIntent, evidenceShareTitle))
             },
             modifier = Modifier.fillMaxWidth(),
+            enabled = !controlsLocked,
         ) {
             Text(stringResource(R.string.usb_share_full_evidence))
         }

@@ -21,6 +21,7 @@ class MainActivity : ComponentActivity() {
                 if (welcomeCompleted) {
                     Phase2UsbEvidenceScreen(
                         probe = app.usbEvidenceProbe,
+                        adbProbe = app.adbUsbHandshakeProbe,
                         diagnostics = app.diagnostics,
                         initialSessionId = app.evidenceSessionId,
                         beginNewSession = app::beginEvidenceSession,

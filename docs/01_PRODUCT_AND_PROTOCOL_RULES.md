@@ -16,6 +16,12 @@
 
 Warnings and explicit user-intent confirmation belong in guided UI. They are not protocol permissions. Raw protocol surfaces must not be arbitrarily narrower than typed surfaces.
 
+## ADB handshake evidence rule
+
+The first ADB slice is diagnostic, not a general ADB client. It may send exactly one `CNXN` and the peer-required `AUTH` signature/public-key responses. It must not send `OPEN`, `WRTE`, shell, sync/push, reboot, package-management or other ADB service traffic. There is no vendor VID/PID whitelist: ADB candidacy is the protocol interface shape (`FF/42/01`) with bulk IN+OUT.
+
+Handshake diagnostics may record command/type names, byte counts, endpoint addresses, call timing/result codes, peer protocol/max-payload metadata and a coarse peer kind (`DEVICE`/`RECOVERY`/`SIDELOAD`/`UNKNOWN`). They must not record AUTH tokens, RSA signatures, public-key material, private-key paths/content, or raw connection banners. A failed USB transfer is terminal for the probe: no automatic second `CNXN`, reconnect, `clearEndpointHalt`, or service command is allowed to hide the first failure.
+
 ## Fastboot DATA backend retention rule
 
 The clean rewrite must not erase hardware-proven transport capability merely because the implementation is being replaced.
