@@ -1,5 +1,8 @@
 package io.github.ncorror.nekoflash.ui
 
+import android.content.Intent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -19,21 +22,32 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.github.ncorror.nekoflash.R
 import io.github.ncorror.nekoflash.core.diagnostics.InMemoryDiagnosticSink
+import io.github.ncorror.nekoflash.core.diagnostics.formatDiagnosticEvidence
 import io.github.ncorror.nekoflash.transport.usb.android.UsbDeviceEvidence
 import io.github.ncorror.nekoflash.transport.usb.android.UsbEvidenceProbe
+import java.time.Instant
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+
+private val evidenceFileTimestamp = DateTimeFormatter
+    .ofPattern("yyyyMMdd-HHmmss'Z'")
+    .withZone(ZoneOffset.UTC)
 
 @Composable
 fun Phase2UsbEvidenceScreen(
     probe: UsbEvidenceProbe,
     diagnostics: InMemoryDiagnosticSink,
 ) {
+    val context = LocalContext.current
     var devices by remember { mutableStateOf<List<UsbDeviceEvidence>>(emptyList()) }
     var status by remember { mutableStateOf("") }
     var evidenceLines by remember { mutableStateOf<List<String>>(emptyList()) }
+    var pendingExportText by remember { mutableStateOf("") }
 
     fun refreshEvidence() {
         evidenceLines = diagnostics.snapshot().takeLast(30).map { event ->
@@ -44,6 +58,29 @@ fun Phase2UsbEvidenceScreen(
                     append(event.fields.entries.joinToString(" · ") { (key, value) -> "$key=$value" })
                 }
             }
+        }
+    }
+
+    fun fullEvidenceText(): String = formatDiagnosticEvidence(
+        events = diagnostics.snapshot(),
+        generatedAtEpochMillis = System.currentTimeMillis(),
+    )
+
+    val saveEvidence = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("text/plain"),
+    ) { uri ->
+        if (uri == null) {
+            status = context.getString(R.string.usb_evidence_save_cancelled)
+        } else {
+            val saved = runCatching {
+                context.contentResolver.openOutputStream(uri, "wt")
+                    ?.bufferedWriter(Charsets.UTF_8)
+                    ?.use { writer -> writer.write(pendingExportText) }
+                    ?: error("Content resolver returned no output stream")
+            }.isSuccess
+            status = context.getString(
+                if (saved) R.string.usb_evidence_saved else R.string.usb_evidence_save_failed,
+            )
         }
     }
 
@@ -91,7 +128,7 @@ fun Phase2UsbEvidenceScreen(
                     style = MaterialTheme.typography.titleMedium,
                 )
                 Text(
-                    text = "permission=${device.permissionGranted} · interfaces=${device.interfaces.size} · bulk-pair=${device.bulkPairInterfaceIndexes.joinToString()}",
+                    text = "permission=${device.permissionGranted} · interfaces=${device.interfaces.size} · bulk-pair interfaces=[${device.bulkPairInterfaceIndexes.joinToString()}]",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -137,6 +174,36 @@ fun Phase2UsbEvidenceScreen(
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text(stringResource(R.string.usb_refresh_evidence))
+        }
+        OutlinedButton(
+            onClick = {
+                pendingExportText = fullEvidenceText()
+                saveEvidence.launch(
+                    "NekoFlash-usb-evidence-${evidenceFileTimestamp.format(Instant.now())}.txt",
+                )
+            },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(stringResource(R.string.usb_save_full_evidence))
+        }
+        OutlinedButton(
+            onClick = {
+                val text = fullEvidenceText()
+                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_SUBJECT, "NekoFlash USB evidence")
+                    putExtra(Intent.EXTRA_TEXT, text)
+                }
+                context.startActivity(
+                    Intent.createChooser(
+                        shareIntent,
+                        context.getString(R.string.usb_share_full_evidence),
+                    ),
+                )
+            },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(stringResource(R.string.usb_share_full_evidence))
         }
         Text(
             text = stringResource(R.string.usb_evidence_log),

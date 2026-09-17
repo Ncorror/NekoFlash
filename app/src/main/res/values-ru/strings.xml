@@ -14,4 +14,9 @@
     <string name="usb_probe_open_claim">Проверить open + claim</string>
     <string name="usb_refresh_evidence">Обновить журнал evidence</string>
     <string name="usb_evidence_log">Последние USB evidence</string>
+    <string name="usb_save_full_evidence">Сохранить полный evidence в файл</string>
+    <string name="usb_share_full_evidence">Поделиться полным evidence</string>
+    <string name="usb_evidence_saved">Файл evidence сохранён</string>
+    <string name="usb_evidence_save_cancelled">Сохранение evidence отменено</string>
+    <string name="usb_evidence_save_failed">Не удалось сохранить evidence</string>
 </resources>

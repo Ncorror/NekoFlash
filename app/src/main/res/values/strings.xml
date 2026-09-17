@@ -14,4 +14,9 @@
     <string name="usb_probe_open_claim">Probe open + claim</string>
     <string name="usb_refresh_evidence">Refresh evidence log</string>
     <string name="usb_evidence_log">Recent USB evidence</string>
+    <string name="usb_save_full_evidence">Save full evidence file</string>
+    <string name="usb_share_full_evidence">Share full evidence</string>
+    <string name="usb_evidence_saved">Evidence file saved</string>
+    <string name="usb_evidence_save_cancelled">Evidence save cancelled</string>
+    <string name="usb_evidence_save_failed">Evidence file save failed</string>
 </resources>

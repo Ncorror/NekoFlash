@@ -90,6 +90,17 @@ def main() -> int:
     if missing_retention:
         return fail(f'Fastboot DATA retention contract drifted: missing {missing_retention}')
 
+    diagnostics_export = (ROOT / 'core/diagnostics/src/main/kotlin/io/github/ncorror/nekoflash/core/diagnostics/DiagnosticTextExport.kt').read_text(encoding='utf-8')
+    usb_screen = (ROOT / 'app/src/main/kotlin/io/github/ncorror/nekoflash/ui/Phase2UsbEvidenceScreen.kt').read_text(encoding='utf-8')
+    export_tokens = ['<redacted>', 'formatDiagnosticEvidence']
+    missing_export = [token for token in export_tokens if token not in diagnostics_export]
+    if missing_export:
+        return fail(f'diagnostics export contract drifted: missing {missing_export}')
+    screen_export_tokens = ['ActivityResultContracts.CreateDocument("text/plain")', 'Intent.ACTION_SEND', 'bulk-pair interfaces=[']
+    missing_screen_export = [token for token in screen_export_tokens if token not in usb_screen]
+    if missing_screen_export:
+        return fail(f'USB evidence export UI drifted: missing {missing_screen_export}')
+
     for relative, expected in EXPECTED_HASHES.items():
         actual = sha256(ROOT / relative)
         if actual != expected:
@@ -100,7 +111,7 @@ def main() -> int:
         if '/src/test/' in path.as_posix():
             tests += len(re.findall(r'^\s*@Test\b', path.read_text(encoding='utf-8'), flags=re.MULTILINE))
 
-    print(f'docs consistency: PASS (one status source; 4 modules; Phase 2 USB boundary; Native USBFS retained; brand hashes exact; {tests} @Test methods)')
+    print(f'docs consistency: PASS (one status source; 4 modules; Phase 2 USB boundary; full evidence export; Native USBFS retained; brand hashes exact; {tests} @Test methods)')
     return 0
 
 

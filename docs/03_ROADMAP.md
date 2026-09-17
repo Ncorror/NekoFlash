@@ -65,15 +65,22 @@ Implemented in the first slice:
 - [x] unit coverage for the known `18D1:4EE7`, `FF/42/01`, bulk `0x01/0x81` shape and vendor-neutral bulk-pair selection;
 - [x] repository rules/ADR retain Native USBFS as a required future Fastboot DATA backend rather than an optional optimization.
 
-Still open before ADB framing/handshake:
+Hardware/CI closure for the first USB boundary slice:
 
-- [ ] run the new evidence probe on known Poco/Xiaomi hardware, including the problematic HyperOS case;
-- [ ] record permission/open/claim results and descriptor snapshots in `04_HARDWARE_EVIDENCE.md`;
-- [ ] determine the failing layer from evidence; root cause remains `UNKNOWN` until then;
-- [ ] obtain authoritative CI `test lint assembleDebug` PASS for this Phase 2 changeset.
+- [x] authoritative CI `test lint assembleDebug` PASS for commit `17b46cb2bdb2c25ec53cb8c62197e2f35885f4d9`; verification artifact reports 7/7 JVM tests PASS and USB lint with 0 issues;
+- [x] owner hardware run on the connected Poco/Xiaomi target reached permission granted, `openDevice` success and `claimInterface(false)` success on interface 0;
+- [x] observed descriptor shape remained `18D1:4EE7`, interface `FF/42/01`, bulk OUT `0x01` / bulk IN `0x81`, max packet size 512;
+- [x] the base Android USB discovery/permission/open/claim boundary is therefore hardware-proven for this target; the intermittent Xiaomi/Poco ADB root cause remains `UNKNOWN` and is now narrowed to a layer after successful claim.
+
+Evidence usability follow-up:
+
+- [x] full in-memory diagnostics can be saved through Android's document picker as a UTF-8 `.txt` file;
+- [x] full diagnostics can be shared through the system share sheet;
+- [x] exported structured fields defensively redact likely secret/raw protocol material;
+- [x] the on-screen `bulk-pair` label now identifies interface indexes explicitly instead of looking like a count.
 
 Fastboot DATA retention is now an explicit requirement for later Phase 2/3 protocol work: `ASYNC_USB_REQUEST` remains the A2 hardware-proven Java fallback; `NATIVE_USBFS` must return as a freshly validated high-throughput backend; a bounded `SYNC_BULK` path may exist as an explicitly preselected fallback/diagnostic mode. Native selection occurs before `download:` and no backend switch/retry is allowed after DATA negotiation starts.
 
 ## Next minimal step
 
-Build the Phase 2 APK in CI and run the evidence screen on the known Poco/Xiaomi targets. Capture the exact VID/PID, interface class/subclass/protocol, endpoint addresses/max packet sizes, permission result, `openDevice` result, and each `claimInterface(false)` result. Update `04_HARDWARE_EVIDENCE.md` in the same changeset. Do not add ADB framing/handshake until those results make the transport boundary technically credible.
+Add the smallest evidence-first ADB handshake probe on top of the now hardware-proven USB claim boundary: transmit/receive only enough ADB framing for `CNXN`/`AUTH`, record packet types, byte counts, timing and terminal outcome, and keep credentials/raw authentication material out of diagnostics. Do not add shell/push services, Fastboot protocol execution, or Native USBFS implementation in that handshake slice.

@@ -73,7 +73,11 @@ These are retained evidence, not a claim that the rewrite's future Native USBFS 
 
 Code now exists for an Application-scoped evidence-only Android USB probe, so Activity recreation does not own or replace the permission receiver. It records physical device inventory, VID/PID, interface class/subclass/protocol, endpoint address/direction/type/max-packet-size, Android permission state/callback, `openDevice` outcome, and each `claimInterface(false)` result for interfaces containing both bulk IN and bulk OUT. A successful claim is immediately released and the connection is closed; no ADB/Fastboot bytes are transmitted.
 
-Hardware result for this new rewrite slice: **PENDING**. The known Poco/Xiaomi observations remain the first target. Root cause remains `UNKNOWN` until this probe is exercised and the result is recorded here.
+Hardware result for this rewrite slice: **PASS for the base Android USB boundary on the owner-tested Poco/Xiaomi target**. On 2026-09-17, the Phase 2 screen showed `18D1:4EE7`, interface index/id `0`, class/subclass/protocol `255/66/1` (`FF/42/01`), bulk OUT `0x01` and bulk IN `0x81`, both with max packet size 512. After Android USB permission was granted, the UI reported `ClaimSucceeded(deviceName=/dev/bus/usb/001/002, interfaceIndex=0, interfaceId=0)`. No ADB/Fastboot bytes were sent by this probe.
+
+This closes discovery/permission/descriptor/open/claim as the immediate failing layer for that run. The historical intermittent Xiaomi/Poco ADB behavior is **not** declared fixed: its root cause remains `UNKNOWN`, but investigation can now move to bulk I/O and ADB `CNXN`/`AUTH` behavior after a proven claim. The first scan's older `permissionGranted=false` evidence is expected pre-permission state and does not contradict the later `permission=true`/claim success.
+
+Commit `17b46cb2bdb2c25ec53cb8c62197e2f35885f4d9` also has authoritative CI verification: 7/7 JVM tests PASS, 0 failures/errors/skips, and `:transport:usb-android` lint reports 0 issues.
 
 ### Phase 2 local pre-CI verification — 2026-09-17
 
@@ -84,3 +88,7 @@ Hardware result for this new rewrite slice: **PENDING**. The known Poco/Xiaomi o
 - Kotlin syntax/type compilation of `:core:model`, `:core:diagnostics`, all `:transport:usb-android` production sources, their JVM tests, and `NekoFlashApplication` against minimal Android/JUnit API stubs: PASS. This checks the new source boundary without claiming a real Android SDK/AGP build.
 - `./gradlew test lint assembleDebug --no-daemon --stacktrace`: DID NOT REACH PROJECT CONFIGURATION because this environment could not resolve `services.gradle.org` while fetching Gradle 9.5.0 (`UnknownHostException`). No Gradle/CI PASS is claimed from this local attempt.
 - New Phase 2 hardware run: PENDING.
+
+## Phase 2 evidence export follow-up
+
+The hardware run exposed an evidence-collection usability gap: the first slice kept structured diagnostics only in process memory and displayed only the latest 30 events, so a full machine-readable run could not be archived directly from the app. The follow-up adds full UTF-8 text export through Android's document picker plus system text sharing. The export contains the complete current `InMemoryDiagnosticSink` snapshot, not only the 30 lines rendered on screen. Likely secret/raw protocol fields are defensively redacted by key name; producers must still avoid emitting secrets by design.
