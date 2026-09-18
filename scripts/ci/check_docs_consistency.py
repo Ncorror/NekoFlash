@@ -27,7 +27,13 @@ def test_method_count() -> int:
     annotation = re.compile(r"^\s*@Test\b")
     count = 0
     for path in ROOT.rglob("*.kt"):
-        if "src/test" not in path.as_posix():
+        posix = path.as_posix()
+        # `.archives/` — распакованные Legacy и A2, которые держит
+        # `scripts/archives/archive.py`. Их тесты чужие, и считать их своим
+        # покрытием значило бы отчитаться перед собой чужой работой.
+        if "/.archives/" in posix or posix.startswith(".archives/"):
+            continue
+        if "src/test" not in posix:
             continue
         count += sum(1 for line in path.read_text(encoding="utf-8").splitlines() if annotation.search(line))
     return count

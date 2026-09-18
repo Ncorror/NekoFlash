@@ -30,3 +30,7 @@ Thumbs.db
 *.swp
 *.swo
 *~
+
+# Распакованные архивы (scripts/archives/archive.py). Кэш, а не источник:
+# источник — zip в reference/archives, и он в репозитории.
+.archives/

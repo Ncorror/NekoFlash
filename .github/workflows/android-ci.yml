@@ -50,6 +50,11 @@ jobs:
       - name: Documentation consistency
         run: python3 ./scripts/ci/check_docs_consistency.py
 
+      # Ненарушаемое правило №1 было единственным без гейта: все остальные
+      # проверялись автоматически, а главное — вниманием человека.
+      - name: No capability guards
+        run: python3 ./scripts/ci/check_no_guards.py
+
       - name: Kotlin style, complexity and module boundaries
         run: ./scripts/ci/check_kotlin_style.sh
 
