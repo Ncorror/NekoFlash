@@ -14,6 +14,7 @@ REQUIRED_DOCS = [
     'docs/03_ROADMAP.md',
     'docs/04_HARDWARE_EVIDENCE.md',
     'docs/05_CAPABILITY_MATRIX.md',
+    'docs/06_FULL_PROTOCOL_AUDIT.md',
 ]
 EXPECTED_MODULES = {':app', ':core:model', ':core:diagnostics', ':protocol:adb', ':transport:usb-android'}
 EXPECTED_HASHES = {
@@ -68,10 +69,54 @@ def main() -> int:
         'only current phase/status authority',
         'code/tests/docs/evidence drift audit',
         'exact Legacy/A2/current snapshots',
+        '06_FULL_PROTOCOL_AUDIT.md',
     ]
     missing_handoff = [token for token in handoff_tokens if token not in start_here]
     if missing_handoff:
         return fail(f'new-session recovery contract drifted: missing {missing_handoff}')
+
+    product_rules = (ROOT / 'docs/01_PRODUCT_AND_PROTOCOL_RULES.md').read_text(encoding='utf-8')
+    professional_tokens = [
+        'professional Android host toolkit',
+        'Correctness protection is not capability restriction',
+        'Novice/Expert',
+        'product command allowlist/denylist',
+        'Hard invariant',
+        'Device authority',
+        'Advisory',
+        'User intent',
+        'Unknown',
+    ]
+    missing_professional = [token for token in professional_tokens if token not in product_rules]
+    if missing_professional:
+        return fail(f'professional capability policy drifted: missing {missing_professional}')
+
+    professional_adr = ROOT / 'docs/adr/0005_PROFESSIONAL_CAPABILITY_POLICY.md'
+    if not professional_adr.is_file():
+        return fail('professional capability policy ADR is missing')
+    professional_adr_text = professional_adr.read_text(encoding='utf-8')
+    professional_adr_tokens = ['Novice/Expert', 'product allowlist', 'Device authority', 'Unknown', 'Quick Flash', 'Mi Unlock']
+    missing_professional_adr = [token for token in professional_adr_tokens if token not in professional_adr_text]
+    if missing_professional_adr:
+        return fail(f'professional capability ADR drifted: missing {missing_professional_adr}')
+
+    full_audit = (ROOT / 'docs/06_FULL_PROTOCOL_AUDIT.md').read_text(encoding='utf-8')
+    full_audit_tokens = [
+        'Sync `LIST`',
+        'Wireless ADB',
+        'Zero-Length Packet',
+        'incremental install',
+        'Burst Mode',
+        '`fastboot update` / `flashall`',
+        '`stage` / `get_staged`',
+        'Native USBFS',
+        'generation-aware permission callback identity',
+        'sparse',
+        'professional Android host toolkit',
+    ]
+    missing_full_audit = [token for token in full_audit_tokens if token not in full_audit]
+    if missing_full_audit:
+        return fail(f'full protocol audit drifted: missing {missing_full_audit}')
 
     workflow = (ROOT / '.github/workflows/android-ci.yml').read_text(encoding='utf-8')
     workflow_tokens = [
@@ -227,7 +272,7 @@ def main() -> int:
         if '/src/test/' in path.as_posix():
             tests += len(re.findall(r'^\s*@Test\b', path.read_text(encoding='utf-8'), flags=re.MULTILINE))
 
-    print(f'docs consistency: PASS (one status source; 5 modules; auto-first USB/ADB entry; ADB handshake boundary; full evidence export; multi-file evidence ZIP; Native USBFS retained; brand hashes exact; {tests} @Test methods)')
+    print(f'docs consistency: PASS (one status source; 5 modules; professional capability policy; full protocol audit; auto-first USB/ADB entry; ADB handshake boundary; full evidence export; multi-file evidence ZIP; Native USBFS retained; brand hashes exact; {tests} @Test methods)')
     return 0
 
 

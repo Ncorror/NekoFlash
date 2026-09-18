@@ -93,36 +93,60 @@ Fastboot DATA retention is now an explicit requirement for later Phase 2/3 proto
 
 ### Minimal ADB CNXN/AUTH evidence slice
 
-This changeset starts the next boundary without turning NekoFlash into a general ADB client:
+This boundary is now code/CI/hardware-proven without turning NekoFlash into a general ADB client:
 
-- [x] add executable pure-JVM `:protocol:adb` framing/handshake ownership;
+- [x] executable pure-JVM `:protocol:adb` framing/handshake ownership;
 - [x] exactly one outbound `CNXN`; handle peer `AUTH TOKEN` with persistent app-private RSA signature and, only after a repeated token, the mincrypt public-key payload;
 - [x] no `OPEN`, `WRTE`, shell, sync/push, reboot or other ADB service traffic;
 - [x] Android adapter selects `FF/42/01` + bulk IN/OUT without a VID/PID whitelist, opens and claims with `force=false`, then releases/closes after the terminal handshake outcome;
 - [x] no hidden reconnect, second `CNXN`, endpoint-halt clear or retry after a failed transfer;
 - [x] evidence records safe packet semantics, payload byte counts, individual USB read/write requested/result bytes and timing, and terminal outcome; AUTH token/signature/public-key bytes and raw banners are never logged;
-- [x] `adb-events.txt` becomes a first-class evidence ZIP section;
-- [ ] authoritative CI for this changeset;
-- [ ] owner hardware run on an enumerating target, starting with POCO X3 Pro.
+- [x] `adb-events.txt` is a first-class evidence ZIP section;
+- [x] authoritative CI for commit `d8c39d5f7000e0b7b01af96f45007e7595b3e480`: 26/26 JVM tests PASS, USB lint 0 issues, app lint 0 errors / 11 non-blocking warnings;
+- [x] owner POCO X3 Pro hardware run: `18D1:4EE7`, permission/open/claim PASS, `CNXN -> AUTH TOKEN -> AUTH SIGNATURE -> AUTH TOKEN -> AUTH RSAPUBLICKEY -> CNXN`, terminal `CONNECTED`, `authPath=PUBLIC_KEY`, approximately 1.8 s.
 
-The POCO F5 Android-mode enumeration quirk is deliberately not used to block this slice. Reference evidence already proves `marble` as a real Fastboot peer, including `18D1:D00D`, `getvar:product -> marble`, bootloader/fastbootd traffic, and a historical recovery case where leaving/re-entering Fastboot caused the re-enumeration that restored writes. That observation is retained for the later Fastboot/lifecycle phase rather than turned into a hidden recovery policy now.
+The POCO F5 Android-mode enumeration quirk is deliberately not used to block this slice. Reference evidence already proves `marble` as a real Fastboot peer, including `18D1:D00D`, `getvar:product -> marble`, bootloader/fastbootd traffic, and a historical case where leaving/re-entering Fastboot caused the re-enumeration that restored writes. That observation is retained for the later Fastboot/lifecycle phase rather than turned into a hidden recovery policy now.
+
+### Auto-first ordinary USB/ADB entry
+
+Owner review of Legacy, A2 and the previous `main` identified a product-flow regression in the diagnostic rewrite: scan, permission, open/claim and ADB handshake had become four required button presses even though Legacy/A2 performed ordinary attach/startup progression automatically. ADR `docs/adr/0004_USB_ADB_AUTO_FIRST_ENTRY.md` makes the restored behavior a repository-resident contract.
+
+Implementation/CI acceptance:
+
+- [x] auto-first ordinary USB/ADB entry implementation after the Welcome gate: startup/attach -> scan -> permission -> open/claim -> bounded CNXN/AUTH without requiring the diagnostic buttons;
+- [x] Legacy-equivalent one-shot startup settle delay of **350 ms** for a device already connected when the authorized UI entry begins;
+- [x] Android USB attach intent delivery with a class-255 wildcard that is delivery-only, never a VID/PID support allowlist;
+- [x] automatic selection only when there is exactly one physical device with exactly one canonical ADB `FF/42/01` bulk IN+OUT interface; ambiguity/generic vendor bulk remains manual;
+- [x] USB permission and target RSA dialogs remain explicit user/platform approvals, with the host flow continuing automatically after permission callback;
+- [x] terminal transport/protocol/auth failure is not silently retried in the same attachment generation; detach or **New evidence session** explicitly re-arms;
+- [x] `Scan USB`, `Permission`, `Open + claim`, and `ADB CNXN/AUTH` remain diagnostic/retry fallback controls, not the normal workflow;
+- [x] the same auto-first product contract is retained for future Fastboot implementation, including explicit re-enumeration evidence, without introducing Fastboot bytes in this slice;
+- [x] authoritative CI for auto-first commit `54b89ccf3f255dd8dc0fa4614a4a393f74211eda`: **31/31 JVM tests PASS**, 0 failures/errors/skips; USB lint 0 issues; app lint 0 errors / 11 non-blocking warnings;
+- [ ] owner hardware auto-first acceptance: on POCO X3 Pro, enter the authorized app workspace and connect/leave connected the target, approve only Android USB/RSA system dialogs when shown, do **not** press the diagnostic sequencing buttons, then capture the resulting ZIP.
+
+### Full cross-archive/protocol audit — completed 2026-09-18
+
+`06_FULL_PROTOCOL_AUDIT.md` records the full code/docs/capability audit across Legacy, frozen A2, previous `main`, the current rewrite and current AOSP protocol/client behavior. The audit also restores the stronger professional-tool policy in ADR `0005_PROFESSIONAL_CAPABILITY_POLICY.md`: no Novice/Expert permission system, hidden capability tier, product command allowlist/denylist, vendor whitelist or invented host authorization. Protocol/platform correctness remains strict; device/peer authority remains authoritative.
+
+Confirmed gaps that were absent or incomplete even in the archives are now explicit instead of silently inherited as "done":
+
+- ADB Sync `LIST` was documented but not actually implemented in previous `main`;
+- modern ADB Sync v2/compression is absent;
+- modern Wireless ADB pairing/TLS/mDNS host transport is absent from all archived implementations;
+- specialized/long-lived ADB services need to ride the future generic streaming service engine rather than a product allowlist;
+- explicit/verified ADB USB **Zero-Length Packet (ZLP)** handling at endpoint max-packet boundaries is absent across the supplied archives and is a correctness prerequisite before broad `WRTE`/Sync traffic;
+- ADB incremental install (Incremental Server + V4/`.idsig` workflow), atomic `install-multi-package`, and Burst Mode/delayed-ACK support are absent across the archives; Burst Mode is a later performance feature, not a prerequisite for baseline correctness;
+- Fastboot `update`/`flashall` factory-image orchestration is absent;
+- sparse-image support was never connected end-to-end and already-sparse re-splitting is absent;
+- some desktop-fastboot commands such as `wipe-super` are host workflows, so a raw terminal string alone does not prove equivalent functionality;
+- Native USBFS was lost in previous `main` despite real Legacy/A2 value and remains a required future DATA OUT backend with fresh hardware validation.
+- AOSP Fastboot staging (`stage`/`get_staged`) and network `tcp:`/`udp:` transports are not first-class capabilities in any supplied archive; they remain lower-priority professional backlog behind the USB flashing/data core.
+
+The audit also found a current correctness hardening item before broad ADB services: USB permission callback identity should recover A2's process/generation-aware stale-callback protection, followed by explicit detach/re-enumeration race tests. This is lifecycle correctness, not a capability restriction.
 
 ## Next minimal step
 
-Run authoritative CI for the minimal ADB handshake changeset, install the APK, create a clean `POCO X3 Pro` evidence session, then run `Scan -> Permission -> ADB CNXN/AUTH probe -> ZIP`. If the target asks for RSA authorization, approve it and let the probe terminate on `CNXN` or an explicit transfer/protocol failure. Review `adb-events.txt` before adding any ADB service command.
-## Phase 2 ADB handshake verification and auto-first entry follow-up
-
-Commit `d8c39d5f7000e0b7b01af96f45007e7595b3e480` has authoritative GitHub Actions verification for the bounded ADB handshake slice: **26/26 JVM tests PASS**, `:transport:usb-android` lint reports no issues, and app lint reports 0 errors with 11 non-blocking warnings. The owner hardware archive `NekoFlash-evidence-20260917-231324Z.zip` then proved the first real POCO X3 Pro (`targetLabel=poco x3pro`) ADB run end-to-end through this boundary: `18D1:4EE7`, permission granted, open success, `claimInterface(false)=true`, `CNXN -> AUTH TOKEN -> AUTH SIGNATURE -> AUTH TOKEN -> AUTH RSAPUBLICKEY -> CNXN`, terminal `CONNECTED`, `authPath=PUBLIC_KEY`, with the connection released/closed after approximately 1.8 s. This is a USB + ADB-handshake PASS only; it does not claim shell/sync/reboot/Fastboot support.
-
-Owner review of Legacy, A2 and the previous `main` identified a product-flow regression in the diagnostic rewrite: scan, permission, open/claim and ADB handshake had become four required button presses even though Legacy/A2 performed ordinary attach/startup progression automatically. The retained acceptance contract is now:
-
-- [ ] **auto-first ordinary USB/ADB entry** after the Welcome gate: startup/attach -> scan -> permission -> open/claim -> bounded CNXN/AUTH without requiring the diagnostic buttons;
-- [ ] Legacy-equivalent one-shot startup settle delay of **350 ms** for a device already connected when the authorized UI entry begins;
-- [ ] Android USB attach intent delivery restored with a class-255 wildcard that is delivery-only, never a VID/PID support allowlist;
-- [ ] automatic selection only when there is exactly one physical device with exactly one canonical ADB `FF/42/01` bulk IN+OUT interface; ambiguity/generic vendor bulk remains manual;
-- [ ] USB permission and target RSA dialogs remain explicit user/platform approvals, with the host flow continuing automatically after permission callback;
-- [ ] terminal transport/protocol/auth failure is not silently retried in the same attachment generation; detach or **New evidence session** explicitly re-arms;
-- [ ] `Scan USB`, `Permission`, `Open + claim`, and `ADB CNXN/AUTH` remain diagnostic/retry fallback controls, not the normal workflow;
-- [ ] the same auto-first product contract is retained for future Fastboot implementation, including explicit re-enumeration evidence, without introducing Fastboot bytes in this slice.
-
-ADR `docs/adr/0004_USB_ADB_AUTO_FIRST_ENTRY.md` makes this behavior a repository-resident architecture/acceptance decision so it cannot be silently lost in another cleanup.
+1. Perform the owner **auto-first hardware acceptance** on POCO X3 Pro without pressing the diagnostic sequencing buttons and archive the resulting evidence ZIP.
+2. Then harden USB lifecycle ownership before broad ADB services: generation-aware permission callback identity, stale-callback rejection, detach/re-enumeration state tests and bounded mode-switch observation.
+3. Prove endpoint-aware ADB USB **ZLP** behavior at `wMaxPacketSize` boundaries before enabling broad `WRTE`/Sync/service traffic. This is wire correctness, not a capability restriction.
+4. Only after that foundation is green, restore the ADB stream core (one physical reader + logical stream router/mailboxes + generic raw service path) and layer shell/sync/install/reboot/forward/reverse/Sideload over the same engine. The audited missing capabilities in `06_FULL_PROTOCOL_AUDIT.md` stay visible backlog rather than being forgotten.

@@ -12,9 +12,20 @@
 - The Legacy Welcome JPEG is immutable and byte-identical. The launcher artwork remains reference-only until owner review.
 - Preserve Legacy color DNA through semantic roles rather than by cloning the old UI architecture.
 
-## Product policy boundary
+## Professional capability policy boundary
 
-Warnings and explicit user-intent confirmation belong in guided UI. They are not protocol permissions. Raw protocol surfaces must not be arbitrarily narrower than typed surfaces.
+NekoFlash is a professional Android host toolkit. **Correctness protection is not capability restriction.** The application does not create a second authorization system above ADB, Fastboot, Recovery or vendor protocols. This rule is binding on typed UI, raw consoles, Quick Flash, Mi Unlock and future automation; see ADR `0005_PROFESSIONAL_CAPABILITY_POLICY.md`.
+
+There is no Novice/Expert permission profile, unlockable Expert Mode, hidden capability tier, product command allowlist/denylist, or vendor/product whitelist that grants the right to use a valid protocol capability. Progressive disclosure is a UI density choice only. Raw protocol surfaces may expose valid peer capabilities directly and must not be arbitrarily narrower than typed surfaces.
+
+All decisions that can stop or shape an operation belong to exactly one of four classes:
+
+- **Hard invariant** — stop/fail/`Unknown` because protocol/platform correctness cannot be preserved: malformed framing, stale ownership/generation, impossible wire representation, broken exact-byte contract, ambiguous mutation, unsafe cancel/drain state, missing platform permission, or an equivalent technical condition.
+- **Device authority** — send the valid request and surface the actual peer/device result, including `FAIL`, lock/AVB/OEM restrictions, missing ADB authorization, unsupported service, or vendor rejection. Do not pre-empt the peer with a host authorization rule.
+- **Advisory** — warn/preflight and allow the professional operator to continue; never turn uncertainty, a quirk, lock state, low battery or missing optional metadata into a hidden deny.
+- **User intent** — guided UI may request a precise confirmation (including typed confirmation for destructive actions); raw protocol surfaces remain direct. Confirmation expresses intent, not protocol permission.
+
+If mutation may have happened but the final state cannot be proved, the result is `Unknown` and the host must not hide that uncertainty with a silent automatic retry. Any future proposal for a host-side restriction must name the concrete Hard invariant or platform requirement it enforces; "dangerous", "advanced", "locked", "unsupported by our UI", or "not on an allowlist" is not sufficient.
 
 ## ADB handshake evidence rule
 
